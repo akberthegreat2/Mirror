@@ -15,11 +15,17 @@ from mirror_core.exceptions import (
     RegistryError,
     ValidationError,
 )
-from mirror_core.executor import Executor, StepState
+from mirror_core.executor import (
+    ExecutionResult,
+    ExecutionRun,
+    Executor,
+    RunOutcome,
+    StepState,
+)
 from mirror_core.lifecycle import AsyncLifecycle
 from mirror_core.middleware import Middleware, MiddlewareChain
 from mirror_core.pipeline import ErrorPolicy, Pipeline, RetryPolicy, Step
-from mirror_core.planner import ExecutionPlan, Planner
+from mirror_core.planner import CompiledStep, ExecutionPlan, Planner
 from mirror_core.registry import Registry
 from mirror_core.resource import BlobReference, ProducerRef, ResourceEnvelope
 from mirror_core.settings import MirrorSettings
@@ -59,9 +65,13 @@ __all__ = [
     "ErrorPolicy",
     # Planner
     "Planner",
+    "CompiledStep",
     "ExecutionPlan",
     # Executor
     "Executor",
+    "ExecutionRun",
+    "ExecutionResult",
+    "RunOutcome",
     "StepState",
     # Application
     "Application",

@@ -1,14 +1,14 @@
-"""Tests for executor integration with registry, components, and middleware."""
+"""Tests for isolated execution runs and terminal outcomes."""
 
 from unittest.mock import AsyncMock
 
 import pytest
-from mirror_core.executor import Executor, StepState
+from mirror_core.exceptions import ExecutionError
+from mirror_core.executor import Executor, RunOutcome, StepState
 from mirror_core.middleware import MiddlewareChain
 from mirror_core.pipeline import Pipeline, Step
 from mirror_core.planner import Planner
-from mirror_core.registry import CapabilityConfig, Registry
-from mirror_core.resource import ProducerRef, ResourceEnvelope
+from mirror_core.registry import CapabilityConfig, ProviderConfig, Registry
 from pydantic import BaseModel
 
 
@@ -21,258 +21,170 @@ class MockResult(BaseModel):
     status: int = 200
 
 
-async def mock_runner(provider, request, *, signal_bus=None, step_id=None):
-    """Mock runner that calls the provider's fetch method."""
+def make_plan(*steps: Step):
+    registry = Registry()
+    registry.register_capability(
+        CapabilityConfig(
+            name="fetch",
+            api_version="1.2",
+            request_model=MockRequest,
+            result_model=MockResult,
+            output_ports={"result": MockResult},
+        )
+    )
+    registry.register_provider(
+        ProviderConfig(
+            name="httpx",
+            capability="fetch",
+            capability_api="~=1.0",
+            factory="test:provider",
+            metadata={"version": "0.9"},
+        )
+    )
+    pipeline = Pipeline(
+        id="test",
+        steps=list(steps),
+        inputs={"url": "str"},
+    )
+    return Planner(registry, default_providers={"fetch": "httpx"}).plan(pipeline)
+
+
+async def runner(provider, request, *, signal_bus=None, step_id=None):
     return await provider.fetch(request)
 
 
 @pytest.mark.asyncio
-async def test_executor_run_with_runner():
-    """Executor stores result when a runner function is provided."""
-    registry = Registry()
-    registry.register_capability(
-        CapabilityConfig(
-            name="fetch",
-            api_version="1.0",
-            request_model=MockRequest,
-            result_model=MockResult,
+async def test_executor_uses_runtime_inputs_and_accurate_producer() -> None:
+    provider = AsyncMock()
+    provider.fetch = AsyncMock(return_value=MockResult(content="hello"))
+    plan = make_plan(
+        Step(
+            id="fetch_page",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
         )
     )
+    executor = Executor({("fetch", "httpx"): provider})
 
-    mock_provider = AsyncMock()
-    mock_provider.fetch = AsyncMock(return_value=MockResult(content="hello world"))
-
-    executor = Executor(
-        registry=registry,
-        components={"fetch": mock_provider},
-        max_concurrency=5,
-        signal_bus=None,
-        middleware_chain=None,
-    )
-    executor.set_producer(
-        ProducerRef(
-            capability="test",
-            capability_version="1.0",
-            provider="test",
-            provider_version="1.0",
-        )
-    )
-
-    pipeline = Pipeline(
-        id="test",
-        steps=[
-            Step(
-                id="a",
-                capability="fetch",
-                input={"url": "$pipeline.url"},
-                outputs=["result"],
-            )
-        ],
+    result = await executor.execute_run(
+        plan,
         inputs={"url": "https://example.com"},
+        runner=runner,
     )
 
-    planner = Planner(registry)
-    plan = planner.plan(pipeline)
-
-    async def runner(provider, request, signal_bus=None, step_id=None):
-        return await mock_runner(provider, request)
-
-    results = await executor.execute(plan, runner=runner)
-
-    assert "a" in results
-    envelope = results["a"]
-    assert isinstance(envelope, ResourceEnvelope)
-    assert envelope.resource_type == "MockResult"
-    assert envelope.payload == MockResult(content="hello world")
-    assert envelope.producer.capability == "test"
-
-    mock_provider.fetch.assert_called_once()
-    call_args = mock_provider.fetch.call_args[0][0]
-    assert isinstance(call_args, MockRequest)
-    assert call_args.url == "https://example.com"
+    assert result.outcome is RunOutcome.SUCCEEDED
+    envelope = result.results["fetch_page"]
+    assert envelope.producer.capability == "fetch"
+    assert envelope.producer.capability_version == "1.2"
+    assert envelope.producer.provider == "httpx"
+    assert envelope.producer.step_id == "fetch_page"
+    assert envelope.parents == []
+    provider.fetch.assert_awaited_once_with(MockRequest(url="https://example.com"))
 
 
 @pytest.mark.asyncio
-async def test_executor_respects_step_condition():
-    """Step is skipped when condition evaluates to False."""
-    registry = Registry()
-    registry.register_capability(
-        CapabilityConfig(
-            name="fetch",
-            api_version="1.0",
-            request_model=MockRequest,
-            result_model=MockResult,
-        )
+async def test_executor_tracks_only_direct_resource_parents() -> None:
+    provider = AsyncMock()
+    provider.fetch = AsyncMock(side_effect=[MockResult(content="a"), MockResult(content="b")])
+    plan = make_plan(
+        Step(id="a", capability="fetch", input={"url": "$pipeline.url"}, outputs=["result"]),
+        Step(id="b", capability="fetch", input={"url": "a.content"}, outputs=["result"]),
     )
+    executor = Executor({("fetch", "httpx"): provider}, max_concurrency=1)
 
-    executor = Executor(
-        registry=registry,
-        components={"fetch": AsyncMock()},
-        max_concurrency=5,
-    )
-    executor.set_producer(
-        ProducerRef(
-            capability="test",
-            capability_version="1.0",
-            provider="test",
-            provider_version="1.0",
-        )
-    )
+    result = await executor.execute_run(plan, inputs={"url": "https://example.com"}, runner=runner)
 
-    pipeline = Pipeline(
-        id="test",
-        steps=[
-            Step(
-                id="a",
-                capability="fetch",
-                input={"url": "$pipeline.url"},
-                outputs=["result"],
-                condition="false",
-            )
-        ],
-        inputs={"url": "https://example.com"},
-    )
-
-    planner = Planner(registry)
-    plan = planner.plan(pipeline)
-
-    def patched_evaluate_condition(self, condition, inputs, results):
-        return False
-
-    executor._evaluate_condition = patched_evaluate_condition.__get__(executor)
-
-    results = await executor.execute(plan, runner=AsyncMock())
-    assert "a" not in results
-    assert executor._states["a"] == StepState.SKIPPED
+    assert result.results["b"].parents == [result.results["a"].resource_id]
 
 
 @pytest.mark.asyncio
-async def test_executor_with_middleware_chain():
-    """Middleware chain wraps the runner when provided."""
-    registry = Registry()
-    registry.register_capability(
-        CapabilityConfig(
-            name="fetch",
-            api_version="1.0",
-            request_model=MockRequest,
-            result_model=MockResult,
+async def test_executor_condition_can_skip_step() -> None:
+    provider = AsyncMock()
+    plan = make_plan(
+        Step(
+            id="a",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+            condition="false",
         )
     )
+    executor = Executor({("fetch", "httpx"): provider})
 
-    mock_provider = AsyncMock()
-    mock_provider.fetch = AsyncMock(return_value=MockResult(content="ok"))
+    result = await executor.execute_run(plan, inputs={"url": "x"}, runner=runner)
 
-    call_order = []
+    assert result.states["a"] is StepState.SKIPPED
+    assert result.outcome is RunOutcome.SUCCEEDED
+    provider.fetch.assert_not_called()
 
-    class RecordingMiddleware:
+
+@pytest.mark.asyncio
+async def test_executor_abort_is_reported_and_raised() -> None:
+    provider = AsyncMock()
+    provider.fetch = AsyncMock(side_effect=ValueError("network failed"))
+    plan = make_plan(
+        Step(
+            id="a",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+            on_error="abort",
+        ),
+        Step(
+            id="b",
+            capability="fetch",
+            input={"url": "a.content"},
+            outputs=["result"],
+        ),
+    )
+    executor = Executor({("fetch", "httpx"): provider})
+
+    with pytest.raises(ExecutionError, match="network failed"):
+        await executor.execute(plan, inputs={"url": "x"}, runner=runner)
+
+    assert executor.last_run is not None
+    assert executor.last_run.outcome is RunOutcome.FAILED
+    assert executor.last_run.states["a"] is StepState.FAILED
+    assert executor.last_run.states["b"] in {StepState.CANCELLED, StepState.SKIPPED}
+
+
+@pytest.mark.asyncio
+async def test_middleware_can_short_circuit_provider() -> None:
+    provider = AsyncMock()
+
+    class CacheMiddleware:
         async def __call__(self, invocation, next_middleware):
-            call_order.append("before")
-            result = await next_middleware(invocation)
-            call_order.append("after")
-            return result
+            return MockResult(content="cached")
 
-    chain = MiddlewareChain([RecordingMiddleware()])
-
+    plan = make_plan(
+        Step(id="a", capability="fetch", input={"url": "$pipeline.url"}, outputs=["result"])
+    )
     executor = Executor(
-        registry=registry,
-        components={"fetch": mock_provider},
-        max_concurrency=5,
-        middleware_chain=chain,
-    )
-    executor.set_producer(
-        ProducerRef(
-            capability="test",
-            capability_version="1.0",
-            provider="test",
-            provider_version="1.0",
-        )
+        {("fetch", "httpx"): provider},
+        middleware_chain=MiddlewareChain([CacheMiddleware()]),
     )
 
-    pipeline = Pipeline(
-        id="test",
-        steps=[
-            Step(
-                id="a",
-                capability="fetch",
-                input={"url": "$pipeline.url"},
-                outputs=["result"],
-            )
-        ],
-        inputs={"url": "https://example.com"},
-    )
+    result = await executor.execute_run(plan, inputs={"url": "x"}, runner=runner)
 
-    planner = Planner(registry)
-    plan = planner.plan(pipeline)
-
-    async def runner(provider, request, signal_bus=None, step_id=None):
-        return await mock_runner(provider, request)
-
-    results = await executor.execute(plan, runner=runner)
-
-    assert "a" in results
-    assert call_order == ["before", "after"]
+    assert result.results["a"].payload == MockResult(content="cached")
+    provider.fetch.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_executor_error_abort():
-    """Step failure with on_error='abort' cancels the pipeline."""
-    registry = Registry()
-    registry.register_capability(
-        CapabilityConfig(
-            name="fetch",
-            api_version="1.0",
-            request_model=MockRequest,
-            result_model=MockResult,
-        )
+async def test_concurrent_runs_do_not_share_state() -> None:
+    provider = AsyncMock()
+    provider.fetch = AsyncMock(side_effect=lambda request: MockResult(content=request.url))
+    plan = make_plan(
+        Step(id="a", capability="fetch", input={"url": "$pipeline.url"}, outputs=["result"])
+    )
+    executor = Executor({("fetch", "httpx"): provider})
+
+    first, second = await __import__("asyncio").gather(
+        executor.execute_run(plan, inputs={"url": "one"}, runner=runner),
+        executor.execute_run(plan, inputs={"url": "two"}, runner=runner),
     )
 
-    mock_provider = AsyncMock()
-    mock_provider.fetch = AsyncMock(side_effect=ValueError("fail"))
-
-    executor = Executor(
-        registry=registry,
-        components={"fetch": mock_provider},
-        max_concurrency=5,
-    )
-    executor.set_producer(
-        ProducerRef(
-            capability="test",
-            capability_version="1.0",
-            provider="test",
-            provider_version="1.0",
-        )
-    )
-
-    pipeline = Pipeline(
-        id="test",
-        steps=[
-            Step(
-                id="a",
-                capability="fetch",
-                input={"url": "$pipeline.url"},
-                outputs=["result"],
-                on_error="abort",
-            ),
-            Step(
-                id="b",
-                capability="fetch",
-                input={"url": "$pipeline.url"},
-                outputs=["result"],
-            ),
-        ],
-        inputs={"url": "https://example.com"},
-    )
-
-    planner = Planner(registry)
-    plan = planner.plan(pipeline)
-
-    async def runner(provider, request, signal_bus=None, step_id=None):
-        return await mock_runner(provider, request)
-
-    results = await executor.execute(plan, runner=runner)
-
-    assert "a" not in results
-    assert "b" not in results
-    # The failing step should be FAILED, not CANCELLED.
-    assert executor._states["a"] == StepState.FAILED
-    assert executor._cancelled is True
+    assert first.run_id != second.run_id
+    assert first.results["a"].payload.content == "one"
+    assert second.results["a"].payload.content == "two"

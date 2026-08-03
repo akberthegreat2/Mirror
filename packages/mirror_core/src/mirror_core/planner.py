@@ -1,4 +1,4 @@
-"""Pipeline planner: validates graph, detects cycles, topological sort."""
+"""Compile declarative pipelines into immutable execution plans."""
 
 from __future__ import annotations
 
@@ -6,189 +6,276 @@ import hashlib
 from collections import deque
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from mirror_core.exceptions import PlannerError
 from mirror_core.pipeline import Pipeline, Step
+from mirror_core.registry import CapabilityConfig, ProviderConfig, Registry
 
 
-class ExecutionPlan:
-    def __init__(
-        self,
-        pipeline_id: str,
-        steps: list[Step],
-        order: list[str],
-        parallel_groups: list[list[str]],
-        dependencies: dict[str, set[str]],
-        config_fingerprint: str,
-        pipeline_inputs: dict[str, str] | None = None,
-    ):
-        self.pipeline_id = pipeline_id
-        self.steps = {step.id: step for step in steps}
-        self.order = order
-        self.parallel_groups = parallel_groups
-        self.dependencies = dependencies
-        self.config_fingerprint = config_fingerprint
-        self._step_list = steps
-        self.pipeline_inputs = pipeline_inputs or {}
+class CompiledStep(BaseModel):
+    """A step with capability and provider identities resolved at compile time."""
 
-    def get_step(self, step_id: str) -> Step:
-        return self.steps[step_id]
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    definition: Step
+    capability: CapabilityConfig
+    provider: ProviderConfig
+    dependencies: frozenset[str] = Field(default_factory=frozenset)
+
+    @property
+    def id(self) -> str:
+        return self.definition.id
+
+
+class ExecutionPlan(BaseModel):
+    """Immutable plan consumed by the executor."""
+
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    pipeline_id: str
+    steps: dict[str, CompiledStep]
+    order: tuple[str, ...]
+    parallel_groups: tuple[tuple[str, ...], ...]
+    config_fingerprint: str
+    input_names: frozenset[str] = Field(default_factory=frozenset)
+
+    def get_step(self, step_id: str) -> CompiledStep:
+        try:
+            return self.steps[step_id]
+        except KeyError as exc:
+            raise PlannerError(f"Unknown compiled step: {step_id}") from exc
 
     @property
     def step_ids(self) -> list[str]:
-        return self.order
+        return list(self.order)
+
+    @property
+    def dependencies(self) -> dict[str, set[str]]:
+        return {step_id: set(step.dependencies) for step_id, step in self.steps.items()}
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "pipeline_id": self.pipeline_id,
-            "steps": [s.model_dump() for s in self._step_list],
-            "order": self.order,
-            "parallel_groups": self.parallel_groups,
-            "dependencies": {k: list(v) for k, v in self.dependencies.items()},
+            "steps": {
+                step_id: {
+                    "definition": compiled.definition.model_dump(mode="json"),
+                    "capability": compiled.capability.name,
+                    "capability_version": compiled.capability.api_version,
+                    "provider": compiled.provider.name,
+                    "dependencies": sorted(compiled.dependencies),
+                }
+                for step_id, compiled in self.steps.items()
+            },
+            "order": list(self.order),
+            "parallel_groups": [list(group) for group in self.parallel_groups],
             "config_fingerprint": self.config_fingerprint,
+            "input_names": sorted(self.input_names),
         }
 
 
 class Planner:
-    def __init__(self, registry: Any):
+    """Validate a pipeline and resolve all runtime identities exactly once."""
+
+    def __init__(self, registry: Registry, default_providers: dict[str, str] | None = None) -> None:
         self._registry = registry
+        self._default_providers = default_providers or {}
 
     def plan(self, pipeline: Pipeline) -> ExecutionPlan:
-        self._validate_capabilities(pipeline)
-        self._validate_bindings(pipeline)
+        self._validate_unique_step_ids(pipeline)
+        capabilities = self._resolve_capabilities(pipeline)
+        providers = self._resolve_providers(pipeline, capabilities)
+        dependencies, reverse_dependencies = self._build_dependency_graph(pipeline)
+        order = self._topological_sort(pipeline, dependencies, reverse_dependencies)
+        self._validate_bindings(pipeline, capabilities)
 
-        deps, reverse_deps = self._build_dependency_graph(pipeline)
-        self._detect_cycles(pipeline, deps)
+        groups = self._compute_parallel_groups(dependencies, order)
 
-        order = self._topological_sort(pipeline, deps, reverse_deps)
-        parallel_groups = self._compute_parallel_groups(pipeline, deps, order)
-
+        compiled_steps = {
+            step.id: CompiledStep(
+                definition=step,
+                capability=capabilities[step.id],
+                provider=providers[step.id],
+                dependencies=frozenset(dependencies[step.id]),
+            )
+            for step in pipeline.steps
+        }
         fingerprint = hashlib.sha256(pipeline.model_dump_json().encode()).hexdigest()
-
         return ExecutionPlan(
             pipeline_id=pipeline.id,
-            steps=pipeline.steps,
-            order=order,
-            parallel_groups=parallel_groups,
-            dependencies=deps,
+            steps=compiled_steps,
+            order=tuple(order),
+            parallel_groups=tuple(tuple(group) for group in groups),
             config_fingerprint=fingerprint,
-            pipeline_inputs=pipeline.inputs,
+            input_names=frozenset(pipeline.inputs),
         )
 
-    def _validate_capabilities(self, pipeline: Pipeline) -> None:
+    @staticmethod
+    def _validate_unique_step_ids(pipeline: Pipeline) -> None:
+        step_ids = [step.id for step in pipeline.steps]
+        duplicates = sorted({step_id for step_id in step_ids if step_ids.count(step_id) > 1})
+        if duplicates:
+            raise PlannerError(f"Duplicate pipeline step IDs: {', '.join(duplicates)}")
+
+    def _resolve_capabilities(self, pipeline: Pipeline) -> dict[str, CapabilityConfig]:
+        resolved: dict[str, CapabilityConfig] = {}
         for step in pipeline.steps:
             try:
-                version = self._get_latest_capability_version(step.capability)
-                self._registry.get_capability(step.capability, version)
-            except Exception as e:
+                resolved[step.id] = self._registry.resolve_capability(step.capability)
+            except Exception as exc:
                 raise PlannerError(
-                    f"Unknown capability '{step.capability}' in step '{step.id}'",
-                    cause=e,
-                ) from e
+                    f"Unknown capability {step.capability!r} in step {step.id!r}",
+                    cause=exc,
+                ) from exc
+        return resolved
 
-    def _get_latest_capability_version(self, capability_name: str) -> str:
-        """Get the latest registered version for a capability."""
-        all_keys = self._registry.list_capabilities()
-        matching: list[str] = [k for k in all_keys if k.startswith(f"{capability_name}:")]
-        if not matching:
-            raise PlannerError(f"No registered versions found for capability '{capability_name}'")
-        # Sort versions semantically (simple string sort for alpha)
-        matching.sort()
-        # Extract version part: "capability:1.0" -> "1.0"
-        return matching[-1].split(":", 1)[1]
-
-    def _validate_bindings(self, pipeline: Pipeline) -> None:
-        outputs: dict[str, set[str]] = {step.id: set(step.outputs) for step in pipeline.steps}
-        outputs["$pipeline"] = set(pipeline.inputs.keys())
-
+    def _resolve_providers(
+        self,
+        pipeline: Pipeline,
+        capabilities: dict[str, CapabilityConfig],
+    ) -> dict[str, ProviderConfig]:
+        resolved: dict[str, ProviderConfig] = {}
         for step in pipeline.steps:
-            for _, source in step.input.items():
-                if "." in source:
-                    src_step, src_output = source.split(".", 1)
-                    if src_step == "$pipeline":
-                        continue
-                    if src_step not in outputs:
-                        raise PlannerError(f"Step '{step.id}' references unknown step '{src_step}'")
-                    if src_output not in outputs[src_step]:
+            requested = step.provider or self._default_providers.get(step.capability)
+            try:
+                resolved[step.id] = self._registry.resolve_provider(
+                    capabilities[step.id], requested
+                )
+            except Exception as exc:
+                raise PlannerError(
+                    f"Unable to resolve provider for step {step.id!r} " f"({step.capability!r})",
+                    cause=exc,
+                ) from exc
+        return resolved
+
+    def _validate_bindings(
+        self,
+        pipeline: Pipeline,
+        capabilities: dict[str, CapabilityConfig],
+    ) -> None:
+        steps_by_id = {step.id: step for step in pipeline.steps}
+        for step in pipeline.steps:
+            capability = capabilities[step.id]
+            declared_inputs = set(capability.input_ports)
+            if not declared_inputs and capability.request_model is not None:
+                declared_inputs = set(capability.request_model.model_fields)
+
+            for target, source in step.input.items():
+                if declared_inputs and target not in declared_inputs:
+                    raise PlannerError(f"Step {step.id!r} binds undeclared input port {target!r}")
+                source_step, source_output = self._parse_binding(source, step.id)
+                if source_step == "$pipeline":
+                    if source_output not in pipeline.inputs:
                         raise PlannerError(
-                            f"Step '{step.id}' references unknown output '{src_output}' "
-                            f"from step '{src_step}'"
+                            f"Step {step.id!r} references undeclared pipeline input "
+                            f"{source_output!r}"
                         )
+                    continue
+                if source_step not in steps_by_id:
+                    raise PlannerError(f"Step {step.id!r} references unknown step {source_step!r}")
+                source_capability = capabilities[source_step]
+                source_ports = set(source_capability.output_ports)
+                if source_capability.result_model is not None:
+                    source_ports.update(source_capability.result_model.model_fields)
+                if not source_ports:
+                    source_ports = set(steps_by_id[source_step].outputs)
+                if source_output not in source_ports:
+                    raise PlannerError(
+                        f"Step {step.id!r} references unknown output {source_output!r} "
+                        f"from step {source_step!r}"
+                    )
+                self._validate_port_compatibility(
+                    source_step,
+                    source_output,
+                    source_capability,
+                    step.id,
+                    target,
+                    capability,
+                )
+
+    @staticmethod
+    def _parse_binding(source: str, step_id: str) -> tuple[str, str]:
+        if "." not in source:
+            raise PlannerError(
+                f"Step {step_id!r} has invalid binding {source!r}; expected '<step>.<output>'"
+            )
+        return tuple(source.split(".", 1))  # type: ignore[return-value]
+
+    @staticmethod
+    def _validate_port_compatibility(
+        source_step: str,
+        source_output: str,
+        source_capability: CapabilityConfig,
+        target_step: str,
+        target_input: str,
+        target_capability: CapabilityConfig,
+    ) -> None:
+        source_type: Any = source_capability.output_ports.get(source_output)
+        if source_type is None and source_capability.result_model is not None:
+            field = source_capability.result_model.model_fields.get(source_output)
+            source_type = field.annotation if field is not None else None
+        target_type: Any = target_capability.input_ports.get(target_input)
+        if target_type is None and target_capability.request_model is not None:
+            field = target_capability.request_model.model_fields.get(target_input)
+            target_type = field.annotation if field is not None else None
+        if source_type is None or target_type is None or source_type == target_type:
+            return
+        if isinstance(source_type, type) and isinstance(target_type, type):
+            if issubclass(source_type, target_type) or issubclass(target_type, source_type):
+                return
+        source_name = getattr(source_type, "__name__", str(source_type))
+        target_name = getattr(target_type, "__name__", str(target_type))
+        raise PlannerError(
+            f"Incompatible binding {source_step}.{source_output} ({source_name}) "
+            f"-> {target_step}.{target_input} ({target_name})"
+        )
 
     def _build_dependency_graph(
         self, pipeline: Pipeline
     ) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
-        deps: dict[str, set[str]] = {step.id: set() for step in pipeline.steps}
-        reverse_deps: dict[str, set[str]] = {step.id: set() for step in pipeline.steps}
-
+        dependencies = {step.id: set() for step in pipeline.steps}
+        reverse = {step.id: set() for step in pipeline.steps}
         for step in pipeline.steps:
-            for _, source in step.input.items():
-                if "." in source:
-                    src_step, _ = source.split(".", 1)
-                    if src_step == "$pipeline":
-                        continue
-                    deps[step.id].add(src_step)
-                    reverse_deps.setdefault(src_step, set()).add(step.id)
+            for source in step.input.values():
+                source_step, _ = self._parse_binding(source, step.id)
+                if source_step == "$pipeline":
+                    continue
+                dependencies[step.id].add(source_step)
+                reverse[source_step].add(step.id)
+        return dependencies, reverse
 
-        return deps, reverse_deps
-
-    def _detect_cycles(self, pipeline: Pipeline, deps: dict[str, set[str]]) -> None:
-        visited: set[str] = set()
-        stack: set[str] = set()
-
-        def dfs(node: str) -> None:
-            visited.add(node)
-            stack.add(node)
-            for neighbor in deps.get(node, set()):
-                if neighbor not in visited:
-                    dfs(neighbor)
-                elif neighbor in stack:
-                    raise PlannerError(f"Cycle detected: {node} -> {neighbor}")
-            stack.remove(node)
-
-        for step in pipeline.steps:
-            if step.id not in visited:
-                dfs(step.id)
-
+    @staticmethod
     def _topological_sort(
-        self,
         pipeline: Pipeline,
-        deps: dict[str, set[str]],
-        reverse_deps: dict[str, set[str]],
+        dependencies: dict[str, set[str]],
+        reverse_dependencies: dict[str, set[str]],
     ) -> list[str]:
-        in_degree: dict[str, int] = {step.id: len(deps[step.id]) for step in pipeline.steps}
-        queue = deque([node for node in in_degree if in_degree[node] == 0])
-        result: list[str] = []
-
+        in_degree = {step.id: len(dependencies[step.id]) for step in pipeline.steps}
+        queue = deque(step.id for step in pipeline.steps if in_degree[step.id] == 0)
+        order: list[str] = []
         while queue:
             node = queue.popleft()
-            result.append(node)
-            for dependent in reverse_deps.get(node, set()):
+            order.append(node)
+            for dependent in sorted(reverse_dependencies[node]):
                 in_degree[dependent] -= 1
                 if in_degree[dependent] == 0:
                     queue.append(dependent)
-
-        if len(result) != len(in_degree):
+        if len(order) != len(in_degree):
             raise PlannerError("Cycle detected in pipeline graph")
-        return result
+        return order
 
+    @staticmethod
     def _compute_parallel_groups(
-        self,
-        pipeline: Pipeline,
-        deps: dict[str, set[str]],
-        order: list[str],
+        dependencies: dict[str, set[str]], order: list[str]
     ) -> list[list[str]]:
-        groups: list[list[str]] = []
-        remaining = set(order)
-
-        while remaining:
-            group: list[str] = []
-            for node in list(remaining):
-                if all(dep not in remaining for dep in deps.get(node, set())):
-                    group.append(node)
-            if not group:
-                raise PlannerError("Failed to compute parallel groups")
-            for node in group:
-                remaining.remove(node)
-            groups.append(group)
-
-        return groups
+        level: dict[str, int] = {}
+        for step_id in order:
+            level[step_id] = (
+                0
+                if not dependencies[step_id]
+                else 1 + max(level[dependency] for dependency in dependencies[step_id])
+            )
+        groups: dict[int, list[str]] = {}
+        for step_id in order:
+            groups.setdefault(level[step_id], []).append(step_id)
+        return [groups[index] for index in sorted(groups)]

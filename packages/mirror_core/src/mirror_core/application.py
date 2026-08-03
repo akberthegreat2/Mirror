@@ -1,23 +1,24 @@
-"""Application composition root with transactional lifecycle."""
+"""Mirror application composition root and transactional lifecycle."""
 
 from __future__ import annotations
 
 import importlib
 import logging
 import types
-from typing import Any
+from contextlib import AsyncExitStack
+from typing import Any, cast
 
 from pydantic import BaseModel
 
 from mirror_core.discovery import DiscoveryResult, DiscoverySource, discover
-from mirror_core.exceptions import ApplicationError, ExecutionError
-from mirror_core.executor import Executor
+from mirror_core.exceptions import ApplicationError
+from mirror_core.executor import ExecutionResult, Executor
 from mirror_core.lifecycle import AsyncLifecycle
-from mirror_core.middleware import MiddlewareChain
-from mirror_core.pipeline import Pipeline, Step
+from mirror_core.middleware import Middleware, MiddlewareChain
+from mirror_core.pipeline import Pipeline
 from mirror_core.planner import Planner
-from mirror_core.registry import Registry
-from mirror_core.resource import ProducerRef, ResourceEnvelope
+from mirror_core.registry import MiddlewareConfig, Registry
+from mirror_core.resource import ResourceEnvelope
 from mirror_core.settings import MirrorSettings
 from mirror_core.signals import SignalBus
 
@@ -25,18 +26,11 @@ logger = logging.getLogger(__name__)
 
 
 class EmptySettings(BaseModel):
-    """Default empty settings model for providers that don't define one."""
-
-    pass
+    """Settings model used by components with no configuration."""
 
 
 class Application:
-    """Composition root for Mirror.
-
-    Supports both async context manager and explicit start/shutdown.
-    Startup is transactional: if any component fails, all previously
-    initialized components are shut down in reverse order.
-    """
+    """Own and compose one isolated Mirror runtime."""
 
     def __init__(
         self,
@@ -49,11 +43,9 @@ class Application:
         self._registry = Registry()
         self._signal_bus = SignalBus()
         self._executor: Executor | None = None
-        self._components: dict[str, Any] = {}
-        self._initialized: list[str] = []
+        self._components: dict[tuple[str, str], Any] = {}
+        self._lifecycle_stack: AsyncExitStack | None = None
         self._started = False
-        self._shutdown_complete = False
-        self._producer_ref: ProducerRef | None = None
 
     async def __aenter__(self) -> Application:
         await self.start()
@@ -68,215 +60,188 @@ class Application:
         await self.shutdown()
 
     async def start(self) -> None:
-        """Start the application transactionally."""
+        """Discover, validate, instantiate, and start the application atomically."""
         if self._started:
             return
-
+        self._reset_runtime_state()
+        stack = AsyncExitStack()
+        await stack.__aenter__()
         try:
             self._discovery_result = discover(source=self._discovery_source)
             if self._discovery_result.has_errors():
-                raise ApplicationError(f"Discovery errors: {self._discovery_result.errors}")
-
+                raise ApplicationError(
+                    "Extension discovery failed",
+                    details={"errors": self._discovery_result.errors},
+                )
+            if self._discovery_result.has_duplicates():
+                raise ApplicationError(
+                    "Duplicate extension descriptors discovered",
+                    details={"duplicates": self._discovery_result.duplicates},
+                )
             self._register_descriptors()
-
-            # Build middleware chain from discovered middleware configs
-            middleware_chain = self._build_middleware_chain()
-
-            # Initialize components
-            await self._initialize_components()
-
-            # Set producer reference for executor
-            self._producer_ref = ProducerRef(
-                capability="application",
-                capability_version="0.1.0",
-                provider="core",
-                provider_version="0.1.0",
-                config_fingerprint=self.settings.model_dump_json(),
-            )
-
+            self._registry.freeze()
+            middleware_chain = await self._build_middleware_chain(stack)
+            await self._initialize_components(stack)
             self._executor = Executor(
-                registry=self._registry,
                 components=self._components,
-                max_concurrency=10,  # TODO: from settings
+                max_concurrency=self.settings.max_concurrency,
                 signal_bus=self._signal_bus,
                 middleware_chain=middleware_chain,
             )
-            self._executor.set_producer(self._producer_ref)
-
-            await self._emit("application.started")
+            self._lifecycle_stack = stack.pop_all()
             self._started = True
-
-        except Exception as e:
-            await self._rollback_startup(e)
+            await self._emit("application.started", application=self)
+        except Exception:
+            await stack.aclose()
+            self._reset_runtime_state()
             raise
 
-    async def run_pipeline(self, pipeline: Pipeline) -> dict[str, ResourceEnvelope]:
-        """Run a pipeline end-to-end.
+    async def run_pipeline(
+        self,
+        pipeline: Pipeline,
+        *,
+        inputs: dict[str, Any] | None = None,
+    ) -> dict[str, ResourceEnvelope]:
+        """Compile and execute a pipeline using explicit runtime inputs."""
+        result = await self.run_pipeline_detailed(pipeline, inputs=inputs)
+        return result.results
 
-        Args:
-            pipeline: The pipeline definition to execute.
-
-        Returns:
-            dict[str, ResourceEnvelope]: Results for each step.
-        """
-        if not self._started:
+    async def run_pipeline_detailed(
+        self,
+        pipeline: Pipeline,
+        *,
+        inputs: dict[str, Any] | None = None,
+    ) -> ExecutionResult:
+        """Compile and execute a pipeline and return its terminal run state."""
+        if not self._started or self._executor is None:
             raise ApplicationError("Application must be started before running pipelines")
-        if self._executor is None:
-            raise ApplicationError("Executor not initialized")
-
-        planner = Planner(self._registry)
-        plan = planner.plan(pipeline)
-
-        # Define a runner that routes to the correct capability runner
-        # This is a placeholder; we need a registry of capability runners
-        # or we can use the step's runner from the capability config
-        async def step_runner(step: Step, inputs: dict[str, Any]) -> Any:
-            # Look up the capability config
-            cap_config = self._registry.get_capability(step.capability, "1.0")
-            if cap_config.runner is None:
-                raise ExecutionError(f"No runner defined for capability '{step.capability}'")
-            # Import the runner function
-            module_path, _, func_name = cap_config.runner.rpartition(":")
-            module = importlib.import_module(module_path)
-            runner_func = getattr(module, func_name)
-            # The runner expects (provider, request, ...) – we need to construct request from inputs
-            provider = self._components.get(step.capability)
-            if provider is None:
-                raise ExecutionError(f"No provider initialized for '{step.capability}'")
-            # Build request from inputs using the request_model
-            request_model = cap_config.request_model
-            if request_model is None:
-                raise ExecutionError(f"No request_model for '{step.capability}'")
-            request = request_model.model_validate(inputs)
-            return await runner_func(provider, request, signal_bus=self.signal_bus, step_id=step.id)
-
-        return await self._executor.execute(plan, step_runner)
+        defaults = {
+            capability: str(config["provider"])
+            for capability, config in self.settings.components.items()
+            if "provider" in config
+        }
+        plan = Planner(self._registry, default_providers=defaults).plan(pipeline)
+        return await self._executor.execute_run(plan, inputs=inputs or {})
 
     async def shutdown(self) -> None:
-        """Shut down the application gracefully."""
-        if self._shutdown_complete:
+        """Cancel active runs and release every owned resource once."""
+        if not self._started and self._lifecycle_stack is None:
             return
-
-        await self._emit("application.shutting_down")
-
-        if self._executor:
+        await self._emit("application.shutting_down", application=self)
+        if self._executor is not None:
             self._executor.cancel()
-
-        for cap_name in reversed(self._initialized):
-            instance = self._components.get(cap_name)
-            if instance and isinstance(instance, AsyncLifecycle):
-                try:
-                    await instance.teardown()
-                except Exception as e:
-                    logger.error(f"Error during teardown of {cap_name}: {e}")
-            self._components.pop(cap_name, None)
-
-        self._initialized.clear()
+        stack, self._lifecycle_stack = self._lifecycle_stack, None
+        if stack is not None:
+            await stack.aclose()
         self._started = False
-        self._shutdown_complete = True
-        await self._emit("application.shutdown")
-        logger.info("Application shutdown complete")
+        self._executor = None
+        self._components.clear()
+        await self._emit("application.shutdown", application=self)
 
     def _register_descriptors(self) -> None:
-        if not self._discovery_result:
-            raise ApplicationError("Discovery result is empty")
-        for cap in self._discovery_result.capabilities:
-            self._registry.register_capability(cap)
-        for prov in self._discovery_result.providers:
-            self._registry.register_provider(prov)
-        for mw in self._discovery_result.middleware:
-            self._registry.register_middleware(mw)
-        for iface in self._discovery_result.interfaces:
-            self._registry.register_interface(iface)
+        result = self._discovery_result
+        if result is None:
+            raise ApplicationError("Discovery result is unavailable")
+        for capability in result.capabilities:
+            self._registry.register_capability(capability)
+        for provider in result.providers:
+            self._registry.register_provider(provider)
+        for middleware in result.middleware:
+            self._registry.register_middleware(middleware)
+        for interface in result.interfaces:
+            self._registry.register_interface(interface)
 
-    def _build_middleware_chain(self) -> MiddlewareChain | None:
-        """Build middleware chain from registry and settings."""
-        # Get global middleware list
-        global_middleware_names = self.settings.global_middleware
-        if not global_middleware_names:
-            return None
-
-        middlewares = []
-        for name in global_middleware_names:
-            config = self._registry.get_middleware(name)
-            # Import factory
-            import importlib
-
-            module_path, _, class_name = config.factory.rpartition(":")
-            module = importlib.import_module(module_path)
-            factory = getattr(module, class_name)
-            # Instantiate with settings (if any)
-            settings_cls = config.settings_model
-            if settings_cls:
-                if isinstance(settings_cls, str):
-                    mod_path, _, cls_name = settings_cls.rpartition(":")
-                    mod = importlib.import_module(mod_path)
-                    settings_cls = getattr(mod, cls_name)
-                # Get settings from component_settings or defaults
-                # For now, use empty dict
-                instance = factory()
-            else:
-                instance = factory()
-            middlewares.append(instance)
-
-        return MiddlewareChain(middlewares)
-
-    async def _initialize_components(self) -> None:
-        for cap_name, config in self.settings.components.items():
-            provider_name = config.get("provider")
-            if not provider_name:
-                raise ApplicationError(f"No provider selected for {cap_name}")
-
-            provider_config = self._registry.get_provider(cap_name, provider_name)
-
-            # Import factory
-            module_path, _, class_name = provider_config.factory.rpartition(":")
-            module = importlib.import_module(module_path)
-            factory = getattr(module, class_name)
-
-            # Resolve settings model (with fallback)
-            settings_cls = provider_config.settings_model
-
-            if isinstance(settings_cls, str):
-                # Import settings model from string path
-                mod_path, _, cls_name = settings_cls.rpartition(":")
-                mod = importlib.import_module(mod_path)
-                settings_cls = getattr(mod, cls_name)
-
-            # Ensure we have a concrete model class
-            if settings_cls is None:
-                settings_cls = EmptySettings
-            elif not (isinstance(settings_cls, type) and issubclass(settings_cls, BaseModel)):
-                # Fallback if something unexpected
-                settings_cls = EmptySettings
-
-            # Now settings_cls is guaranteed to be a subclass of BaseModel
-            provider_settings = settings_cls.model_validate(
-                self.settings.component_settings.get(cap_name, {}).get(provider_name, {})
+    async def _initialize_components(self, stack: AsyncExitStack) -> None:
+        for capability_name, selection in self.settings.components.items():
+            provider_name = selection.get("provider")
+            if not isinstance(provider_name, str) or not provider_name:
+                raise ApplicationError(f"No provider selected for {capability_name!r}")
+            capability = self._registry.resolve_capability(capability_name)
+            provider = self._registry.resolve_provider(capability, provider_name)
+            factory = self._import_symbol(provider.factory)
+            settings_model = self._resolve_settings_model(provider.settings_model)
+            raw_settings = self.settings.component_settings.get(capability_name, {}).get(
+                provider_name, {}
             )
-
-            instance = factory(provider_settings)
-
+            instance = factory(settings_model.model_validate(raw_settings))
+            if capability.protocol is not None and not isinstance(instance, capability.protocol):
+                raise ApplicationError(
+                    f"Provider {provider.name!r} does not implement capability "
+                    f"protocol {capability.name!r}"
+                )
             if isinstance(instance, AsyncLifecycle):
+                stack.push_async_callback(instance.teardown)
                 await instance.setup()
+            self._components[(capability_name, provider_name)] = instance
 
-            self._components[cap_name] = instance
-            self._initialized.append(cap_name)
-            logger.info(f"Initialized component: {cap_name} (provider: {provider_name})")
+    async def _build_middleware_chain(self, stack: AsyncExitStack) -> MiddlewareChain | None:
+        configs = [self._registry.get_middleware(name) for name in self.settings.global_middleware]
+        ordered = self._order_middleware(configs)
+        instances: list[Middleware] = []
+        for config in ordered:
+            factory = self._import_symbol(config.factory)
+            settings_model = self._resolve_settings_model(config.settings_model)
+            raw_settings = self.settings.middleware_settings.get(config.name, {})
+            instance = factory(settings_model.model_validate(raw_settings))
+            if isinstance(instance, AsyncLifecycle):
+                stack.push_async_callback(instance.teardown)
+                await instance.setup()
+            instances.append(cast(Middleware, instance))
+        return MiddlewareChain(instances) if instances else None
 
-    async def _rollback_startup(self, original_exception: Exception) -> None:
-        if not self._initialized:
-            return
-        logger.warning(f"Rolling back startup after failure: {original_exception}")
-        for cap_name in reversed(self._initialized):
-            instance = self._components.get(cap_name)
-            if instance and isinstance(instance, AsyncLifecycle):
-                try:
-                    await instance.teardown()
-                except Exception as e:
-                    logger.error(f"Error during rollback teardown of {cap_name}: {e}")
-            self._components.pop(cap_name, None)
-        self._initialized.clear()
+    @staticmethod
+    def _order_middleware(configs: list[MiddlewareConfig]) -> list[MiddlewareConfig]:
+        """Topologically order middleware, using priority as a stable tie-breaker."""
+        by_name = {config.name: config for config in configs}
+        dependencies = {config.name: set(config.after) for config in configs}
+        for config in configs:
+            for target in config.before:
+                if target in dependencies:
+                    dependencies[target].add(config.name)
+            unknown = dependencies[config.name].difference(by_name)
+            if unknown:
+                raise ApplicationError(
+                    f"Middleware {config.name!r} references unknown ordering targets: "
+                    f"{', '.join(sorted(unknown))}"
+                )
+        ordered: list[MiddlewareConfig] = []
+        remaining = set(by_name)
+        while remaining:
+            ready = [name for name in remaining if not dependencies[name].intersection(remaining)]
+            if not ready:
+                raise ApplicationError("Middleware ordering constraints contain a cycle")
+            ready.sort(key=lambda name: (-by_name[name].priority, name))
+            for name in ready:
+                ordered.append(by_name[name])
+                remaining.remove(name)
+        return ordered
+
+    @staticmethod
+    def _import_symbol(path: str) -> Any:
+        module_name, separator, symbol_name = path.rpartition(":")
+        if not separator:
+            raise ApplicationError(f"Invalid import path: {path!r}")
+        try:
+            return getattr(importlib.import_module(module_name), symbol_name)
+        except (ImportError, AttributeError) as exc:
+            raise ApplicationError(f"Unable to import {path!r}", cause=exc) from exc
+
+    @classmethod
+    def _resolve_settings_model(cls, value: type[BaseModel] | str | None) -> type[BaseModel]:
+        if value is None:
+            return EmptySettings
+        resolved = cls._import_symbol(value) if isinstance(value, str) else value
+        if not isinstance(resolved, type) or not issubclass(resolved, BaseModel):
+            raise ApplicationError("Component settings model must be a Pydantic model")
+        return resolved
+
+    def _reset_runtime_state(self) -> None:
+        self._registry = Registry()
+        self._signal_bus = SignalBus()
+        self._executor = None
+        self._components = {}
+        self._discovery_result = None
+        self._started = False
 
     async def _emit(self, signal: str, **kwargs: Any) -> None:
         await self._signal_bus.emit(signal, **kwargs)

@@ -31,3 +31,17 @@ def test_from_file():
         s = MirrorSettings.from_file(Path(f.name))
         assert s.application_name == "testapp"
         Path(f.name).unlink()
+
+
+def test_merge_deep_merges_and_preserves_secrets():
+    base = MirrorSettings(
+        components={"fetch": {"provider": "httpx", "enabled": True}},
+        secrets={"token": "secret"},
+    )
+    override = MirrorSettings(components={"fetch": {"provider": "firecrawl"}})
+
+    merged = MirrorSettings.merge(base, override)
+
+    assert merged.components["fetch"] == {"provider": "firecrawl", "enabled": True}
+    assert merged.secrets["token"].get_secret_value() == "secret"
+    assert merged.model_dump()["secrets"]["token"] == "***REDACTED***"

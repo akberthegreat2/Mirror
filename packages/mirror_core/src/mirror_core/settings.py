@@ -1,29 +1,20 @@
-"""Configuration engine with deterministic precedence.
-
-Precedence (later wins):
-    1. Model defaults
-    2. Package defaults (set by individual packages)
-    3. Configuration file (YAML/TOML/JSON)
-    4. Environment variables (MIRROR_*)
-    5. Runtime overrides
-"""
+"""Deterministic, immutable configuration for Mirror applications."""
 
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from mirror_core.exceptions import ConfigurationError
+
 
 class MirrorSettings(BaseSettings):
-    """Root settings for Mirror application.
-
-    Environment variables are read with prefix "MIRROR_".
-    Nested keys use double underscore: MIRROR_COMPONENTS__FETCH__PROVIDER
-    """
+    """Root settings resolved from environment, files, and runtime values."""
 
     model_config = SettingsConfigDict(
         env_prefix="MIRROR_",
@@ -32,100 +23,91 @@ class MirrorSettings(BaseSettings):
         frozen=True,
     )
 
-    # Core application metadata
     application_name: str = "mirror"
     environment: Literal["development", "staging", "production"] = "development"
     debug: bool = False
-
-    # Component selection: capability → provider name
-    components: dict[str, dict[str, Any]] = Field(
-        default_factory=dict,
-        description="Mapping of capability name to provider config",
-    )
-
-    # Component settings: capability → provider → settings dict
-    component_settings: dict[str, dict[str, Any]] = Field(
-        default_factory=dict,
-        description="Provider-specific settings",
-    )
-
-    # Middleware selection: capability → list of middleware names
-    middleware: dict[str, list[str]] = Field(
-        default_factory=dict,
-        description="Per-capability middleware list",
-    )
-
-    # Global middleware applied to all capabilities
-    global_middleware: list[str] = Field(
-        default_factory=list,
-        description="Middleware applied to every capability",
-    )
-
-    # Secrets (redacted from repr/dumps)
-    secrets: dict[str, SecretStr] = Field(
-        default_factory=dict,
-        description="Secrets redacted from logs",
-    )
+    max_concurrency: int = Field(default=10, ge=1)
+    components: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    component_settings: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    middleware: dict[str, list[str]] = Field(default_factory=dict)
+    middleware_settings: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    global_middleware: list[str] = Field(default_factory=list)
+    secrets: dict[str, SecretStr] = Field(default_factory=dict)
 
     @field_validator("secrets", mode="before")
     @classmethod
-    def coerce_secrets(cls, v: Any) -> dict[str, SecretStr]:
-        if v is None:
+    def coerce_secrets(cls, value: Any) -> dict[str, SecretStr]:
+        if value is None:
             return {}
-        if isinstance(v, dict):
-            return {k: SecretStr(str(vv)) for k, vv in v.items()}
-        raise ValueError("secrets must be a dict")
+        if isinstance(value, dict):
+            return {
+                key: secret if isinstance(secret, SecretStr) else SecretStr(str(secret))
+                for key, secret in value.items()
+            }
+        raise ValueError("secrets must be a mapping")
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
-        """Override to redact secrets."""
+        """Serialize settings with secret values redacted."""
         data = super().model_dump(**kwargs)
         if "secrets" in data:
-            data["secrets"] = dict.fromkeys(data["secrets"], "***REDACTED***")
+            data["secrets"] = {key: "***REDACTED***" for key in self.secrets}
         return data
 
     def model_dump_json(self, **kwargs: Any) -> str:
-        """Override to redact secrets in JSON output."""
-        data = self.model_dump(mode="json")
-        if "secrets" in data:
-            data["secrets"] = dict.fromkeys(data["secrets"], "***REDACTED***")
-        return json.dumps(data, **kwargs)
+        """Serialize settings as JSON with secret values redacted."""
+        return json.dumps(self.model_dump(mode="json"), **kwargs)
+
+    def raw_dump(self) -> dict[str, Any]:
+        """Return internal Python values without redacting secrets."""
+        return BaseSettings.model_dump(self, mode="python")
 
     @classmethod
     def from_file(cls, path: Path | str) -> MirrorSettings:
-        """Load settings from YAML, TOML, or JSON file."""
-        import tomllib
-
+        """Load settings from YAML, TOML, or JSON."""
         path = Path(path)
-        with open(path, "rb") as f:
-            if path.suffix in (".yaml", ".yml"):
-                import yaml
-
-                data = yaml.safe_load(f)
+        try:
+            if path.suffix in {".yaml", ".yml"}:
+                try:
+                    import yaml
+                except ImportError as exc:
+                    raise ConfigurationError(
+                        "YAML configuration requires the 'yaml' extra"
+                    ) from exc
+                with path.open("r", encoding="utf-8") as stream:
+                    data = yaml.safe_load(stream) or {}
             elif path.suffix == ".toml":
-                data = tomllib.load(f)
+                import tomllib
+
+                with path.open("rb") as stream:
+                    data = tomllib.load(stream)
             elif path.suffix == ".json":
-                data = json.load(f)
+                with path.open("r", encoding="utf-8") as stream:
+                    data = json.load(stream)
             else:
-                raise ValueError(f"Unsupported file format: {path.suffix}")
+                raise ConfigurationError(f"Unsupported configuration format: {path.suffix}")
+        except OSError as exc:
+            raise ConfigurationError(f"Unable to read configuration file: {path}") from exc
         return cls.model_validate(data)
 
     @classmethod
     def from_env(cls) -> MirrorSettings:
-        """Load from environment variables only (no file)."""
+        """Resolve settings from model defaults and environment variables."""
         return cls()
 
     @classmethod
     def merge(cls, *overrides: MirrorSettings) -> MirrorSettings:
-        """Merge multiple settings instances (later wins).
-
-        Preserves secrets: uses raw model_dump(mode='python') to keep SecretStr objects.
-        """
+        """Deep-merge settings instances with later values taking precedence."""
         merged: dict[str, Any] = {}
-
         for settings in overrides:
-            # Use mode='python' to preserve SecretStr objects (not redacted)
-            raw = settings.model_dump(mode="python")
-            # Deep merge (simple dict update for now)
-            merged.update(raw)
-
+            merged = _deep_merge(merged, settings.raw_dump())
         return cls.model_validate(merged)
+
+
+def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    result = deepcopy(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(result.get(key), dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = deepcopy(value)
+    return result
