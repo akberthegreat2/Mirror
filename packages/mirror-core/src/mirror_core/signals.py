@@ -6,10 +6,11 @@ Telemetry receiver failure must not silently fail a pipeline unless configured a
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 import logging
-from typing import Any, Callable, Coroutine, TypeVar
+from collections.abc import Callable, Coroutine
+from contextlib import suppress
+from typing import Any, TypeVar
 
 from mirror_core.exceptions import MirrorError
 
@@ -35,10 +36,8 @@ class SignalBus:
     def unsubscribe(self, signal_name: str, handler: SignalHandler) -> None:
         """Unsubscribe a handler from a signal."""
         if signal_name in self._receivers:
-            try:
+            with suppress(ValueError):
                 self._receivers[signal_name].remove(handler)
-            except ValueError:
-                pass
 
     async def emit(self, signal_name: str, *args: Any, **kwargs: Any) -> None:
         """Emit a signal, calling all subscribed handlers.

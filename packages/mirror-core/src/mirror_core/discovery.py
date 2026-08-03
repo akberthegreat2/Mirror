@@ -7,15 +7,16 @@ Descriptors are metadata objects, not instantiated components.
 from __future__ import annotations
 
 import importlib.metadata
-from typing import Any, Callable, Protocol
+from collections.abc import Callable
+from typing import Any, Protocol
 
 from mirror_core.exceptions import DiscoveryError
 from mirror_core.registry import (
     CapabilityConfig,
-    ProviderConfig,
-    MiddlewareConfig,
-    InterfaceConfig,
     ExtensionDescriptor,
+    InterfaceConfig,
+    MiddlewareConfig,
+    ProviderConfig,
 )
 
 
@@ -117,7 +118,7 @@ def discover(
     try:
         entries = source.iter_entry_points(group)
     except Exception as e:
-        raise DiscoveryError(f"Failed to read entry points: {e}", cause=e)
+        raise DiscoveryError(f"Failed to read entry points: {e}", cause=e) from e
 
     for name, loader in entries:
         try:

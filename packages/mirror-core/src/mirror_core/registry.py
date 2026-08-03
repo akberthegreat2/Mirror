@@ -12,7 +12,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from mirror_core.exceptions import RegistryError
 
-
 # Descriptor Models (immutable)
 
 

@@ -1,0 +1,36 @@
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        pass_filenames: false
+        args:
+          - --strict
+          - --explicit-package-bases
+          - packages/mirror-core/src
+          - packages/mirror-cli/src
+          - packages/mirror-fetch/src
+          - packages/mirror-fetch-httpx/src
+          - packages/mirror-testing/src
+        additional_dependencies:
+          - pydantic
+          - types-pyyaml
+          - pydantic-settings

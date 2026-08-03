@@ -8,13 +8,13 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable, Coroutine
 from enum import Enum
-from typing import Any, Callable, Coroutine, Optional
+from typing import Any
 
 from mirror_core.exceptions import ExecutionError
 from mirror_core.pipeline import Step
 from mirror_core.planner import ExecutionPlan
-from mirror_core.resource import ResourceEnvelope
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class Executor:
     def __init__(
         self,
         max_concurrency: int = 10,
-        signal_bus: Optional[Any] = None,
+        signal_bus: Any | None = None,
     ):
         self.max_concurrency = max_concurrency
         self.signal_bus = signal_bus
@@ -74,8 +74,7 @@ class Executor:
             ready_steps = [
                 step_id
                 for step_id in group
-                if self._states[step_id] == StepState.PENDING
-                and self._can_run(step_id, plan)
+                if self._states[step_id] == StepState.PENDING and self._can_run(step_id, plan)
             ]
 
             if not ready_steps:
@@ -109,11 +108,12 @@ class Executor:
             inputs = self._resolve_inputs(step, plan)
 
             # Check condition
-            if step.condition:
-                if not self._evaluate_condition(step.condition, inputs, self._results):
-                    self._states[step_id] = StepState.SKIPPED
-                    await self._emit("step.skipped", step=step)
-                    return
+            if step.condition and not self._evaluate_condition(
+                step.condition, inputs, self._results
+            ):
+                self._states[step_id] = StepState.SKIPPED
+                await self._emit("step.skipped", step=step)
+                return
 
             try:
                 result = await self._run_with_retry(step, inputs, runner)
@@ -126,7 +126,7 @@ class Executor:
                 await self._emit("step.failed", step=step, error=str(e))
                 if step.on_error == "abort":
                     self._cancelled = True
-                    raise ExecutionError(f"Step {step_id} failed: {e}", cause=e)
+                    raise ExecutionError(f"Step {step.id} failed", cause=e) from e
 
     def _resolve_inputs(self, step: Step, plan: ExecutionPlan) -> dict[str, Any]:
         """Resolve step inputs from previous results."""
@@ -206,9 +206,10 @@ class Executor:
 
         if jitter > 0:
             import random
+
             wait += random.uniform(0, jitter)
 
-        return min(wait, 60.0)  # cap at 60 seconds
+        return min(wait, 60.0)  # type: ignore[no-any-return]
 
     async def _emit(self, signal: str, **kwargs: Any) -> None:
         """Emit a signal if bus is available."""

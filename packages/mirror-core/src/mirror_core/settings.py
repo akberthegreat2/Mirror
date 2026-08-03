@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,7 +27,6 @@ class MirrorSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="MIRROR_",
         env_nested_delimiter="__",
-        env_nested_max_depth=3,
         extra="ignore",
         frozen=True,
     )
@@ -85,19 +84,20 @@ class MirrorSettings(BaseSettings):
 
     def model_dump_json(self, **kwargs: Any) -> str:
         """Override to redact secrets in JSON output."""
-        data = self.model_dump()
         return super().model_dump_json(**kwargs)
 
     @classmethod
     def from_file(cls, path: Path | str) -> MirrorSettings:
         """Load settings from YAML, TOML, or JSON file."""
         import json
+
         import tomllib
 
         path = Path(path)
         with open(path, "rb") as f:
             if path.suffix in (".yaml", ".yml"):
                 import yaml
+
                 data = yaml.safe_load(f)
             elif path.suffix == ".toml":
                 data = tomllib.load(f)

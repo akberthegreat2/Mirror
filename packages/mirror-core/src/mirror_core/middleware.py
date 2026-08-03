@@ -6,12 +6,10 @@ request, result, or exception.
 
 from __future__ import annotations
 
-from typing import Any, Callable, Awaitable, Protocol, TypeVar
+from collections.abc import Awaitable, Callable
+from typing import Any, Protocol
 
-T = TypeVar("T")
 Invocation = dict[str, Any]  # typed dict with request, context, metadata
-
-MiddlewareHandler = Callable[["Middleware", Invocation], Awaitable[Any]]
 NextMiddleware = Callable[[Invocation], Awaitable[Any]]
 
 
@@ -60,5 +58,14 @@ class MiddlewareChain:
         for middleware in reversed(self._middlewares):
             current = middleware
             next_chain = chain
-            chain = lambda inv, m=current, n=next_chain: m(inv, n)  # noqa: E731
+
+            # Bind current and next_chain at definition time
+            async def wrapper(
+                invocation: Invocation,
+                m: Middleware = current,
+                n: NextMiddleware = next_chain,
+            ) -> Any:
+                return await m(invocation, n)
+
+            chain = wrapper
         return chain

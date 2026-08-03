@@ -81,11 +81,8 @@ class Planner:
 
         # Generate fingerprint from pipeline definition
         import hashlib
-        import json
 
-        fingerprint = hashlib.sha256(
-            pipeline.model_dump_json().encode()
-        ).hexdigest()
+        fingerprint = hashlib.sha256(pipeline.model_dump_json().encode()).hexdigest()
 
         return ExecutionPlan(
             pipeline_id=pipeline.id,
@@ -105,7 +102,7 @@ class Planner:
                 raise PlannerError(
                     f"Unknown capability '{step.capability}' in step '{step.id}'",
                     cause=e,
-                )
+                ) from e
 
     def _validate_bindings(self, pipeline: Pipeline) -> None:
         """Check that all input bindings resolve to existing outputs."""
@@ -119,13 +116,11 @@ class Planner:
             outputs["$pipeline"] = outputs.get("$pipeline", set()) | {input_name}
 
         for step in pipeline.steps:
-            for target, source in step.input.items():
+            for _, source in step.input.items():
                 if "." in source:
                     src_step, src_output = source.split(".", 1)
                     if src_step not in outputs:
-                        raise PlannerError(
-                            f"Step '{step.id}' references unknown step '{src_step}'"
-                        )
+                        raise PlannerError(f"Step '{step.id}' references unknown step '{src_step}'")
                     if src_output not in outputs[src_step]:
                         raise PlannerError(
                             f"Step '{step.id}' references unknown output '{src_output}' "
@@ -134,18 +129,14 @@ class Planner:
                 else:
                     # Assume it's a pipeline input
                     if source not in pipeline.inputs:
-                        raise PlannerError(
-                            f"Step '{step.id}' references unknown input '{source}'"
-                        )
+                        raise PlannerError(f"Step '{step.id}' references unknown input '{source}'")
 
-    def _build_dependency_graph(
-        self, pipeline: Pipeline
-    ) -> dict[str, set[str]]:
+    def _build_dependency_graph(self, pipeline: Pipeline) -> dict[str, set[str]]:
         """Build dependency graph from step inputs."""
         deps: dict[str, set[str]] = {step.id: set() for step in pipeline.steps}
 
         for step in pipeline.steps:
-            for target, source in step.input.items():
+            for _, source in step.input.items():
                 if "." in source:
                     src_step, _ = source.split(".", 1)
                     deps[step.id].add(src_step)
@@ -171,12 +162,10 @@ class Planner:
             if step.id not in visited:
                 dfs(step.id)
 
-    def _topological_sort(
-        self, pipeline: Pipeline, deps: dict[str, set[str]]
-    ) -> list[str]:
+    def _topological_sort(self, pipeline: Pipeline, deps: dict[str, set[str]]) -> list[str]:
         """Kahn's algorithm for topological sort."""
         in_degree: dict[str, int] = {step.id: 0 for step in pipeline.steps}
-        for node, neighbors in deps.items():
+        for _, neighbors in deps.items():
             for neighbor in neighbors:
                 in_degree[neighbor] = in_degree.get(neighbor, 0) + 1
 

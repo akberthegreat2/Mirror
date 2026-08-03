@@ -69,9 +69,7 @@ class ResourceEnvelope(BaseModel):
             "payload": payload.model_dump(mode="json"),
             "metadata": metadata or {},
         }
-        fingerprint = hashlib.sha256(
-            json.dumps(data, sort_keys=True).encode()
-        ).hexdigest()
+        fingerprint = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
         return cls(
             resource_type=resource_type,

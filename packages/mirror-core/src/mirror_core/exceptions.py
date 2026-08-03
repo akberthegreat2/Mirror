@@ -5,7 +5,7 @@ Core defines only generic exceptions. Capability-specific errors
 packages and inherit from MirrorError.
 """
 
-from typing import Any, Optional
+from typing import Any
 
 
 class MirrorError(Exception):
@@ -14,8 +14,8 @@ class MirrorError(Exception):
     def __init__(
         self,
         message: str,
-        details: Optional[dict[str, Any]] = None,
-        cause: Optional[Exception] = None,
+        details: dict[str, Any] | None = None,
+        cause: Exception | None = None,
     ) -> None:
         self.message = message
         self.details = details or {}
@@ -31,6 +31,10 @@ class ConfigurationError(MirrorError):
 
 class LifecycleError(MirrorError):
     """Raised when component setup or teardown fails."""
+
+
+class ApplicationError(MirrorError):
+    """Raised when application startup or shutdown fails."""
 
 
 class DiscoveryError(MirrorError):
