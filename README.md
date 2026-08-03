@@ -11,7 +11,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the full specification.
 pip install -e .[dev]
 
 # Install packages individually
-pip install -e packages/mirror-core
+pip install -e packages/mirror_core
 pip install -e packages/mirror-fetch
 pip install -e packages/mirror-fetch-httpx
 

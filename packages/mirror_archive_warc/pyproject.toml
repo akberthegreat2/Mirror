@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirror_archive-warc"
+version = "0.1.0"
+description = "WARC provider for Mirror Archive capability"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Mirror Contributors"}]
+requires-python = ">=3.10"
+dependencies = [
+    "mirror_core>=0.1.0",
+    "mirror_archive>=0.1.0",
+    "warcio>=1.7",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "pytest-asyncio>=0.21"]
+dev = ["ruff", "mypy"]
+
+[project.entry-points."mirror"]
+warc = "mirror_archive_warc:provider"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mirror_archive_warc*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+asyncio_mode = "auto"

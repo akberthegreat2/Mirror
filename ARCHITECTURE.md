@@ -20,7 +20,7 @@ Users build applications by composing capabilities, not by customizing a monolit
 
 | Principle | Meaning |
 |-----------|---------|
-| **Core knows nothing** | `mirror-core` has no knowledge of HTTP, HTML, archives, or any domain. It imports no capability package. |
+| **Core knows nothing** | `mirror_core` has no knowledge of HTTP, HTML, archives, or any domain. It imports no capability package. |
 | **Discovery, not hardcoding** | All extensions are discovered via entry points. No hardcoded lists of capabilities, providers, or commands. |
 | **Installed ≠ Activated** | Installing a package does not activate it. Settings decide which components are active. |
 | **Typed boundaries** | All data passing between components is typed (Pydantic models). No dictionaries. |
@@ -36,7 +36,7 @@ Users build applications by composing capabilities, not by customizing a monolit
 
 ```
 packages/
-├── mirror-core/            # Chassis. Zero domain knowledge.
+├── mirror_core/            # Chassis. Zero domain knowledge.
 ├── mirror-fetch/           # Capability: retrieve web resources.
 ├── mirror-fetch-httpx/     # Provider: HTTPX implementation.
 ├── mirror-fetch-firecrawl/ # Provider: Firecrawl implementation.
@@ -52,10 +52,10 @@ packages/
 ### Dependency Rules
 
 ```
-capability ──> mirror-core
+capability ──> mirror_core
 provider ──> capability
-provider ──> mirror-core
-interface ──> mirror-core
+provider ──> mirror_core
+interface ──> mirror_core
 interface ──> capability (optional, for dynamic generation)
 ```
 
@@ -63,7 +63,7 @@ interface ──> capability (optional, for dynamic generation)
 
 ---
 
-## 4. Core Subsystems (`mirror-core`)
+## 4. Core Subsystems (`mirror_core`)
 
 | Subsystem | Responsibility |
 |-----------|----------------|
@@ -338,7 +338,7 @@ Capability-specific errors (`FetchError`, `ArchiveError`) are defined in their r
 
 | Step | Action |
 |------|--------|
-| 1 | Create `mirror-core` with all engine subsystems. |
+| 1 | Create `mirror_core` with all engine subsystems. |
 | 2 | Port `mirror-fetch` capability (protocol, models, runner, signals, contract tests). |
 | 3 | Port `mirror-fetch-httpx` provider. |
 | 4 | Port `mirror-cli` interface (dynamic command discovery). |

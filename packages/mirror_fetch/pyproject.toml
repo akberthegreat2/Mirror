@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirror_fetch"
+version = "0.1.0"
+description = "Mirror Fetch capability – retrieve web resources"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Mirror Contributors"}]
+requires-python = ">=3.10"
+dependencies = [
+    "mirror_core>=0.1.0",
+    "pydantic>=2.0",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "pytest-asyncio>=0.21", "pytest-cov>=4.0"]
+dev = ["ruff", "mypy"]
+
+[project.entry-points."mirror"]
+fetch = "mirror_fetch:capability"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mirror_fetch*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+asyncio_mode = "auto"

@@ -25,11 +25,11 @@ repos:
         args:
           - --strict
           - --explicit-package-bases
-          - packages/mirror-core/src
-          - packages/mirror-cli/src
-          - packages/mirror-fetch/src
-          - packages/mirror-fetch-httpx/src
-          - packages/mirror-testing/src
+          - packages/mirror_core/src
+          - packages/mirror_cli/src
+          - packages/mirror_fetch/src
+          - packages/mirror_fetch_httpx/src
+          - packages/mirror_testing/src
         additional_dependencies:
           - pydantic
           - types-pyyaml
