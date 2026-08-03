@@ -5,21 +5,32 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mirror-testing"
 version = "0.1.0"
-description = "Shared contract-testing utilities for Mirror"
+description = "Contract‑testing utilities for Mirror providers"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Mirror Contributors"}]
 requires-python = ">=3.10"
 dependencies = [
     "mirror-core>=0.1.0",
-    "pytest>=7.0",
-    "pytest-asyncio>=0.21",
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
 ]
+
+[project.optional-dependencies]
+dev = ["ruff", "mypy"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["mirror_testing*"]
 namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+asyncio_mode = "auto"
