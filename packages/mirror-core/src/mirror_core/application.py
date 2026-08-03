@@ -1,13 +1,10 @@
-"""Application composition root with transactional lifecycle.
-
-Application owns discovery, registry, settings, signals, middleware,
-and execution engine. Startup is transactional: if any component fails,
-all previously initialized components are shut down in reverse order.
-"""
+"""Application composition root with transactional lifecycle."""
 
 from __future__ import annotations
 
+import importlib
 import logging
+import types
 from typing import Any
 
 from pydantic import BaseModel
@@ -16,7 +13,9 @@ from mirror_core.discovery import DiscoveryResult, DiscoverySource, discover
 from mirror_core.exceptions import ApplicationError
 from mirror_core.executor import Executor
 from mirror_core.lifecycle import AsyncLifecycle
+from mirror_core.middleware import MiddlewareChain
 from mirror_core.registry import Registry
+from mirror_core.resource import ProducerRef
 from mirror_core.settings import MirrorSettings
 from mirror_core.signals import SignalBus
 
@@ -32,11 +31,9 @@ class EmptySettings(BaseModel):
 class Application:
     """Composition root for Mirror.
 
-    Owns discovery, registry, settings, signals, middleware,
-    and execution engine.
-
-    Startup is transactional: if any component fails to initialize,
-    all previously initialized components are torn down in reverse order.
+    Supports both async context manager and explicit start/shutdown.
+    Startup is transactional: if any component fails, all previously
+    initialized components are shut down in reverse order.
     """
 
     def __init__(
@@ -50,37 +47,57 @@ class Application:
         self._registry = Registry()
         self._signal_bus = SignalBus()
         self._executor: Executor | None = None
-        self._components: dict[str, Any] = {}  # name → component instance
-        self._initialized: list[str] = []  # order of initialization
+        self._components: dict[str, Any] = {}
+        self._initialized: list[str] = []
         self._started = False
         self._shutdown_complete = False
+        self._producer_ref: ProducerRef | None = None
+
+    async def __aenter__(self) -> Application:
+        await self.start()
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
+    ) -> None:
+        await self.shutdown()
 
     async def start(self) -> None:
-        """Start the application transactionally.
-
-        Discovers extensions, resolves configured providers, and initializes them.
-        If any component fails, all previously initialized components are torn down.
-        """
+        """Start the application transactionally."""
         if self._started:
             return
 
         try:
-            # 1. Discover extensions
             self._discovery_result = discover(source=self._discovery_source)
             if self._discovery_result.has_errors():
                 raise ApplicationError(f"Discovery errors: {self._discovery_result.errors}")
 
-            # 2. Register descriptors
             self._register_descriptors()
 
-            # 3. Resolve and initialize components
+            # Build middleware chain from discovered middleware configs
+            middleware_chain = self._build_middleware_chain()
+
+            # Initialize components
             await self._initialize_components()
 
-            # 4. Initialize executor
+            # Set producer reference for executor
+            self._producer_ref = ProducerRef(
+                capability="application",
+                capability_version="0.1.0",
+                provider="core",
+                provider_version="0.1.0",
+                config_fingerprint=self.settings.model_dump_json(),
+            )
+
             self._executor = Executor(
                 max_concurrency=10,  # TODO: from settings
                 signal_bus=self._signal_bus,
+                middleware_chain=middleware_chain,
             )
+            self._executor.set_producer(self._producer_ref)
 
             await self._emit("application.started")
             self._started = True
@@ -89,105 +106,16 @@ class Application:
             await self._rollback_startup(e)
             raise
 
-    def _register_descriptors(self) -> None:
-        """Register all discovered descriptors."""
-        if not self._discovery_result:
-            raise ApplicationError("Discovery result is empty")
-
-        for cap in self._discovery_result.capabilities:
-            self._registry.register_capability(cap)
-
-        for prov in self._discovery_result.providers:
-            self._registry.register_provider(prov)
-
-        for mw in self._discovery_result.middleware:
-            self._registry.register_middleware(mw)
-
-        for iface in self._discovery_result.interfaces:
-            self._registry.register_interface(iface)
-
-    async def _initialize_components(self) -> None:
-        """Initialize all components from settings."""
-        for cap_name, config in self.settings.components.items():
-            provider_name = config.get("provider")
-            if not provider_name:
-                raise ApplicationError(f"No provider selected for {cap_name}")
-
-            # Get provider descriptor
-            provider_config = self._registry.get_provider(cap_name, provider_name)
-
-            # Import factory
-            import importlib
-
-            module_path, _, class_name = provider_config.factory.rpartition(":")
-            module = importlib.import_module(module_path)
-            factory = getattr(module, class_name)
-
-            # Instantiate with settings
-            settings_cls = provider_config.settings_model
-            if isinstance(settings_cls, str):
-                # Import settings model from string path
-                mod_path, _, cls_name = settings_cls.rpartition(":")
-                import importlib
-
-                mod = importlib.import_module(mod_path)
-                settings_cls = getattr(mod, cls_name)
-
-            # Ensure we have a concrete model class
-            if settings_cls is None:
-                settings_cls = EmptySettings
-            elif not (isinstance(settings_cls, type) and issubclass(settings_cls, BaseModel)):
-                # Fallback – should not happen, but keep type safe
-                settings_cls = EmptySettings
-
-            # Now settings_cls is guaranteed to be a subclass of BaseModel
-            provider_settings = settings_cls.model_validate(
-                self.settings.component_settings.get(cap_name, {}).get(provider_name, {})
-            )
-
-            instance = factory(provider_settings)
-
-            # Initialize lifecycle
-            if isinstance(instance, AsyncLifecycle):
-                await instance.setup()
-
-            self._components[cap_name] = instance
-            self._initialized.append(cap_name)
-            logger.info(f"Initialized component: {cap_name} (provider: {provider_name})")
-
-    async def _rollback_startup(self, original_exception: Exception) -> None:
-        """Rollback initialized components in reverse order."""
-        if not self._initialized:
-            return
-
-        logger.warning(f"Rolling back startup after failure: {original_exception}")
-
-        for cap_name in reversed(self._initialized):
-            instance = self._components.get(cap_name)
-            if instance and isinstance(instance, AsyncLifecycle):
-                try:
-                    await instance.teardown()
-                except Exception as e:
-                    logger.error(f"Error during rollback teardown of {cap_name}: {e}")
-            self._components.pop(cap_name, None)
-
-        self._initialized.clear()
-
     async def shutdown(self) -> None:
-        """Shut down the application gracefully.
-
-        Shutdown reverses initialization order. Idempotent.
-        """
+        """Shut down the application gracefully."""
         if self._shutdown_complete:
             return
 
         await self._emit("application.shutting_down")
 
-        # Shutdown executor
         if self._executor:
             self._executor.cancel()
 
-        # Reverse order teardown
         for cap_name in reversed(self._initialized):
             instance = self._components.get(cap_name)
             if instance and isinstance(instance, AsyncLifecycle):
@@ -200,12 +128,85 @@ class Application:
         self._initialized.clear()
         self._started = False
         self._shutdown_complete = True
-
         await self._emit("application.shutdown")
         logger.info("Application shutdown complete")
 
+    def _register_descriptors(self) -> None:
+        if not self._discovery_result:
+            raise ApplicationError("Discovery result is empty")
+        for cap in self._discovery_result.capabilities:
+            self._registry.register_capability(cap)
+        for prov in self._discovery_result.providers:
+            self._registry.register_provider(prov)
+        for mw in self._discovery_result.middleware:
+            self._registry.register_middleware(mw)
+        for iface in self._discovery_result.interfaces:
+            self._registry.register_interface(iface)
+
+    def _build_middleware_chain(self) -> MiddlewareChain | None:
+        """Build middleware chain from registry and settings."""
+        # For now, return None – middleware integration is future work.
+        # In future, we'll instantiate middleware factories.
+        return None
+
+    async def _initialize_components(self) -> None:
+        for cap_name, config in self.settings.components.items():
+            provider_name = config.get("provider")
+            if not provider_name:
+                raise ApplicationError(f"No provider selected for {cap_name}")
+
+            provider_config = self._registry.get_provider(cap_name, provider_name)
+
+            # Import factory
+            module_path, _, class_name = provider_config.factory.rpartition(":")
+            module = importlib.import_module(module_path)
+            factory = getattr(module, class_name)
+
+            # Resolve settings model (with fallback)
+            settings_cls = provider_config.settings_model
+
+            if isinstance(settings_cls, str):
+                # Import settings model from string path
+                mod_path, _, cls_name = settings_cls.rpartition(":")
+                mod = importlib.import_module(mod_path)
+                settings_cls = getattr(mod, cls_name)
+
+            # Ensure we have a concrete model class
+            if settings_cls is None:
+                settings_cls = EmptySettings
+            elif not (isinstance(settings_cls, type) and issubclass(settings_cls, BaseModel)):
+                # Fallback if something unexpected
+                settings_cls = EmptySettings
+
+            # Now settings_cls is guaranteed to be a subclass of BaseModel
+            provider_settings = settings_cls.model_validate(
+                self.settings.component_settings.get(cap_name, {}).get(provider_name, {})
+            )
+
+            instance = factory(provider_settings)
+
+            if isinstance(instance, AsyncLifecycle):
+                await instance.setup()
+
+            self._components[cap_name] = instance
+            self._initialized.append(cap_name)
+            logger.info(f"Initialized component: {cap_name} (provider: {provider_name})")
+
+    async def _rollback_startup(self, original_exception: Exception) -> None:
+        if not self._initialized:
+            return
+        logger.warning(f"Rolling back startup after failure: {original_exception}")
+        for cap_name in reversed(self._initialized):
+            instance = self._components.get(cap_name)
+            if instance and isinstance(instance, AsyncLifecycle):
+                try:
+                    await instance.teardown()
+                except Exception as e:
+                    logger.error(f"Error during rollback teardown of {cap_name}: {e}")
+            self._components.pop(cap_name, None)
+        self._initialized.clear()
+
     async def _emit(self, signal: str, **kwargs: Any) -> None:
-        """Emit a signal if bus is available."""
         await self._signal_bus.emit(signal, **kwargs)
 
     @property

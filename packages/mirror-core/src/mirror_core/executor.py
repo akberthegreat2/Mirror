@@ -12,9 +12,13 @@ from collections.abc import Callable, Coroutine
 from enum import Enum
 from typing import Any
 
+from pydantic import BaseModel
+
 from mirror_core.exceptions import ExecutionError
+from mirror_core.middleware import MiddlewareChain
 from mirror_core.pipeline import Step
 from mirror_core.planner import ExecutionPlan
+from mirror_core.resource import ProducerRef, ResourceEnvelope
 
 logger = logging.getLogger(__name__)
 
@@ -37,19 +41,26 @@ class Executor:
         self,
         max_concurrency: int = 10,
         signal_bus: Any | None = None,
+        middleware_chain: MiddlewareChain | None = None,
     ):
         self.max_concurrency = max_concurrency
         self.signal_bus = signal_bus
+        self.middleware_chain = middleware_chain
         self._semaphore = asyncio.Semaphore(max_concurrency)
-        self._results: dict[str, Any] = {}
+        self._results: dict[str, ResourceEnvelope] = {}
         self._states: dict[str, StepState] = {}
         self._cancelled = False
+        self._producer_ref: ProducerRef | None = None
+
+    def set_producer(self, producer: ProducerRef) -> None:
+        """Set the producer reference for wrapping results."""
+        self._producer_ref = producer
 
     async def execute(
         self,
         plan: ExecutionPlan,
         runner: Callable[[Step, dict[str, Any]], Coroutine[Any, Any, Any]],
-    ) -> dict[str, Any]:
+    ) -> dict[str, ResourceEnvelope]:
         """Execute the plan.
 
         Args:
@@ -57,7 +68,7 @@ class Executor:
             runner: Function that executes a step given inputs.
 
         Returns:
-            dict mapping step_id to result.
+            dict mapping step_id to ResourceEnvelope.
         """
         self._results = {}
         self._states = {step_id: StepState.PENDING for step_id in plan.step_ids}
@@ -65,12 +76,10 @@ class Executor:
 
         await self._emit("pipeline.started", plan=plan)
 
-        # Process nodes in parallel groups
         for group in plan.parallel_groups:
             if self._cancelled:
                 break
 
-            # Check if group can run (all dependencies satisfied)
             ready_steps = [
                 step_id
                 for step_id in group
@@ -80,12 +89,10 @@ class Executor:
             if not ready_steps:
                 continue
 
-            # Run group in parallel
             tasks = [self._run_step(step_id, plan, runner) for step_id in ready_steps]
             await asyncio.gather(*tasks, return_exceptions=True)
 
         await self._emit("pipeline.finished", plan=plan, results=self._results)
-
         return self._results
 
     async def _run_step(
@@ -104,10 +111,8 @@ class Executor:
             self._states[step_id] = StepState.RUNNING
             await self._emit("step.started", step=step)
 
-            # Build inputs from dependencies
             inputs = self._resolve_inputs(step, plan)
 
-            # Check condition
             if step.condition and not self._evaluate_condition(
                 step.condition, inputs, self._results
             ):
@@ -116,17 +121,60 @@ class Executor:
                 return
 
             try:
-                result = await self._run_with_retry(step, inputs, runner)
-                self._results[step_id] = result
+                # Wrap execution with middleware if present
+                if self.middleware_chain:
+                    # Build invocation dict
+                    invocation = {
+                        "step": step,
+                        "inputs": inputs,
+                        "context": {
+                            "results": self._results,
+                            "signal_bus": self.signal_bus,
+                        },
+                        "metadata": {
+                            "execution_id": plan.pipeline_id,
+                            "step_id": step_id,
+                        },
+                    }
+                    # Middleware will call the final runner
+                    result = await self.middleware_chain.execute(
+                        invocation,
+                        lambda inv: self._run_capability(inv["step"], inv["inputs"], runner),
+                    )
+                else:
+                    result = await self._run_capability(step, inputs, runner)
+
+                # Wrap result in ResourceEnvelope
+                if self._producer_ref is None:
+                    raise ExecutionError("ProducerRef not set for executor")
+                envelope = ResourceEnvelope.create(
+                    resource_type=step.capability.capitalize() + "Result",
+                    schema_version="1.0",
+                    payload=result,
+                    producer=self._producer_ref,
+                    parents=[r.resource_id for r in self._results.values()],
+                )
+                self._results[step_id] = envelope
                 self._states[step_id] = StepState.SUCCEEDED
-                await self._emit("step.succeeded", step=step, result=result)
+                await self._emit("step.succeeded", step=step, result=envelope)
 
             except Exception as e:
                 self._states[step_id] = StepState.FAILED
                 await self._emit("step.failed", step=step, error=str(e))
                 if step.on_error == "abort":
                     self._cancelled = True
-                    raise ExecutionError(f"Step {step.id} failed", cause=e) from e
+                    raise ExecutionError(f"Step {step_id} failed: {e}", cause=e) from e
+
+    async def _run_capability(
+        self,
+        step: Step,
+        inputs: dict[str, Any],
+        runner: Callable[[Step, dict[str, Any]], Coroutine[Any, Any, Any]],
+    ) -> Any:
+        """Run the capability (used as final call in middleware chain)."""
+        # If there's a runner in the step config, use it; otherwise call the provided runner
+        # The executor's runner is generic, but we can pass the step and inputs.
+        return await runner(step, inputs)
 
     def _resolve_inputs(self, step: Step, plan: ExecutionPlan) -> dict[str, Any]:
         """Resolve step inputs from previous results."""
@@ -134,88 +182,36 @@ class Executor:
         for target, source in step.input.items():
             if "." in source:
                 src_step, output_name = source.split(".", 1)
-                result = self._results.get(src_step)
-                if result is None:
+                envelope = self._results.get(src_step)
+                if envelope is None:
                     raise ExecutionError(f"Missing dependency: {src_step} -> {step.id}")
-                inputs[target] = getattr(result, output_name, None)
+                payload = envelope.payload
+                if isinstance(payload, BaseModel):
+                    inputs[target] = getattr(payload, output_name, None)
+                elif isinstance(payload, dict):
+                    inputs[target] = payload.get(output_name)
+                else:
+                    inputs[target] = None
             else:
-                # pipeline input
                 inputs[target] = source
         return inputs
 
     def _can_run(self, step_id: str, plan: ExecutionPlan) -> bool:
-        """Check if all dependencies are satisfied."""
         deps = plan.dependencies.get(step_id, set())
         for dep in deps:
-            if self._states.get(dep) not in (
-                StepState.SUCCEEDED,
-                StepState.SKIPPED,
-            ):
+            if self._states.get(dep) not in (StepState.SUCCEEDED, StepState.SKIPPED):
                 return False
         return True
 
     def _evaluate_condition(
         self, condition: str, inputs: dict[str, Any], results: dict[str, Any]
     ) -> bool:
-        """Evaluate a condition using a safe expression language.
-
-        This is a placeholder. In production, use a safe expression evaluator
-        (e.g., a restricted Python AST or a custom language).
-        """
-        # Simple placeholder: avoid eval/exec
-        # In real implementation, use a restricted parser
+        """Placeholder: safe expression evaluator (future work)."""
         return True
 
-    async def _run_with_retry(
-        self,
-        step: Step,
-        inputs: dict[str, Any],
-        runner: Callable[[Step, dict[str, Any]], Coroutine[Any, Any, Any]],
-    ) -> Any:
-        """Run a step with retry policy."""
-        attempts = step.retry.get("attempts", 1) if step.retry else 1
-        backoff = step.retry.get("backoff", "fixed") if step.retry else "fixed"
-        jitter = step.retry.get("jitter", 0.0) if step.retry else 0.0
-
-        last_exception = None
-
-        for attempt in range(attempts):
-            try:
-                if attempt > 0:
-                    await self._emit("step.retrying", step=step, attempt=attempt)
-                return await runner(step, inputs)
-            except Exception as e:
-                last_exception = e
-                if attempt < attempts - 1:
-                    wait = self._calculate_backoff(attempt, backoff, jitter)
-                    await asyncio.sleep(wait)
-
-        raise ExecutionError(
-            f"Step {step.id} failed after {attempts} attempts",
-            cause=last_exception,
-        )
-
-    def _calculate_backoff(self, attempt: int, backoff: str, jitter: float) -> float:
-        """Calculate backoff delay."""
-        if backoff == "exponential":
-            wait = 2 ** (attempt + 1)
-        elif backoff == "linear":
-            wait = attempt + 1
-        else:  # fixed
-            wait = 1.0
-
-        if jitter > 0:
-            import random
-
-            wait += random.uniform(0, jitter)
-
-        return min(wait, 60.0)  # type: ignore[no-any-return]
-
     async def _emit(self, signal: str, **kwargs: Any) -> None:
-        """Emit a signal if bus is available."""
         if self.signal_bus:
             await self.signal_bus.emit(signal, **kwargs)
 
     def cancel(self) -> None:
-        """Cancel execution."""
         self._cancelled = True
