@@ -18,7 +18,7 @@ class HTTPXProvider(AsyncLifecycle, Fetch):
 
     def __init__(self, settings: HTTPXSettings | None = None) -> None:
         self._settings = settings or HTTPXSettings()
-        self._client: httpx.AsyncClient | None = None  # type: ignore[no-any-unimported]
+        self._client: httpx.AsyncClient | None = None
 
     async def setup(self) -> None:
         if self._client is None:

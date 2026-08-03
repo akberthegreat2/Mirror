@@ -2,14 +2,15 @@
 
 import pytest
 from mirror_core.lifecycle import AsyncLifecycle
-from mirror_testing import BaseContract  # Changed from CapabilityContract
+from mirror_testing import BaseContract
+from pydantic import HttpUrl
 
 from mirror_fetch.exceptions import FetchError
 from mirror_fetch.models import FetchRequest, FetchResult
 from mirror_fetch.protocol import Fetch
 
 
-class FetchContract(BaseContract):  # Changed from CapabilityContract
+class FetchContract(BaseContract):
     """Contract tests for Fetch providers.
 
     Subclass this and set provider_class to test your provider.
@@ -31,7 +32,7 @@ class FetchContract(BaseContract):  # Changed from CapabilityContract
 
     @pytest.mark.asyncio
     async def test_request_model(self, provider: Fetch) -> None:
-        request = FetchRequest(url="https://example.com")
+        request = FetchRequest(url=HttpUrl("https://example.com"))
         try:
             await provider.fetch(request)
         except FetchError:
@@ -41,7 +42,7 @@ class FetchContract(BaseContract):  # Changed from CapabilityContract
 
     @pytest.mark.asyncio
     async def test_result_model(self, provider: Fetch) -> None:
-        request = FetchRequest(url="https://httpbin.org/get")
+        request = FetchRequest(url=HttpUrl("https://httpbin.org/get"))
         try:
             result = await provider.fetch(request)
             assert isinstance(result, FetchResult)
@@ -50,7 +51,7 @@ class FetchContract(BaseContract):  # Changed from CapabilityContract
 
     @pytest.mark.asyncio
     async def test_error_translation(self, provider: Fetch) -> None:
-        request = FetchRequest(url="https://invalid-domain-that-does-not-exist.local")
+        request = FetchRequest(url=HttpUrl("https://invalid-domain-that-does-not-exist.local"))
         with pytest.raises(FetchError):
             await provider.fetch(request)
 

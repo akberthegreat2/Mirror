@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 from datetime import datetime, timezone
+from io import BufferedWriter
 from pathlib import Path
 from uuid import uuid4
 
@@ -30,6 +31,7 @@ class WARCProvider(AsyncLifecycle, Archive):
         self._output_dir = self._settings.output_dir
         self._writer: WARCWriter | None = None
         self._current_file: Path | None = None
+        self._file: BufferedWriter | None = None
 
     async def setup(self) -> None:
         """Initialize the WARC writer."""
@@ -46,14 +48,14 @@ class WARCProvider(AsyncLifecycle, Archive):
         # In sync context, we need to open the file and create the writer
         # The WARCWriter expects a file-like object in binary mode.
         # Since warcio is synchronous, we open the file in setup.
-        self._file = open(self._current_file, "wb")
+        self._file = open(self._current_file, "wb")  # noqa: SIM115
         self._writer = WARCWriter(self._file, gzip=self._settings.compress)
 
     async def teardown(self) -> None:
         """Close the WARC writer and file."""
         if self._writer is not None:
             # WARCWriter may need to flush; just close the file.
-            if hasattr(self._file, "close"):
+            if self._file is not None:
                 self._file.close()
             self._writer = None
             self._file = None
@@ -102,10 +104,7 @@ class WARCProvider(AsyncLifecycle, Archive):
                     content = inner.content
                     url = getattr(inner, "url", "unknown")
             else:
-                if isinstance(payload, bytes):
-                    content = payload
-                else:
-                    content = str(payload).encode()
+                content = payload if isinstance(payload, bytes) else str(payload).encode()
 
             # Generate WARC record
             headers_list = [

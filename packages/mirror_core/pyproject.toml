@@ -36,4 +36,12 @@ python_files = "test_*.py"
 asyncio_mode = "auto"
 
 [tool.mypy]
+python_version = "3.10"
+strict = true
+explicit_package_bases = true
+mypy_path = ["src"]
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["tomllib", "yaml"]
+ignore_missing_imports = true

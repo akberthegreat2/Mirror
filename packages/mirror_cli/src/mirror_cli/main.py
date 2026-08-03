@@ -17,7 +17,7 @@ app = typer.Typer(
 console = Console()
 
 
-@app.command()  # type: ignore[misc]
+@app.command()
 def run(
     config: Path | None = typer.Option(
         None,
@@ -41,7 +41,7 @@ def run(
     console.print("[yellow]Not implemented yet[/yellow]")
 
 
-@app.command()  # type: ignore[misc]
+@app.command()
 def list_capabilities() -> None:
     """List all discovered capabilities."""
     table = Table(title="Discovered Capabilities")
@@ -71,7 +71,7 @@ def list_capabilities() -> None:
         console.print(f"[red]Error: {e}[/red]")
 
 
-@app.command()  # type: ignore[misc]
+@app.command()
 def list_providers() -> None:
     """List all discovered providers."""
     table = Table(title="Discovered Providers")
@@ -99,14 +99,14 @@ def list_providers() -> None:
         console.print(f"[red]Error: {e}[/red]")
 
 
-@app.command()  # type: ignore[misc]
+@app.command()
 def status() -> None:
     """Show application status."""
     console.print("[bold]Mirror Status[/bold]")
     console.print("Application: Not running")
 
 
-@app.callback()  # type: ignore[misc]
+@app.callback()
 def callback() -> None:
     """Mirror CLI – application framework for web infrastructure."""
     pass

@@ -38,3 +38,16 @@ namespaces = false
 testpaths = ["tests"]
 python_files = "test_*.py"
 asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+explicit_package_bases = true
+mypy_path = ["src"]
+
+[[tool.mypy.overrides]]
+module = [
+    "warcio",
+    "warcio.*",
+]
+ignore_missing_imports = true
