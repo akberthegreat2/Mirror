@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirror-testing"
+version = "0.1.0"
+description = "Shared contract-testing utilities for Mirror"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Mirror Contributors"}]
+requires-python = ">=3.10"
+dependencies = [
+    "mirror-core>=0.1.0",
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mirror_testing*"]
+namespaces = false

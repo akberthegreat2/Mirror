@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirror-fetch-httpx"
+version = "0.1.0"
+description = "HTTPX provider for Mirror Fetch"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Mirror Contributors"}]
+requires-python = ">=3.10"
+dependencies = [
+    "mirror-core>=0.1.0",
+    "mirror-fetch>=0.1.0",
+    "httpx>=0.24",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0", "pytest-asyncio>=0.21", "pytest-httpx>=0.30"]
+dev = ["ruff", "mypy"]
+
+[project.entry-points."mirror"]
+httpx = "mirror_fetch_httpx:provider"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mirror_fetch_httpx*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+asyncio_mode = "auto"
