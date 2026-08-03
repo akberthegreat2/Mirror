@@ -84,7 +84,12 @@ class MirrorSettings(BaseSettings):
 
     def model_dump_json(self, **kwargs: Any) -> str:
         """Override to redact secrets in JSON output."""
-        return super().model_dump_json(**kwargs)
+        import json
+
+        data = self.model_dump(mode="json")
+        if "secrets" in data:
+            data["secrets"] = {k: "***REDACTED***" for k in data["secrets"]}
+        return json.dumps(data, **kwargs)
 
     @classmethod
     def from_file(cls, path: Path | str) -> MirrorSettings:
