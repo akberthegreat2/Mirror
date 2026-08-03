@@ -5,10 +5,9 @@ from __future__ import annotations
 import asyncio
 import importlib
 import logging
-import random
 from collections.abc import Callable
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel
 
@@ -34,7 +33,11 @@ class StepState(str, Enum):
 
 
 class Executor:
-    """Executes pipelines with bounded concurrency, retries, timeouts, and state management."""
+    """Executes pipelines with bounded concurrency and middleware chain.
+
+    The executor does not implement retry/timeout directly; those are
+    handled by the middleware chain if enabled.
+    """
 
     def __init__(
         self,
@@ -58,9 +61,24 @@ class Executor:
     def set_producer(self, producer: ProducerRef) -> None:
         self._producer_ref = producer
 
-    async def execute(self, plan: ExecutionPlan) -> dict[str, ResourceEnvelope]:
+    async def execute(
+        self,
+        plan: ExecutionPlan,
+        runner: Callable[..., Any] | None = None,
+    ) -> dict[str, ResourceEnvelope]:
+        """Execute the plan.
+
+        Args:
+            plan: The execution plan.
+            runner: Optional runner function (for testing). If not provided,
+                    runner is resolved from capability registry.
+
+        Returns:
+            dict[str, ResourceEnvelope]: Results for each step.
+        """
+        self._runner = runner
         self._results = {}
-        self._states = {step_id: StepState.PENDING for step_id in plan.step_ids}
+        self._states = dict.fromkeys(plan.step_ids, StepState.PENDING)
         self._cancelled = False
 
         await self._emit("pipeline.started", plan=plan)
@@ -83,6 +101,10 @@ class Executor:
 
     async def _run_step(self, step_id: str, plan: ExecutionPlan) -> None:
         async with self._semaphore:
+            # If already in a terminal state, do nothing.
+            if self._states.get(step_id) not in (StepState.PENDING, StepState.READY):
+                return
+
             if self._cancelled:
                 self._states[step_id] = StepState.CANCELLED
                 return
@@ -101,144 +123,98 @@ class Executor:
                 return
 
             try:
-                provider = self._resolve_provider(step)
-                request = self._build_request(step, inputs)
-                cap_config = self.registry.get_capability(step.capability, "1.0")
-                runner_path = cap_config.runner
-                if not runner_path:
-                    raise ExecutionError(f"No runner defined for capability '{step.capability}'")
-                module_path, _, func_name = runner_path.rpartition(":")
-                module = importlib.import_module(module_path)
-                runner_func = getattr(module, func_name)
-            except Exception as e:
-                self._states[step_id] = StepState.FAILED
-                await self._emit("step.failed", step=step, error=str(e))
-                if step.on_error == "abort":
-                    self._cancelled = True
-                    raise ExecutionError(f"Step {step_id} setup failed: {e}", cause=e) from e
-                return
+                provider = self._get_provider(step.capability)
 
-            try:
-                result = await self._run_with_retry_and_timeout(
-                    step, runner_func, provider, request, inputs
+                cap_config = self.registry.get_capability(step.capability, "1.0")
+                if cap_config.request_model is None:
+                    raise ExecutionError(f"No request_model for capability '{step.capability}'")
+                request = cap_config.request_model.model_validate(inputs)
+
+                if self._runner is not None:
+                    runner = self._runner
+                else:
+                    runner = self._get_runner(step.capability)
+
+                result = await self._execute_step_with_middleware(
+                    step=step,
+                    runner=runner,
+                    provider=provider,
+                    request=request,
                 )
+
+                if self._producer_ref is None:
+                    raise ExecutionError("ProducerRef not set for executor")
+
+                # Derive the resource type from the capability descriptor
+                resource_type = (
+                    cap_config.result_model.__name__
+                    if cap_config.result_model
+                    else f"{step.capability.capitalize()}Result"
+                )
+
+                envelope = ResourceEnvelope.create(
+                    resource_type=resource_type,
+                    schema_version="1.0",
+                    payload=result,
+                    producer=self._producer_ref,
+                    parents=[r.resource_id for r in self._results.values()],
+                )
+                self._results[step_id] = envelope
+                self._states[step_id] = StepState.SUCCEEDED
+                await self._emit("step.succeeded", step=step, result=envelope)
+
             except Exception as e:
                 self._states[step_id] = StepState.FAILED
                 await self._emit("step.failed", step=step, error=str(e))
                 if step.on_error == "abort":
                     self._cancelled = True
                     raise ExecutionError(f"Step {step_id} failed: {e}", cause=e) from e
-                return
 
-            if self._producer_ref is None:
-                raise ExecutionError("ProducerRef not set for executor")
-
-            if not isinstance(result, BaseModel):
-                raise ExecutionError(
-                    f"Step {step_id} returned non-BaseModel output: {type(result).__name__}"
-                )
-
-            cap_config = self.registry.get_capability(step.capability, "1.0")
-            resource_type = (
-                cap_config.result_model.__name__
-                if cap_config.result_model
-                else f"{step.capability.capitalize()}Result"
-            )
-
-            envelope = ResourceEnvelope.create(
-                resource_type=resource_type,
-                schema_version="1.0",
-                payload=result,
-                producer=self._producer_ref,
-                parents=[r.resource_id for r in self._results.values()],
-            )
-            self._results[step_id] = envelope
-            self._states[step_id] = StepState.SUCCEEDED
-            await self._emit("step.succeeded", step=step, result=envelope)
-
-    async def _run_with_retry_and_timeout(
+    async def _execute_step_with_middleware(
         self,
         step: Step,
         runner: Callable[..., Any],
         provider: Any,
-        request: BaseModel,
-        inputs: dict[str, Any],
+        request: Any,
     ) -> Any:
-        retry_config = step.retry or {}
-        attempts = retry_config.get("attempts", 1)
-        backoff = retry_config.get("backoff", "fixed")
-        jitter = retry_config.get("jitter", 0.0)
-        timeout = step.timeout
-
-        last_exception: Exception | None = None
-
-        for attempt in range(attempts):
-            try:
-                if attempt > 0:
-                    await self._emit("step.retrying", step=step, attempt=attempt + 1)
-                    wait = self._calculate_backoff(attempt, backoff, jitter)
-                    await asyncio.sleep(wait)
-
-                if timeout is not None and timeout > 0:
-                    result = await asyncio.wait_for(
-                        runner(
-                            provider,
-                            request,
-                            settings=None,
-                            signal_bus=self.signal_bus,
-                            step_id=step.id,
-                        ),
-                        timeout=timeout,
-                    )
-                else:
-                    result = await runner(
-                        provider,
-                        request,
-                        settings=None,
-                        signal_bus=self.signal_bus,
-                        step_id=step.id,
-                    )
-                return result
-
-            except asyncio.TimeoutError as e:
-                last_exception = e
-                if attempt == attempts - 1:
-                    raise ExecutionError(f"Step {step.id} timed out after {timeout}s") from e
-                continue
-            except Exception as e:
-                last_exception = e
-                if attempt == attempts - 1:
-                    raise
-                continue
-
-        raise ExecutionError(
-            f"Step {step.id} failed after {attempts} attempts", cause=last_exception
+        if self.middleware_chain:
+            invocation = {
+                "step": step,
+                "request": request,
+                "provider": provider,
+                "context": {
+                    "signal_bus": self.signal_bus,
+                    "results": self._results,
+                },
+            }
+            return await self.middleware_chain.execute(
+                invocation,
+                lambda inv: runner(
+                    inv["provider"],
+                    inv["request"],
+                    signal_bus=inv["context"]["signal_bus"],
+                    step_id=inv["step"].id,
+                ),
+            )
+        return await runner(
+            provider,
+            request,
+            signal_bus=self.signal_bus,
+            step_id=step.id,
         )
 
-    def _calculate_backoff(self, attempt: int, backoff: str, jitter: float) -> float:
-        if backoff == "exponential":
-            wait: float = float(2 ** (attempt + 1))
-        elif backoff == "linear":
-            wait = float(attempt + 1)
-        else:  # fixed
-            wait = 1.0
+    def _get_runner(self, capability_name: str) -> Callable[..., Any]:
+        cap_config = self.registry.get_capability(capability_name, "1.0")
+        if cap_config.runner is None:
+            raise ExecutionError(f"No runner defined for capability '{capability_name}'")
+        module_path, _, func_name = cap_config.runner.rpartition(":")
+        module = importlib.import_module(module_path)
+        return cast(Callable[..., Any], getattr(module, func_name))
 
-        if jitter > 0:
-            wait += random.uniform(0, jitter)
-
-        return min(wait, 60.0)
-
-    def _resolve_provider(self, step: Step) -> Any:
-        if step.capability not in self.components:
-            raise ExecutionError(f"No provider found for capability '{step.capability}'")
-        return self.components[step.capability]
-
-    def _build_request(self, step: Step, inputs: dict[str, Any]) -> BaseModel:
-        cap_config = self.registry.get_capability(step.capability, "1.0")
-        request_model = cap_config.request_model
-        if not request_model:
-            raise ExecutionError(f"No request_model defined for capability '{step.capability}'")
-        return request_model.model_validate(inputs)
+    def _get_provider(self, capability_name: str) -> Any:
+        if capability_name not in self.components:
+            raise ExecutionError(f"No provider for capability '{capability_name}'")
+        return self.components[capability_name]
 
     def _resolve_inputs(self, step: Step, plan: ExecutionPlan) -> dict[str, Any]:
         inputs: dict[str, Any] = {}

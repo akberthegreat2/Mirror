@@ -1,0 +1,43 @@
+"""Timeout middleware for enforcing timeouts on invocations."""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any
+
+from mirror_core.middleware import Invocation, NextMiddleware
+
+
+class TimeoutMiddleware:
+    """Enforce a timeout on capability invocation.
+
+    Settings:
+        timeout (float): Maximum execution time in seconds. Default: 30.0.
+    """
+
+    def __init__(self, timeout: float = 30.0) -> None:
+        self.timeout = timeout
+
+    async def __call__(self, invocation: Invocation, next_middleware: NextMiddleware) -> Any:
+        """Execute with timeout."""
+        try:
+            return await asyncio.wait_for(
+                next_middleware(invocation),
+                timeout=self.timeout,
+            )
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"Invocation timed out after {self.timeout} seconds") from None
+
+
+def middleware_config() -> dict[str, Any]:
+    """Return middleware descriptor for discovery."""
+    return {
+        "name": "timeout",
+        "factory": "mirror_middleware.timeout:TimeoutMiddleware",
+        "settings_model": None,
+        "applies_to": None,
+        "ordering_constraints": {"after": ["retry"], "before": ["ratelimit"]},
+        "metadata": {
+            "description": "Enforce a timeout on capability invocations",
+        },
+    }

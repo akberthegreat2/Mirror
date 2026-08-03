@@ -7,6 +7,7 @@ Contract‑testing utilities for Mirror providers.
 ```python
 from mirror_testing import ContractTestCase, CapabilityContract
 
+
 class FetchContract(CapabilityContract):
     @staticmethod
     def create_provider(settings=None):
@@ -19,6 +20,7 @@ class FetchContract(CapabilityContract):
     @staticmethod
     def invalid_request():
         return FetchRequest(url="not-a-url")
+
 
 class TestFetchHTTPX(ContractTestCase):
     capability_contract = FetchContract

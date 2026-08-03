@@ -33,13 +33,5 @@ clean:
 	find packages -type d -name ".pytest_cache" -exec rm -rf {} +
 	find packages -type d -name ".mypy_cache" -exec rm -rf {} +
 
-check:
-	@echo "=== Linting ==="
-	ruff check packages/
-	@echo "=== Formatting ==="
-	ruff format packages/
-	@echo "=== Type checking ==="
-	make type
-
 check: lint format type test
 	@echo "=== All checks passed ==="

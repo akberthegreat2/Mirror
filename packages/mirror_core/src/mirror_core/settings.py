@@ -80,14 +80,14 @@ class MirrorSettings(BaseSettings):
         """Override to redact secrets."""
         data = super().model_dump(**kwargs)
         if "secrets" in data:
-            data["secrets"] = {k: "***REDACTED***" for k in data["secrets"]}
+            data["secrets"] = dict.fromkeys(data["secrets"], "***REDACTED***")
         return data
 
     def model_dump_json(self, **kwargs: Any) -> str:
         """Override to redact secrets in JSON output."""
         data = self.model_dump(mode="json")
         if "secrets" in data:
-            data["secrets"] = {k: "***REDACTED***" for k in data["secrets"]}
+            data["secrets"] = dict.fromkeys(data["secrets"], "***REDACTED***")
         return json.dumps(data, **kwargs)
 
     @classmethod

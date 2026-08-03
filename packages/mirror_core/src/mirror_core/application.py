@@ -10,11 +10,11 @@ from typing import Any
 from pydantic import BaseModel
 
 from mirror_core.discovery import DiscoveryResult, DiscoverySource, discover
-from mirror_core.exceptions import ApplicationError
+from mirror_core.exceptions import ApplicationError, ExecutionError
 from mirror_core.executor import Executor
 from mirror_core.lifecycle import AsyncLifecycle
 from mirror_core.middleware import MiddlewareChain
-from mirror_core.pipeline import Pipeline
+from mirror_core.pipeline import Pipeline, Step
 from mirror_core.planner import Planner
 from mirror_core.registry import Registry
 from mirror_core.resource import ProducerRef, ResourceEnvelope
@@ -121,13 +121,36 @@ class Application:
         """
         if not self._started:
             raise ApplicationError("Application must be started before running pipelines")
-
         if self._executor is None:
             raise ApplicationError("Executor not initialized")
 
         planner = Planner(self._registry)
         plan = planner.plan(pipeline)
-        return await self._executor.execute(plan)
+
+        # Define a runner that routes to the correct capability runner
+        # This is a placeholder; we need a registry of capability runners
+        # or we can use the step's runner from the capability config
+        async def step_runner(step: Step, inputs: dict[str, Any]) -> Any:
+            # Look up the capability config
+            cap_config = self._registry.get_capability(step.capability, "1.0")
+            if cap_config.runner is None:
+                raise ExecutionError(f"No runner defined for capability '{step.capability}'")
+            # Import the runner function
+            module_path, _, func_name = cap_config.runner.rpartition(":")
+            module = importlib.import_module(module_path)
+            runner_func = getattr(module, func_name)
+            # The runner expects (provider, request, ...) – we need to construct request from inputs
+            provider = self._components.get(step.capability)
+            if provider is None:
+                raise ExecutionError(f"No provider initialized for '{step.capability}'")
+            # Build request from inputs using the request_model
+            request_model = cap_config.request_model
+            if request_model is None:
+                raise ExecutionError(f"No request_model for '{step.capability}'")
+            request = request_model.model_validate(inputs)
+            return await runner_func(provider, request, signal_bus=self.signal_bus, step_id=step.id)
+
+        return await self._executor.execute(plan, step_runner)
 
     async def shutdown(self) -> None:
         """Shut down the application gracefully."""
@@ -168,9 +191,35 @@ class Application:
 
     def _build_middleware_chain(self) -> MiddlewareChain | None:
         """Build middleware chain from registry and settings."""
-        # For now, return None – middleware integration is future work.
-        # In future, we'll instantiate middleware factories.
-        return None
+        # Get global middleware list
+        global_middleware_names = self.settings.global_middleware
+        if not global_middleware_names:
+            return None
+
+        middlewares = []
+        for name in global_middleware_names:
+            config = self._registry.get_middleware(name)
+            # Import factory
+            import importlib
+
+            module_path, _, class_name = config.factory.rpartition(":")
+            module = importlib.import_module(module_path)
+            factory = getattr(module, class_name)
+            # Instantiate with settings (if any)
+            settings_cls = config.settings_model
+            if settings_cls:
+                if isinstance(settings_cls, str):
+                    mod_path, _, cls_name = settings_cls.rpartition(":")
+                    mod = importlib.import_module(mod_path)
+                    settings_cls = getattr(mod, cls_name)
+                # Get settings from component_settings or defaults
+                # For now, use empty dict
+                instance = factory()
+            else:
+                instance = factory()
+            middlewares.append(instance)
+
+        return MiddlewareChain(middlewares)
 
     async def _initialize_components(self) -> None:
         for cap_name, config in self.settings.components.items():
