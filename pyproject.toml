@@ -46,6 +46,13 @@ plugins = ["pydantic.mypy"]
 explicit_package_bases = true
 exclude = ["packages/*/tests/"]
 
+[[tool.mypy.overrides]]
+module = [
+    "mirror_fetch.testing",
+    "mirror_testing.*",  # also for any future test files
+]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["packages/*/tests"]
