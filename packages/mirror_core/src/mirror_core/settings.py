@@ -32,6 +32,8 @@ class MirrorSettings(BaseSettings):
     middleware: dict[str, list[str]] = Field(default_factory=dict)
     middleware_settings: dict[str, dict[str, Any]] = Field(default_factory=dict)
     global_middleware: list[str] = Field(default_factory=list)
+    worker_backend: str = "inline"
+    worker_settings: dict[str, Any] = Field(default_factory=dict)
     secrets: dict[str, SecretStr] = Field(default_factory=dict)
 
     @field_validator("secrets", mode="before")

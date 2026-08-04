@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mirror_fetch-httpx"
+name = "mirror-fetch-httpx"
 version = "0.1.0"
 description = "HTTPX provider for Mirror Fetch"
 readme = "README.md"
@@ -11,8 +11,8 @@ license = {text = "MIT"}
 authors = [{name = "Mirror Contributors"}]
 requires-python = ">=3.10"
 dependencies = [
-    "mirror_core>=0.1.0",
-    "mirror_fetch>=0.1.0",
+    "mirror-core>=0.1.0",
+    "mirror-fetch>=0.1.0",
     "httpx>=0.24",
 ]
 classifiers = [

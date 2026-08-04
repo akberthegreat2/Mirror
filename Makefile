@@ -1,13 +1,23 @@
-.PHONY: install type lint format test clean
+.PHONY: install lint format format-check type test wheels clean check
 
 install:
 	@for pkg in packages/*/; do \
-		echo "Installing $$pkg"; \
-		pip install -e "$$pkg"; \
+		if [ -f "$$pkg/pyproject.toml" ]; then \
+			echo "Installing $$pkg"; \
+			python -m pip install -e "$$pkg" || exit 1; \
+		fi; \
 	done
 
+lint:
+	ruff check .
+
+format:
+	ruff format .
+
+format-check:
+	ruff format --check .
+
 type:
-	@echo "=== Running type checks ==="
 	@for pkg in packages/*/; do \
 		if [ -d "$$pkg/src" ]; then \
 			echo "Checking $$pkg"; \
@@ -15,23 +25,19 @@ type:
 		fi; \
 	done
 
-lint:
-	@echo "=== Running lints ==="
-	ruff check packages/
-
-format:
-	ruff format packages/
-
 test:
-	@echo "=== Running tests ==="
-	@pytest packages/*/tests
+	pytest
+
+wheels: clean
+	@mkdir -p dist
+	@for pkg in packages/*/; do \
+		if [ -f "$$pkg/pyproject.toml" ]; then \
+			python -m pip wheel --no-deps --no-build-isolation -w dist "$$pkg" || exit 1; \
+		fi; \
+	done
 
 clean:
-	@echo "=== Cleaning ==="
-	find packages -type d -name "*.egg-info" -exec rm -rf {} +
-	find packages -type d -name "__pycache__" -exec rm -rf {} +
-	find packages -type d -name ".pytest_cache" -exec rm -rf {} +
-	find packages -type d -name ".mypy_cache" -exec rm -rf {} +
+	find . -type d \( -name build -o -name dist -o -name "*.egg-info" -o -name __pycache__ -o -name .pytest_cache -o -name .mypy_cache -o -name .ruff_cache \) -prune -exec rm -rf {} +
 
-check: lint format type test
+check: lint format-check type test
 	@echo "=== All checks passed ==="

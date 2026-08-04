@@ -143,7 +143,8 @@ class Planner:
                 )
             except Exception as exc:
                 raise PlannerError(
-                    f"Unable to resolve provider for step {step.id!r} " f"({step.capability!r})",
+                    f"Unable to resolve provider for step {step.id!r} "
+                    f"({step.capability!r})",
                     cause=exc,
                 ) from exc
         return resolved
@@ -156,13 +157,24 @@ class Planner:
         steps_by_id = {step.id: step for step in pipeline.steps}
         for step in pipeline.steps:
             capability = capabilities[step.id]
+            available_outputs = set(capability.output_ports)
+            if capability.result_model is not None:
+                available_outputs.update(capability.result_model.model_fields)
+                available_outputs.add("result")
+            unknown_outputs = sorted(set(step.outputs).difference(available_outputs))
+            if unknown_outputs:
+                raise PlannerError(
+                    f"Step {step.id!r} declares unknown outputs: {', '.join(unknown_outputs)}"
+                )
             declared_inputs = set(capability.input_ports)
             if not declared_inputs and capability.request_model is not None:
                 declared_inputs = set(capability.request_model.model_fields)
 
             for target, source in step.input.items():
                 if declared_inputs and target not in declared_inputs:
-                    raise PlannerError(f"Step {step.id!r} binds undeclared input port {target!r}")
+                    raise PlannerError(
+                        f"Step {step.id!r} binds undeclared input port {target!r}"
+                    )
                 source_step, source_output = self._parse_binding(source, step.id)
                 if source_step == "$pipeline":
                     if source_output not in pipeline.inputs:
@@ -172,7 +184,9 @@ class Planner:
                         )
                     continue
                 if source_step not in steps_by_id:
-                    raise PlannerError(f"Step {step.id!r} references unknown step {source_step!r}")
+                    raise PlannerError(
+                        f"Step {step.id!r} references unknown step {source_step!r}"
+                    )
                 source_capability = capabilities[source_step]
                 source_ports = set(source_capability.output_ports)
                 if source_capability.result_model is not None:
@@ -221,7 +235,7 @@ class Planner:
         if source_type is None or target_type is None or source_type == target_type:
             return
         if isinstance(source_type, type) and isinstance(target_type, type):
-            if issubclass(source_type, target_type) or issubclass(target_type, source_type):
+            if issubclass(source_type, target_type):
                 return
         source_name = getattr(source_type, "__name__", str(source_type))
         target_name = getattr(target_type, "__name__", str(target_type))
@@ -270,10 +284,8 @@ class Planner:
     ) -> list[list[str]]:
         level: dict[str, int] = {}
         for step_id in order:
-            level[step_id] = (
-                0
-                if not dependencies[step_id]
-                else 1 + max(level[dependency] for dependency in dependencies[step_id])
+            level[step_id] = 0 if not dependencies[step_id] else 1 + max(
+                level[dependency] for dependency in dependencies[step_id]
             )
         groups: dict[int, list[str]] = {}
         for step_id in order:

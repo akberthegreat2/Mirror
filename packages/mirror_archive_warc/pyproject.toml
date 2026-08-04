@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mirror_archive-warc"
+name = "mirror-archive-warc"
 version = "0.1.0"
 description = "WARC provider for Mirror Archive capability"
 readme = "README.md"
@@ -11,8 +11,8 @@ license = {text = "MIT"}
 authors = [{name = "Mirror Contributors"}]
 requires-python = ">=3.10"
 dependencies = [
-    "mirror_core>=0.1.0",
-    "mirror_archive>=0.1.0",
+    "mirror-core>=0.1.0",
+    "mirror-archive>=0.1.0",
     "warcio>=1.7",
 ]
 classifiers = [

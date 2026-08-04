@@ -249,7 +249,7 @@ class Step:
     condition: str | None  # safe expression language
     retry: RetryPolicy | None
     timeout: float | None
-    on_error: ErrorPolicy  # abort, continue, skip, fallback
+    on_error: ErrorPolicy  # abort, continue, skip
     metadata: dict[str, Any]
 ```
 

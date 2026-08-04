@@ -1,13 +1,25 @@
+
 """Mirror CLI main entry point."""
 
+from __future__ import annotations
+
 import asyncio
+import json
 from pathlib import Path
 
 import typer
-from mirror_core.application import Application
-from mirror_core.settings import MirrorSettings
 from rich.console import Console
 from rich.table import Table
+
+from mirror_core.application import Application
+from mirror_core.settings import MirrorSettings
+from mirror_cli.scaffold import (
+    collect_project_checks,
+    create_app,
+    create_project,
+    format_checks,
+    project_is_healthy,
+)
 
 app = typer.Typer(
     name="mirror",
@@ -17,45 +29,14 @@ app = typer.Typer(
 console = Console()
 
 
-@app.command()
-def run(
-    config: Path | None = typer.Option(
-        None,
-        "--config",
-        "-c",
-        help="Path to mirror.yaml configuration file",
-    ),
-    pipeline: Path | None = typer.Option(
-        None,
-        "--pipeline",
-        "-p",
-        help="Path to pipeline definition file (YAML)",
-    ),
-) -> None:
-    """Run a pipeline."""
-    console.print("[bold]Running pipeline...[/bold]")
-    if config:
-        console.print(f"Config: {config}")
-    if pipeline:
-        console.print(f"Pipeline: {pipeline}")
-    console.print("[yellow]Not implemented yet[/yellow]")
-
-
-@app.command()
-def list_capabilities() -> None:
-    """List all discovered capabilities."""
+async def _list_capabilities_async() -> None:
+    """List discovered capabilities without leaking application resources."""
     table = Table(title="Discovered Capabilities")
     table.add_column("Name", style="cyan")
     table.add_column("Version", style="green")
     table.add_column("Description", style="white")
 
-    try:
-        settings = MirrorSettings()
-        app_obj = Application(settings=settings)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(app_obj.start())
-
+    async with Application(settings=MirrorSettings()) as app_obj:
         for cap in app_obj.registry.list_capabilities():
             name, version = cap.split(":", 1)
             description = "N/A"
@@ -66,26 +47,17 @@ def list_capabilities() -> None:
                 pass
             table.add_row(name, version, description)
 
-        console.print(table)
-    except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
+    console.print(table)
 
 
-@app.command()
-def list_providers() -> None:
-    """List all discovered providers."""
+async def _list_providers_async() -> None:
+    """List discovered providers without leaking application resources."""
     table = Table(title="Discovered Providers")
     table.add_column("Name", style="cyan")
     table.add_column("Capability", style="green")
     table.add_column("Priority", style="yellow")
 
-    try:
-        settings = MirrorSettings()
-        app_obj = Application(settings=settings)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(app_obj.start())
-
+    async with Application(settings=MirrorSettings()) as app_obj:
         for prov_key in app_obj.registry.list_providers():
             capability, name = prov_key.split(":", 1)
             try:
@@ -94,9 +66,137 @@ def list_providers() -> None:
             except Exception:
                 table.add_row(name, capability, "N/A")
 
-        console.print(table)
-    except Exception as e:
-        console.print(f"[red]Error: {e}[/red]")
+    console.print(table)
+
+
+@app.command()
+def startproject(
+    name: str = typer.Argument(..., help="Project directory name"),
+    root: Path | None = typer.Option(
+        None,
+        "--root",
+        "-r",
+        help="Parent directory for the generated project",
+    ),
+) -> None:
+    """Create a Django-style Mirror project scaffold."""
+    try:
+        created = create_project(name, root=root)
+    except Exception as exc:
+        raise typer.Exit(code=1) from exc
+    console.print(f"[green]Created Mirror project scaffold[/green] {created}")
+    console.print("Next: cd into the project and run `mirror doctor`.")
+
+
+@app.command()
+def startapp(
+    name: str = typer.Argument(..., help="Application package name"),
+    root: Path | None = typer.Option(
+        None,
+        "--root",
+        "-r",
+        help="Project root that contains apps/",
+    ),
+) -> None:
+    """Create a reusable Mirror application scaffold inside apps/."""
+    try:
+        created = create_app(name, root=root)
+    except Exception as exc:
+        raise typer.Exit(code=1) from exc
+    console.print(f"[green]Created Mirror app scaffold[/green] {created}")
+
+
+@app.command()
+def doctor(
+    root: Path | None = typer.Option(
+        None,
+        "--root",
+        "-r",
+        help="Project root to inspect",
+    ),
+) -> None:
+    """Inspect a generated project scaffold and report health checks."""
+    checks = collect_project_checks(root=root)
+    console.print(format_checks(checks))
+    if not project_is_healthy(checks):
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def run(
+    config: Path | None = typer.Option(None, "--config", "-c", help="Path to Mirror settings file"),
+    pipeline: Path = typer.Option(..., "--pipeline", "-p", help="Path to pipeline definition file"),
+    inputs: Path | None = typer.Option(None, "--inputs", "-i", help="JSON/TOML/YAML runtime inputs file"),
+) -> None:
+    """Compile and execute one pipeline with explicit runtime inputs."""
+
+    async def _run() -> None:
+        settings = MirrorSettings.from_file(config) if config is not None else MirrorSettings()
+        pipeline_obj = _load_pipeline(pipeline)
+        runtime_inputs = _load_mapping(inputs) if inputs is not None else {}
+        async with Application(settings=settings) as app_obj:
+            result = await app_obj.run_pipeline_detailed(pipeline_obj, inputs=runtime_inputs)
+        console.print(f"[green]Pipeline finished[/green] {result.outcome.value}")
+        console.print(f"Run ID: {result.run_id}")
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+
+def _load_mapping(path: Path) -> dict[str, object]:
+    """Load a mapping from JSON, TOML, or YAML."""
+    if not path.exists():
+        raise RuntimeError(f"File does not exist: {path}")
+    if path.suffix in {".yaml", ".yml"}:
+        try:
+            import yaml
+        except ImportError as exc:
+            raise RuntimeError("YAML files require PyYAML") from exc
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    elif path.suffix == ".toml":
+        import tomllib
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    elif path.suffix == ".json":
+        data = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        raise RuntimeError(f"Unsupported file format: {path.suffix}")
+    if not isinstance(data, dict):
+        raise RuntimeError(f"Expected an object/mapping in {path}")
+    return data
+
+
+def _load_pipeline(path: Path):
+    """Load and validate a pipeline definition."""
+    from mirror_core.pipeline import Pipeline
+    return Pipeline.model_validate(_load_mapping(path))
+
+
+@app.command("worker-check")
+def worker_check() -> None:
+    """Report the status of the provisional local worker contracts."""
+    console.print("[yellow]Worker execution is experimental and not enabled in alpha.[/yellow]")
+
+@app.command()
+def list_capabilities() -> None:
+    """List all discovered capabilities."""
+    try:
+        asyncio.run(_list_capabilities_async())
+    except Exception as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
+
+
+@app.command()
+def list_providers() -> None:
+    """List all discovered providers."""
+    try:
+        asyncio.run(_list_providers_async())
+    except Exception as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
 
 @app.command()

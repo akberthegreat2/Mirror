@@ -3,7 +3,15 @@
 import asyncio
 
 import pytest
+from pydantic import BaseModel
+
+from mirror_core.middleware import Invocation
+from mirror_core.pipeline import Step
 from mirror_middleware.timeout import TimeoutMiddleware
+
+
+class TimeoutRequest(BaseModel):
+    url: str
 
 
 @pytest.mark.asyncio
@@ -13,7 +21,8 @@ async def test_timeout_success():
         return "done"
 
     middleware = TimeoutMiddleware(timeout=1.0)
-    result = await middleware({}, mock_next)
+    invocation = Invocation(step=Step(id="test", capability="fetch"), request=TimeoutRequest(url="x"), provider=object())
+    result = await middleware(invocation, mock_next)
     assert result == "done"
 
 
@@ -24,5 +33,6 @@ async def test_timeout_exceeded():
         return "done"
 
     middleware = TimeoutMiddleware(timeout=0.01)
+    invocation = Invocation(step=Step(id="test", capability="fetch"), request=TimeoutRequest(url="x"), provider=object())
     with pytest.raises(TimeoutError):
-        await middleware({}, mock_next)
+        await middleware(invocation, mock_next)

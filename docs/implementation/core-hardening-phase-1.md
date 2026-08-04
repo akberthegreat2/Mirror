@@ -1,7 +1,7 @@
 # Core Hardening Phase 1
 
-**Status:** Implemented
-**Scope:** `mirror-core` only
+**Status:** Implemented  
+**Scope:** `mirror-core` only  
 **Architecture references:** Planner, Executor, Settings, Lifecycle, Resource Model
 
 ## Objective

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import logging
 import types
 from contextlib import AsyncExitStack
@@ -10,8 +9,10 @@ from typing import Any, cast
 
 from pydantic import BaseModel
 
+from mirror_core.components import ComponentManager
+
 from mirror_core.discovery import DiscoveryResult, DiscoverySource, discover
-from mirror_core.exceptions import ApplicationError
+from mirror_core.exceptions import ApplicationError, ExecutionError
 from mirror_core.executor import ExecutionResult, Executor
 from mirror_core.lifecycle import AsyncLifecycle
 from mirror_core.middleware import Middleware, MiddlewareChain
@@ -23,10 +24,6 @@ from mirror_core.settings import MirrorSettings
 from mirror_core.signals import SignalBus
 
 logger = logging.getLogger(__name__)
-
-
-class EmptySettings(BaseModel):
-    """Settings model used by components with no configuration."""
 
 
 class Application:
@@ -43,7 +40,7 @@ class Application:
         self._registry = Registry()
         self._signal_bus = SignalBus()
         self._executor: Executor | None = None
-        self._components: dict[tuple[str, str], Any] = {}
+        self._component_manager = ComponentManager(self._registry, self.settings)
         self._lifecycle_stack: AsyncExitStack | None = None
         self._started = False
 
@@ -80,13 +77,13 @@ class Application:
                 )
             self._register_descriptors()
             self._registry.freeze()
-            middleware_chain = await self._build_middleware_chain(stack)
-            await self._initialize_components(stack)
+            middleware_chains = await self._build_middleware_chains(stack)
+            await self._component_manager.initialize(stack)
             self._executor = Executor(
-                components=self._components,
+                components=self._component_manager.instances,
                 max_concurrency=self.settings.max_concurrency,
                 signal_bus=self._signal_bus,
-                middleware_chain=middleware_chain,
+                middleware_chains=middleware_chains,
             )
             self._lifecycle_stack = stack.pop_all()
             self._started = True
@@ -135,7 +132,7 @@ class Application:
             await stack.aclose()
         self._started = False
         self._executor = None
-        self._components.clear()
+        self._component_manager.clear()
         await self._emit("application.shutdown", application=self)
 
     def _register_descriptors(self) -> None:
@@ -151,59 +148,58 @@ class Application:
         for interface in result.interfaces:
             self._registry.register_interface(interface)
 
-    async def _initialize_components(self, stack: AsyncExitStack) -> None:
-        for capability_name, selection in self.settings.components.items():
-            provider_name = selection.get("provider")
-            if not isinstance(provider_name, str) or not provider_name:
-                raise ApplicationError(f"No provider selected for {capability_name!r}")
-            capability = self._registry.resolve_capability(capability_name)
-            provider = self._registry.resolve_provider(capability, provider_name)
-            factory = self._import_symbol(provider.factory)
-            settings_model = self._resolve_settings_model(provider.settings_model)
-            raw_settings = self.settings.component_settings.get(capability_name, {}).get(
-                provider_name, {}
-            )
-            instance = factory(settings_model.model_validate(raw_settings))
-            if capability.protocol is not None and not isinstance(instance, capability.protocol):
-                raise ApplicationError(
-                    f"Provider {provider.name!r} does not implement capability "
-                    f"protocol {capability.name!r}"
-                )
-            if isinstance(instance, AsyncLifecycle):
-                stack.push_async_callback(instance.teardown)
-                await instance.setup()
-            self._components[(capability_name, provider_name)] = instance
+    async def _build_middleware_chains(
+        self, stack: AsyncExitStack
+    ) -> dict[str, MiddlewareChain]:
+        capability_names = list(self.settings.components)
+        requested_names = set(self.settings.global_middleware)
+        for capability in capability_names:
+            requested_names.update(self.settings.middleware.get(capability, []))
 
-    async def _build_middleware_chain(self, stack: AsyncExitStack) -> MiddlewareChain | None:
-        configs = [self._registry.get_middleware(name) for name in self.settings.global_middleware]
-        ordered = self._order_middleware(configs)
-        instances: list[Middleware] = []
-        for config in ordered:
-            factory = self._import_symbol(config.factory)
-            settings_model = self._resolve_settings_model(config.settings_model)
+        if not requested_names or not capability_names:
+            return {}
+
+        configs = {name: self._registry.get_middleware(name) for name in requested_names}
+        instances: dict[str, Middleware] = {}
+        for name in self._order_middleware(list(configs.values())):
+            config = configs[name.name]
+            factory = ComponentManager.import_symbol(config.factory)
+            settings_model = ComponentManager.resolve_settings_model(config.settings_model)
             raw_settings = self.settings.middleware_settings.get(config.name, {})
             instance = factory(settings_model.model_validate(raw_settings))
             if isinstance(instance, AsyncLifecycle):
                 stack.push_async_callback(instance.teardown)
                 await instance.setup()
-            instances.append(cast(Middleware, instance))
-        return MiddlewareChain(instances) if instances else None
+            instances[config.name] = cast(Middleware, instance)
+
+        middleware_chains: dict[str, MiddlewareChain] = {}
+        for capability in capability_names:
+            names = list(dict.fromkeys(self.settings.global_middleware + self.settings.middleware.get(capability, [])))
+            ordered_configs = [configs[name] for name in names if name in configs]
+            ordered = self._order_middleware(ordered_configs)
+            chain_instances = []
+            for config in ordered:
+                if config.applies_to is not None and capability not in config.applies_to:
+                    raise ApplicationError(
+                        f"Middleware {config.name!r} does not apply to capability {capability!r}"
+                    )
+                chain_instances.append(instances[config.name])
+            if chain_instances:
+                middleware_chains[capability] = MiddlewareChain(chain_instances)
+        return middleware_chains
 
     @staticmethod
     def _order_middleware(configs: list[MiddlewareConfig]) -> list[MiddlewareConfig]:
         """Topologically order middleware, using priority as a stable tie-breaker."""
         by_name = {config.name: config for config in configs}
-        dependencies = {config.name: set(config.after) for config in configs}
+        dependencies = {config.name: set() for config in configs}
         for config in configs:
+            for target in config.after:
+                if target in by_name:
+                    dependencies[config.name].add(target)
             for target in config.before:
-                if target in dependencies:
+                if target in by_name:
                     dependencies[target].add(config.name)
-            unknown = dependencies[config.name].difference(by_name)
-            if unknown:
-                raise ApplicationError(
-                    f"Middleware {config.name!r} references unknown ordering targets: "
-                    f"{', '.join(sorted(unknown))}"
-                )
         ordered: list[MiddlewareConfig] = []
         remaining = set(by_name)
         while remaining:
@@ -216,35 +212,21 @@ class Application:
                 remaining.remove(name)
         return ordered
 
-    @staticmethod
-    def _import_symbol(path: str) -> Any:
-        module_name, separator, symbol_name = path.rpartition(":")
-        if not separator:
-            raise ApplicationError(f"Invalid import path: {path!r}")
-        try:
-            return getattr(importlib.import_module(module_name), symbol_name)
-        except (ImportError, AttributeError) as exc:
-            raise ApplicationError(f"Unable to import {path!r}", cause=exc) from exc
-
-    @classmethod
-    def _resolve_settings_model(cls, value: type[BaseModel] | str | None) -> type[BaseModel]:
-        if value is None:
-            return EmptySettings
-        resolved = cls._import_symbol(value) if isinstance(value, str) else value
-        if not isinstance(resolved, type) or not issubclass(resolved, BaseModel):
-            raise ApplicationError("Component settings model must be a Pydantic model")
-        return resolved
-
     def _reset_runtime_state(self) -> None:
         self._registry = Registry()
         self._signal_bus = SignalBus()
         self._executor = None
-        self._components = {}
+        self._component_manager = ComponentManager(self._registry, self.settings)
         self._discovery_result = None
         self._started = False
 
     async def _emit(self, signal: str, **kwargs: Any) -> None:
         await self._signal_bus.emit(signal, **kwargs)
+
+    @property
+    def component_manager(self) -> ComponentManager:
+        """Return the provider lifecycle owner for this runtime."""
+        return self._component_manager
 
     @property
     def registry(self) -> Registry:

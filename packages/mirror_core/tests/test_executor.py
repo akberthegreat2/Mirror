@@ -3,13 +3,14 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from pydantic import BaseModel
+
 from mirror_core.exceptions import ExecutionError
 from mirror_core.executor import Executor, RunOutcome, StepState
-from mirror_core.middleware import MiddlewareChain
+from mirror_core.middleware import Invocation, MiddlewareChain
 from mirror_core.pipeline import Pipeline, Step
 from mirror_core.planner import Planner
 from mirror_core.registry import CapabilityConfig, ProviderConfig, Registry
-from pydantic import BaseModel
 
 
 class MockRequest(BaseModel):
@@ -86,7 +87,9 @@ async def test_executor_uses_runtime_inputs_and_accurate_producer() -> None:
 @pytest.mark.asyncio
 async def test_executor_tracks_only_direct_resource_parents() -> None:
     provider = AsyncMock()
-    provider.fetch = AsyncMock(side_effect=[MockResult(content="a"), MockResult(content="b")])
+    provider.fetch = AsyncMock(
+        side_effect=[MockResult(content="a"), MockResult(content="b")]
+    )
     plan = make_plan(
         Step(id="a", capability="fetch", input={"url": "$pipeline.url"}, outputs=["result"]),
         Step(id="b", capability="fetch", input={"url": "a.content"}, outputs=["result"]),
@@ -154,7 +157,7 @@ async def test_middleware_can_short_circuit_provider() -> None:
     provider = AsyncMock()
 
     class CacheMiddleware:
-        async def __call__(self, invocation, next_middleware):
+        async def __call__(self, invocation: Invocation, next_middleware):
             return MockResult(content="cached")
 
     plan = make_plan(
@@ -188,3 +191,88 @@ async def test_concurrent_runs_do_not_share_state() -> None:
     assert first.run_id != second.run_id
     assert first.results["a"].payload.content == "one"
     assert second.results["a"].payload.content == "two"
+
+@pytest.mark.asyncio
+async def test_step_retry_policy_is_enforced() -> None:
+    from mirror_core.pipeline import RetryPolicy
+
+    provider = AsyncMock()
+    provider.fetch = AsyncMock(
+        side_effect=[ValueError("temporary"), MockResult(content="recovered")]
+    )
+    plan = make_plan(
+        Step(
+            id="a",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+            retry=RetryPolicy(attempts=2),
+        )
+    )
+    executor = Executor({("fetch", "httpx"): provider})
+
+    result = await executor.execute_run(plan, inputs={"url": "x"}, runner=runner)
+
+    assert result.outcome is RunOutcome.SUCCEEDED
+    assert provider.fetch.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_step_timeout_is_enforced() -> None:
+    import asyncio
+
+    provider = AsyncMock()
+
+    async def slow_fetch(request: MockRequest) -> MockResult:
+        await asyncio.sleep(1)
+        return MockResult(content="late")
+
+    provider.fetch = slow_fetch
+    plan = make_plan(
+        Step(
+            id="a",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+            timeout=0.01,
+        )
+    )
+    executor = Executor({("fetch", "httpx"): provider})
+
+    result = await executor.execute_run(plan, inputs={"url": "x"}, runner=runner)
+
+    assert result.outcome is RunOutcome.FAILED
+    assert result.states["a"] is StepState.FAILED
+
+
+@pytest.mark.asyncio
+async def test_cancel_stops_a_running_task() -> None:
+    import asyncio
+
+    started = asyncio.Event()
+    cancelled = asyncio.Event()
+    provider = AsyncMock()
+
+    async def blocking_fetch(request: MockRequest) -> MockResult:
+        started.set()
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+        return MockResult(content="never")
+
+    provider.fetch = blocking_fetch
+    plan = make_plan(
+        Step(id="a", capability="fetch", input={"url": "$pipeline.url"}, outputs=["result"])
+    )
+    executor = Executor({("fetch", "httpx"): provider})
+    task = asyncio.create_task(executor.execute_run(plan, inputs={"url": "x"}, runner=runner))
+    await started.wait()
+    run_id = next(iter(executor._active_runs))
+    executor.cancel(run_id)
+    result = await task
+
+    assert cancelled.is_set()
+    assert result.outcome is RunOutcome.CANCELLED
+    assert result.states["a"] is StepState.CANCELLED

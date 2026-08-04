@@ -5,6 +5,7 @@ about HTTP, parsing, archives, or any domain-specific concept.
 """
 
 from mirror_core.application import Application
+from mirror_core.components import ComponentManager
 from mirror_core.discovery import DiscoveryResult, discover
 from mirror_core.exceptions import (
     ApplicationError,
@@ -23,7 +24,7 @@ from mirror_core.executor import (
     StepState,
 )
 from mirror_core.lifecycle import AsyncLifecycle
-from mirror_core.middleware import Middleware, MiddlewareChain
+from mirror_core.middleware import Invocation, Middleware, MiddlewareChain
 from mirror_core.pipeline import ErrorPolicy, Pipeline, RetryPolicy, Step
 from mirror_core.planner import CompiledStep, ExecutionPlan, Planner
 from mirror_core.registry import Registry
@@ -52,6 +53,7 @@ __all__ = [
     # Signals
     "SignalBus",
     # Middleware
+    "Invocation",
     "Middleware",
     "MiddlewareChain",
     # Resource
@@ -75,4 +77,5 @@ __all__ = [
     "StepState",
     # Application
     "Application",
+    "ComponentManager",
 ]

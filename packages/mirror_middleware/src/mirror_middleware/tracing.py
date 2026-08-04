@@ -1,48 +1,58 @@
-"""Tracing middleware for OpenTelemetry integration (stub).
-
-This is a placeholder for distributed tracing integration.
-"""
+"""Tracing middleware for request context propagation."""
 
 from __future__ import annotations
 
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict
+
 from mirror_core.middleware import Invocation, NextMiddleware
+from mirror_core.registry import MiddlewareConfig
+
+
+class TracingSettings(BaseModel):
+    """Validated settings for tracing middleware."""
+
+    model_config = ConfigDict(frozen=True)
+
+    service_name: str = "mirror"
+    exporter: str = "console"
 
 
 class TracingMiddleware:
-    """OpenTelemetry tracing middleware (stub).
+    """Propagate basic run and step context through the invocation chain."""
 
-    Settings:
-        service_name (str): Name of the service. Default: "mirror".
-        exporter (str): Exporter type (e.g., "console", "otlp"). Default: "console".
-    """
-
-    def __init__(
-        self,
-        service_name: str = "mirror",
-        exporter: str = "console",
-    ) -> None:
-        self.service_name = service_name
-        self.exporter = exporter
-        # TODO: Initialize OpenTelemetry when dependencies are added
+    def __init__(self, settings: TracingSettings | None = None, /, **overrides: Any) -> None:
+        if settings is None:
+            settings = TracingSettings.model_validate(overrides)
+        elif overrides:
+            settings = settings.model_copy(update=overrides)
+        self.settings = settings
 
     async def __call__(self, invocation: Invocation, next_middleware: NextMiddleware) -> Any:
-        """Execute with tracing."""
-        # Placeholder: just call next
-        # In full implementation, wrap with span
+        """Attach trace context and continue."""
+        trace = invocation.context.setdefault("trace", {})
+        trace.setdefault("service_name", self.settings.service_name)
+        trace.setdefault("step_id", invocation.step.id)
+        trace.setdefault("capability", invocation.step.capability)
+        run_id = invocation.context.get("run_id")
+        if run_id is not None:
+            trace.setdefault("run_id", str(run_id))
         return await next_middleware(invocation)
 
 
-def middleware_config() -> dict[str, Any]:
-    """Return middleware descriptor for discovery."""
-    return {
-        "name": "tracing",
-        "factory": "mirror_middleware.tracing:TracingMiddleware",
-        "settings_model": None,
-        "applies_to": None,
-        "ordering_constraints": {"after": ["logging"]},
-        "metadata": {
-            "description": "OpenTelemetry distributed tracing (stub)",
-        },
-    }
+middleware = MiddlewareConfig(
+    name="tracing",
+    factory="mirror_middleware.tracing:TracingMiddleware",
+    settings_model=TracingSettings,
+    applies_to=None,
+    after=["logging"],
+    metadata={
+        "description": "Basic execution context propagation",
+    },
+)
+
+
+def middleware_config() -> MiddlewareConfig:
+    """Return the middleware descriptor for compatibility."""
+    return middleware

@@ -4,11 +4,12 @@ import sys
 from typing import Protocol, runtime_checkable
 
 import pytest
+from pydantic import BaseModel
+
 from mirror_core.application import Application
 from mirror_core.discovery import DiscoverySource
 from mirror_core.registry import CapabilityConfig, ProviderConfig
 from mirror_core.settings import MirrorSettings
-from pydantic import BaseModel
 
 
 class ProviderSettings(BaseModel):

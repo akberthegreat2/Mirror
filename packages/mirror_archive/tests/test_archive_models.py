@@ -2,13 +2,14 @@
 
 from uuid import uuid4
 
-from mirror_archive.models import ArchiveRequest, ArchiveResult
+from mirror_archive.models import ArchivePayload, ArchiveRequest, ArchiveResult
 
 
 def test_archive_request():
-    req = ArchiveRequest(resource_id=uuid4(), payload={"data": "test"})
+    req = ArchiveRequest(resource_id=uuid4(), payload=ArchivePayload(content=b"test", target_uri="https://example.com"))
     assert req.resource_id is not None
-    assert req.payload == {"data": "test"}
+    assert req.payload.content == b"test"
+    assert req.payload.target_uri == "https://example.com"
 
 
 def test_archive_result():

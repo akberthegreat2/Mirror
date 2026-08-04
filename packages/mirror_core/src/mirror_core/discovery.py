@@ -128,6 +128,12 @@ def discover(
             continue
 
         desc = classify_descriptor(obj)
+        if desc is None and callable(obj):
+            try:
+                desc = classify_descriptor(obj())
+            except Exception as exc:
+                result.errors.append((name, f"Failed to resolve callable descriptor: {exc}"))
+                continue
         if desc is None:
             result.errors.append((name, f"Unknown descriptor type: {type(obj).__name__}"))
             continue

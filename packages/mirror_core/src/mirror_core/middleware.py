@@ -9,7 +9,28 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
-Invocation = dict[str, Any]  # typed dict with request, context, metadata
+from pydantic import BaseModel, ConfigDict, Field
+
+from mirror_core.pipeline import Step
+
+
+class Invocation(BaseModel):
+    """Typed middleware invocation payload.
+
+    Middleware receives a frozen invocation object with the resolved step,
+    request model, provider instance, and an open-ended context mapping.
+    The context is intentionally mutable so middleware may attach tracing,
+    metrics, or other execution metadata.
+    """
+
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
+
+    step: Step
+    request: BaseModel
+    provider: Any
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
 NextMiddleware = Callable[[Invocation], Awaitable[Any]]
 
 
@@ -24,7 +45,7 @@ class Middleware(Protocol):
         """Process the invocation.
 
         Args:
-            invocation: Contains request, context, metadata.
+            invocation: Contains the resolved step, request, provider, and context.
             next: Call the next middleware in the chain.
 
         Returns:
@@ -59,7 +80,6 @@ class MiddlewareChain:
             current = middleware
             next_chain = chain
 
-            # Bind current and next_chain at definition time
             async def wrapper(
                 invocation: Invocation,
                 m: Middleware = current,

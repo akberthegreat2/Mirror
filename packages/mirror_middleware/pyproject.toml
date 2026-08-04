@@ -19,11 +19,11 @@ test = ["pytest>=7.0", "pytest-asyncio>=0.21"]
 dev = ["ruff", "mypy"]
 
 [project.entry-points."mirror"]
-retry = "mirror_middleware.retry:middleware_config"
-timeout = "mirror_middleware.timeout:middleware_config"
-ratelimit = "mirror_middleware.ratelimit:middleware_config"
-logging = "mirror_middleware.logging:middleware_config"
-tracing = "mirror_middleware.tracing:middleware_config"
+retry = "mirror_middleware.retry:middleware"
+timeout = "mirror_middleware.timeout:middleware"
+ratelimit = "mirror_middleware.ratelimit:middleware"
+logging = "mirror_middleware.logging:middleware"
+tracing = "mirror_middleware.tracing:middleware"
 
 [tool.setuptools.packages.find]
 where = ["src"]

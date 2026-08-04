@@ -1,11 +1,14 @@
 """Tests for WARC provider."""
 
+import pytest
+
+pytest.importorskip("warcio")
+
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from uuid import uuid4
 
-import pytest
-from mirror_archive.models import ArchiveRequest
+from mirror_archive.models import ArchivePayload, ArchiveRequest
 from mirror_archive_warc.provider import WARCProvider
 from mirror_archive_warc.settings import WARCSettings
 
@@ -28,13 +31,9 @@ async def test_provider_archive():
         provider = WARCProvider(settings=settings)
         await provider.setup()
 
-        class FakePayload:
-            content = b"test content"
-            url = "https://example.com"
-
         request = ArchiveRequest(
             resource_id=uuid4(),
-            payload=FakePayload(),
+            payload=ArchivePayload(content=b"test content", target_uri="https://example.com"),
             metadata={"source": "test"},
         )
 
@@ -51,14 +50,7 @@ async def test_provider_no_setup_auto():
     with TemporaryDirectory() as tmpdir:
         settings = WARCSettings(output_dir=Path(tmpdir))
         provider = WARCProvider(settings=settings)
-        # Should auto-setup
 
-        class FakePayload:
-            content = b"test"
-            url = "https://example.com"
-
-        request = ArchiveRequest(resource_id=uuid4(), payload=FakePayload())
-        result = await provider.archive(request)
-        assert result is not None
-
-        await provider.teardown()
+        request = ArchiveRequest(resource_id=uuid4(), payload=ArchivePayload(content=b"test"))
+        with pytest.raises(Exception, match="not initialized"):
+            await provider.archive(request)

@@ -143,9 +143,7 @@ class Registry:
 
     def resolve_capability(self, name: str, constraint: str | None = None) -> CapabilityConfig:
         """Resolve the newest capability version satisfying an optional constraint."""
-        candidates = [
-            config for (cap_name, _), config in self._capabilities.items() if cap_name == name
-        ]
+        candidates = [config for (cap_name, _), config in self._capabilities.items() if cap_name == name]
         if not candidates:
             raise RegistryError(f"Capability not found: {name}")
         specifier = SpecifierSet(constraint or "")
@@ -169,8 +167,7 @@ class Registry:
         candidates = [
             provider
             for (cap_name, _), provider in self._providers.items()
-            if cap_name == capability.name
-            and (provider_name is None or provider.name == provider_name)
+            if cap_name == capability.name and (provider_name is None or provider.name == provider_name)
         ]
         compatible = [
             provider
