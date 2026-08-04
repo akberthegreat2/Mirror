@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha candidate — 2026-08-04
+
+- Hardened WARC lifecycle, record semantics, concurrency, rotation, and errors.
+- Removed skipped placeholder provider-contract tests.
+- Added deterministic WARC contract coverage without external dependencies.
+- Validated 98 tests, all package wheels, installed imports, entry points, and CLI.
+
 ## 0.1.0-alpha - Unreleased
 
 ### Added
