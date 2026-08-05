@@ -1,64 +1,52 @@
-"""Contract tests for Fetch providers."""
+"""Reusable contract tests for Fetch providers."""
+
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
 
 import pytest
+import pytest_asyncio
 from mirror_core.lifecycle import AsyncLifecycle
 from mirror_testing import BaseContract
-from pydantic import HttpUrl
 
-from mirror_fetch.exceptions import FetchError
-from mirror_fetch.models import FetchRequest, FetchResult
 from mirror_fetch.protocol import Fetch
 
 
 class FetchContract(BaseContract):
-    """Contract tests for Fetch providers.
+    """Provider-independent structural contract for Fetch implementations.
 
-    Subclass this and set provider_class to test your provider.
+    Network success and transport-error behavior require provider-specific
+    deterministic transports and therefore remain in each provider package's
+    tests. This shared suite verifies the common protocol and lifecycle without
+    making external internet requests.
     """
 
-    __test__ = False  # Prevent pytest from collecting this base class
-
+    __test__ = False
     provider_class: type[Fetch] | None = None
 
     @pytest.fixture
     def provider(self) -> Fetch:
         if self.provider_class is None:
-            raise NotImplementedError("provider_class must be set")
+            raise RuntimeError("provider_class must be set")
         return self.provider_class()
 
-    @pytest.mark.asyncio
-    async def test_capability_protocol(self, provider: Fetch) -> None:
+    @pytest_asyncio.fixture
+    async def started_provider(self, provider: Fetch) -> AsyncIterator[Fetch]:
+        if isinstance(provider, AsyncLifecycle):
+            await provider.setup()
+        try:
+            yield provider
+        finally:
+            if isinstance(provider, AsyncLifecycle):
+                await provider.teardown()
+
+    def test_capability_protocol(self, provider: Fetch) -> None:
         assert isinstance(provider, Fetch)
 
     @pytest.mark.asyncio
-    async def test_request_model(self, provider: Fetch) -> None:
-        request = FetchRequest(url=HttpUrl("https://example.com"))
-        try:
-            await provider.fetch(request)
-        except FetchError:
-            pass
-        except Exception as e:
-            pytest.fail(f"Unexpected exception: {e}")
-
-    @pytest.mark.asyncio
-    async def test_result_model(self, provider: Fetch) -> None:
-        request = FetchRequest(url=HttpUrl("https://httpbin.org/get"))
-        try:
-            result = await provider.fetch(request)
-            assert isinstance(result, FetchResult)
-        except FetchError:
-            pytest.skip("Network unavailable")
-
-    @pytest.mark.asyncio
-    async def test_error_translation(self, provider: Fetch) -> None:
-        request = FetchRequest(url=HttpUrl("https://invalid-domain-that-does-not-exist.local"))
-        with pytest.raises(FetchError):
-            await provider.fetch(request)
-
-    @pytest.mark.asyncio
-    async def test_lifecycle(self, provider: Fetch) -> None:
+    async def test_lifecycle_is_idempotent(self, provider: Fetch) -> None:
         if not isinstance(provider, AsyncLifecycle):
-            pytest.skip("Provider does not implement AsyncLifecycle")
+            pytest.fail("Fetch providers must implement AsyncLifecycle")
         await provider.setup()
         await provider.setup()
         await provider.teardown()

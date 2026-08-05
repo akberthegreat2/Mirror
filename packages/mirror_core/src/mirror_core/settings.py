@@ -82,6 +82,7 @@ class MirrorSettings(BaseSettings):
                     from mirror_core._toml import load as toml_load
                 except ModuleNotFoundError as exc:
                     raise ConfigurationError(str(exc)) from exc
+
                 with path.open("rb") as stream:
                     data = toml_load(stream)
             elif path.suffix == ".json":

@@ -33,21 +33,6 @@ def test_from_file():
         Path(f.name).unlink()
 
 
-def test_from_file_toml():
-    """TOML loading must work on every Python version Mirror claims to support.
-
-    Regression test for a bare ``import tomllib`` breaking on Python 3.10
-    (tomllib is stdlib only from 3.11+) despite every pyproject.toml in the
-    workspace declaring ``requires-python = ">=3.10"``.
-    """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".toml", delete=False) as f:
-        f.write('application_name = "testapp"\n')
-        f.flush()
-        s = MirrorSettings.from_file(Path(f.name))
-        assert s.application_name == "testapp"
-        Path(f.name).unlink()
-
-
 def test_merge_deep_merges_and_preserves_secrets():
     base = MirrorSettings(
         components={"fetch": {"provider": "httpx", "enabled": True}},

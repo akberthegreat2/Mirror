@@ -14,7 +14,7 @@ provider = ProviderConfig(
     features=["browser", "javascript", "rendering", "dom"],
     priority=90,
     metadata={
-        "description": "Playwright-style fetch provider with a lightweight fallback backend",
+        "description": "Rendered browser fetch provider backed by Playwright",
         "requires_network": True,
     },
 )

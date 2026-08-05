@@ -31,11 +31,10 @@ def test_status() -> None:
     assert result.exit_code == 0
 
 
-def test_run_no_args() -> None:
-    """The run command should accept an empty invocation."""
+def test_run_requires_pipeline() -> None:
+    """The run command requires an explicit pipeline file."""
     result = runner.invoke(app, ["run"])
-    assert result.exit_code == 0
-    assert "Running pipeline" in result.output
+    assert result.exit_code == 2
 
 
 def test_startproject_creates_scaffold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -110,8 +109,8 @@ def test_generated_manage_py_can_run_doctor(tmp_path: Path, monkeypatch: pytest.
 
 
 
-def test_worker_command() -> None:
-    """The worker command should start and stop the local backend."""
-    result = runner.invoke(app, ["worker"])
+def test_worker_check_command() -> None:
+    """Worker status must be honest about its experimental state."""
+    result = runner.invoke(app, ["worker-check"])
     assert result.exit_code == 0
-    assert "Worker backend ready" in result.output
+    assert "experimental" in result.output

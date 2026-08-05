@@ -94,3 +94,57 @@ def test_planner_rejects_undeclared_pipeline_input() -> None:
 
     with pytest.raises(PlannerError, match="undeclared pipeline input"):
         Planner(registry(), default_providers={"fetch": "httpx"}).plan(pipeline)
+
+
+def test_port_assignability_is_directional() -> None:
+    class Animal(BaseModel):
+        name: str
+
+    class Dog(Animal):
+        breed: str
+
+    class SourceRequest(BaseModel):
+        value: str
+
+    class TargetRequest(BaseModel):
+        animal: Dog
+
+    class TargetResult(BaseModel):
+        ok: bool
+
+    registry = Registry()
+    registry.register_capability(
+        CapabilityConfig(
+            name="source",
+            api_version="1.0",
+            request_model=SourceRequest,
+            result_model=Animal,
+            output_ports={"result": Animal},
+        )
+    )
+    registry.register_capability(
+        CapabilityConfig(
+            name="target",
+            api_version="1.0",
+            request_model=TargetRequest,
+            result_model=TargetResult,
+            input_ports={"animal": Dog},
+        )
+    )
+    registry.register_provider(
+        ProviderConfig(name="source", capability="source", capability_api="~=1.0", factory="x:y")
+    )
+    registry.register_provider(
+        ProviderConfig(name="target", capability="target", capability_api="~=1.0", factory="x:y")
+    )
+    pipeline = Pipeline(
+        id="unsafe",
+        inputs={"value": "str"},
+        steps=[
+            Step(id="source", capability="source", input={"value": "$pipeline.value"}),
+            Step(id="target", capability="target", input={"animal": "source.result"}),
+        ],
+    )
+
+    with pytest.raises(PlannerError, match="Incompatible binding"):
+        Planner(registry).plan(pipeline)

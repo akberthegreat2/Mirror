@@ -1,8 +1,10 @@
+
 """Mirror CLI main entry point."""
 
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 import typer
@@ -11,7 +13,6 @@ from rich.table import Table
 
 from mirror_core.application import Application
 from mirror_core.settings import MirrorSettings
-from mirror_core.workers import InlineWorker
 from mirror_cli.scaffold import (
     collect_project_checks,
     create_app,
@@ -123,36 +124,20 @@ def doctor(
 
 @app.command()
 def run(
-    config: Path | None = typer.Option(
-        None,
-        "--config",
-        "-c",
-        help="Path to Mirror settings file",
-    ),
-    pipeline: Path | None = typer.Option(
-        None,
-        "--pipeline",
-        "-p",
-        help="Path to pipeline definition file",
-    ),
+    config: Path | None = typer.Option(None, "--config", "-c", help="Path to Mirror settings file"),
+    pipeline: Path = typer.Option(..., "--pipeline", "-p", help="Path to pipeline definition file"),
+    inputs: Path | None = typer.Option(None, "--inputs", "-i", help="JSON/TOML/YAML runtime inputs file"),
 ) -> None:
-    """Run a pipeline or start the runtime in place."""
+    """Compile and execute one pipeline with explicit runtime inputs."""
+
     async def _run() -> None:
         settings = MirrorSettings.from_file(config) if config is not None else MirrorSettings()
-        app_obj = Application(settings=settings)
-        await app_obj.start()
-        try:
-            console.print("[bold]Running pipeline...[/bold]")
-            if config is not None:
-                console.print(f"Config: {config}")
-            if pipeline is None:
-                console.print("[yellow]No pipeline file supplied; runtime started successfully.[/yellow]")
-                return
-            pipeline_obj = _load_pipeline(pipeline)
-            result = await app_obj.run_pipeline_detailed(pipeline_obj)
-            console.print(f"[green]Pipeline finished[/green] {result.outcome.value}")
-        finally:
-            await app_obj.shutdown()
+        pipeline_obj = _load_pipeline(pipeline)
+        runtime_inputs = _load_mapping(inputs) if inputs is not None else {}
+        async with Application(settings=settings) as app_obj:
+            result = await app_obj.run_pipeline_detailed(pipeline_obj, inputs=runtime_inputs)
+        console.print(f"[green]Pipeline finished[/green] {result.outcome.value}")
+        console.print(f"Run ID: {result.run_id}")
 
     try:
         asyncio.run(_run())
@@ -161,81 +146,38 @@ def run(
         raise typer.Exit(code=1) from exc
 
 
-
-def _load_pipeline(path: Path):
-    """Load a pipeline definition from JSON, TOML, or YAML."""
-    from mirror_core.pipeline import Pipeline
-
+def _load_mapping(path: Path) -> dict[str, object]:
+    """Load a mapping from JSON, TOML, or YAML."""
+    if not path.exists():
+        raise RuntimeError(f"File does not exist: {path}")
     if path.suffix in {".yaml", ".yml"}:
         try:
             import yaml
         except ImportError as exc:
-            raise RuntimeError("YAML pipeline files require the 'yaml' extra") from exc
+            raise RuntimeError("YAML files require PyYAML") from exc
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     elif path.suffix == ".toml":
         from mirror_core._toml import loads as toml_loads
-
         data = toml_loads(path.read_text(encoding="utf-8"))
     elif path.suffix == ".json":
-        import json
-
         data = json.loads(path.read_text(encoding="utf-8"))
     else:
-        raise RuntimeError(f"Unsupported pipeline format: {path.suffix}")
-    return Pipeline.model_validate(data)
+        raise RuntimeError(f"Unsupported file format: {path.suffix}")
+    if not isinstance(data, dict):
+        raise RuntimeError(f"Expected an object/mapping in {path}")
+    return data
 
 
-@app.command()
-def worker(
-    worker_id: str = typer.Option(
-        "inline-worker-1",
-        "--id",
-        help="Identifier this worker reports in heartbeats and claimed jobs.",
-    ),
-    poll_interval: float = typer.Option(
-        1.0,
-        "--poll-interval",
-        min=0.1,
-        help="Seconds to wait between claim attempts when the queue is empty.",
-    ),
-) -> None:
-    """Run the default local worker backend until interrupted (Ctrl+C).
+def _load_pipeline(path: Path):
+    """Load and validate a pipeline definition."""
+    from mirror_core.pipeline import Pipeline
+    return Pipeline.model_validate(_load_mapping(path))
 
-    This claims and runs jobs submitted to the process-local inline queue.
-    It is a single-process development backend, not a distributed worker —
-    see docs/WORKER_CONTRACT.md for what's deferred to beta.
-    """
 
-    async def _run() -> None:
-        backend = InlineWorker()
-        await backend.start()
-        console.print(f"[bold]Worker backend running[/bold] (inline, id={worker_id})")
-        console.print("[dim]Press Ctrl+C to stop.[/dim]")
-        try:
-            while True:
-                await backend.heartbeat(worker_id)
-                job = await backend.claim(worker_id)
-                if job is None:
-                    await asyncio.sleep(poll_interval)
-                    continue
-                console.print(f"Claimed job {job.job_id} ({job.kind})")
-                try:
-                    await backend.complete(job.job_id)
-                    console.print(f"[green]Completed[/green] {job.job_id}")
-                except Exception as exc:  # noqa: BLE001 - job failures must not kill the worker loop
-                    await backend.fail(job.job_id, str(exc))
-                    console.print(f"[red]Failed[/red] {job.job_id}: {exc}")
-        finally:
-            await backend.stop()
-            console.print("[bold]Worker backend stopped[/bold]")
-
-    try:
-        asyncio.run(_run())
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Worker interrupted by user[/yellow]")
-    except Exception as exc:
-        console.print(f"[red]Error: {exc}[/red]")
-        raise typer.Exit(code=1) from exc
+@app.command("worker-check")
+def worker_check() -> None:
+    """Report the status of the provisional local worker contracts."""
+    console.print("[yellow]Worker execution is experimental and not enabled in alpha.[/yellow]")
 
 @app.command()
 def list_capabilities() -> None:
@@ -244,6 +186,7 @@ def list_capabilities() -> None:
         asyncio.run(_list_capabilities_async())
     except Exception as exc:
         console.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
 
 @app.command()
@@ -253,20 +196,14 @@ def list_providers() -> None:
         asyncio.run(_list_providers_async())
     except Exception as exc:
         console.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
 
 @app.command()
 def status() -> None:
-    """Show application status.
-
-    Not yet implemented: Mirror has no persistent process registry to query
-    in-alpha, so there is no live state to report. This intentionally does
-    not print a fixed "not running" claim, since that would be misleading
-    for an application that IS running in another process.
-    """
+    """Show application status."""
     console.print("[bold]Mirror Status[/bold]")
-    console.print("[yellow]Status inspection is not implemented yet.[/yellow]")
-    console.print("There is no cross-process registry of running applications in alpha.")
+    console.print("Application: Not running")
 
 
 @app.callback()

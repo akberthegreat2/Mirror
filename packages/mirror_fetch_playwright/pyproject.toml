@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mirror-fetch-playwright"
 version = "0.1.0"
-description = "Playwright-style provider for Mirror Fetch"
+description = "Playwright browser provider for Mirror Fetch"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Mirror Contributors"}]
@@ -13,6 +13,7 @@ requires-python = ">=3.10"
 dependencies = [
     "mirror-core>=0.1.0",
     "mirror-fetch>=0.1.0",
+    "playwright>=1.40",
 ]
 classifiers = [
     "Programming Language :: Python :: 3",
