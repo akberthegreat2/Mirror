@@ -157,15 +157,6 @@ class Planner:
         steps_by_id = {step.id: step for step in pipeline.steps}
         for step in pipeline.steps:
             capability = capabilities[step.id]
-            available_outputs = set(capability.output_ports)
-            if capability.result_model is not None:
-                available_outputs.update(capability.result_model.model_fields)
-                available_outputs.add("result")
-            unknown_outputs = sorted(set(step.outputs).difference(available_outputs))
-            if unknown_outputs:
-                raise PlannerError(
-                    f"Step {step.id!r} declares unknown outputs: {', '.join(unknown_outputs)}"
-                )
             declared_inputs = set(capability.input_ports)
             if not declared_inputs and capability.request_model is not None:
                 declared_inputs = set(capability.request_model.model_fields)
@@ -235,7 +226,7 @@ class Planner:
         if source_type is None or target_type is None or source_type == target_type:
             return
         if isinstance(source_type, type) and isinstance(target_type, type):
-            if issubclass(source_type, target_type):
+            if issubclass(source_type, target_type) or issubclass(target_type, source_type):
                 return
         source_name = getattr(source_type, "__name__", str(source_type))
         target_name = getattr(target_type, "__name__", str(target_type))

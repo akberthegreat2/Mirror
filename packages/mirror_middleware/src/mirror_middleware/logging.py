@@ -6,34 +6,30 @@ import logging
 import time
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
-
 from mirror_core.middleware import Invocation, NextMiddleware
 from mirror_core.registry import MiddlewareConfig
 
 logger = logging.getLogger(__name__)
 
 
-class LoggingSettings(BaseModel):
-    """Validated settings for logging middleware."""
-
-    model_config = ConfigDict(frozen=True)
-
-    level: str = "debug"
-    log_args: bool = False
-    log_result: bool = False
-
-
 class LoggingMiddleware:
-    """Log invocation details before and after execution."""
+    """Log invocation details before and after execution.
 
-    def __init__(self, settings: LoggingSettings | None = None, /, **overrides: Any) -> None:
-        if settings is None:
-            settings = LoggingSettings.model_validate(overrides)
-        elif overrides:
-            settings = settings.model_copy(update=overrides)
-        self.settings = settings
-        self.level = getattr(logging, self.settings.level.upper(), logging.DEBUG)
+    Settings:
+        level (str): Log level for messages (debug, info, warning, error). Default: "debug".
+        log_args (bool): Whether to log invocation arguments. Default: False.
+        log_result (bool): Whether to log result (truncated). Default: False.
+    """
+
+    def __init__(
+        self,
+        level: str = "debug",
+        log_args: bool = False,
+        log_result: bool = False,
+    ) -> None:
+        self.level = getattr(logging, level.upper(), logging.DEBUG)
+        self.log_args = log_args
+        self.log_result = log_result
 
     async def __call__(self, invocation: Invocation, next_middleware: NextMiddleware) -> Any:
         """Execute with logging."""
@@ -48,7 +44,7 @@ class LoggingMiddleware:
                 "step_id": step_id,
                 "capability": capability,
                 "invocation_args": invocation.request.model_dump(mode="json")
-                if self.settings.log_args
+                if self.log_args
                 else None,
             },
         )
@@ -63,7 +59,7 @@ class LoggingMiddleware:
                     "step_id": step_id,
                     "capability": capability,
                     "duration": duration,
-                    "result": result if self.settings.log_result else None,
+                    "result": result if self.log_result else None,
                 },
             )
             return result
@@ -85,7 +81,7 @@ class LoggingMiddleware:
 middleware = MiddlewareConfig(
     name="logging",
     factory="mirror_middleware.logging:LoggingMiddleware",
-    settings_model=LoggingSettings,
+    settings_model=None,
     applies_to=None,
     after=["retry", "timeout", "ratelimit"],
     metadata={

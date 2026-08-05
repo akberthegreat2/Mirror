@@ -139,15 +139,6 @@ async def test_real_world_fetch_pipeline_uses_actual_packages(monkeypatch: pytes
     monkeypatch.setattr(HTTPXProvider, "fetch", httpx_fetch)
     monkeypatch.setattr(PlaywrightProvider, "fetch", playwright_fetch)
 
-    async def playwright_setup(self: PlaywrightProvider) -> None:
-        self._browser = object()
-
-    async def playwright_teardown(self: PlaywrightProvider) -> None:
-        self._browser = None
-
-    monkeypatch.setattr(PlaywrightProvider, "setup", playwright_setup)
-    monkeypatch.setattr(PlaywrightProvider, "teardown", playwright_teardown)
-
     pipeline = Pipeline(
         id="smoke-fetch",
         inputs={"url": "str"},

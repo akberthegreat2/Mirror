@@ -1,10 +1,47 @@
-# Mirror documentation index
+# Mirror documentation map
 
-This directory holds the framework documentation that future contributors should
-be able to use without reading the chat history.
+If you are new to Mirror, start here:
 
-## Contract docs
+1. `../README.md`
+2. `getting-started/quickstart.md`
+3. `tutorials/first_project.md`
 
+## User docs
+
+These are written for people using Mirror to build things.
+
+- [Quickstart](getting-started/quickstart.md)
+- [First project](tutorials/first_project.md)
+- [Provider swap](tutorials/provider_swap.md)
+
+## Concepts
+
+These explain the main ideas without diving into internal code.
+
+- [Developer experience](concepts/developer-experience.md)
+- [Execution](concepts/execution.md)
+- [Middleware](concepts/middleware.md)
+- [Providers](concepts/providers.md)
+- [Signals](concepts/signals.md)
+- [Workers](concepts/workers.md)
+
+## Reference
+
+These pages describe commands and packages exactly.
+
+- [CLI reference](reference/cli.md)
+- [Execution reference](reference/execution.md)
+- [Middleware reference](reference/middleware.md)
+- [mirror-core reference](reference/mirror_core.md)
+- [Signals reference](reference/signals.md)
+- [Worker reference](reference/workers.md)
+- [mirror-fetch-playwright](reference/mirror_fetch_playwright.md)
+
+## Contributor docs
+
+These are for maintainers and future contributors.
+
+- [Documentation constitution](CONSTITUTION.md)
 - [Architecture](ARCHITECTURE.md)
 - [Alpha contract](ALPHA_CONTRACT.md)
 - [Execution semantics](EXECUTION_SEMANTICS.md)
@@ -14,30 +51,7 @@ be able to use without reading the chat history.
 - [Release checklist](RELEASE_CHECKLIST.md)
 - [Future work](FUTURE.md)
 - [Contributor guide](CONTRIBUTOR_GUIDE.md)
-
-## Concepts
-
-- [Developer experience](concepts/developer-experience.md)
-- [Execution](concepts/execution.md)
-- [Middleware](concepts/middleware.md)
-- [Providers](concepts/providers.md)
-- [Signals](concepts/signals.md)
-- [Workers](concepts/workers.md)
-
-## Tutorials
-
-- [First project](tutorials/first_project.md)
-- [Provider swap](tutorials/provider_swap.md)
-
-## Reference
-
-- [CLI reference](reference/cli.md)
-- [Execution reference](reference/execution.md)
-- [Middleware reference](reference/middleware.md)
-- [mirror-core reference](reference/mirror_core.md)
-- [Signals reference](reference/signals.md)
-- [Worker reference](reference/workers.md)
-- [mirror-fetch-playwright](reference/mirror_fetch_playwright.md)
+- [Architecture decisions](adr/README.md)
 
 ## Implementation notes
 

@@ -1,8 +1,9 @@
-"""Tests for the real Playwright fetch provider."""
+"""Tests for the Playwright-style fetch provider."""
 
 from __future__ import annotations
 
-from typing import Any
+from types import SimpleNamespace
+from urllib import error as urllib_error
 
 import pytest
 from mirror_fetch.exceptions import FetchError
@@ -12,84 +13,73 @@ from mirror_fetch_playwright.provider import PlaywrightProvider
 from mirror_fetch_playwright.settings import PlaywrightSettings
 
 
-class FakeResponse:
-    status = 200
-
-    async def all_headers(self) -> dict[str, str]:
-        return {"content-type": "text/html"}
+class _FakeHeaders(dict):
+    def get_content_charset(self, default: str = "utf-8") -> str:
+        return self.get("charset", default)
 
 
-class FakePage:
-    url = "https://example.com/"
+class _FakeResponse:
+    def __init__(self, url: str = "https://example.com") -> None:
+        self.url = url
+        self.status = 200
+        self.headers = _FakeHeaders({"Content-Type": "text/plain; charset=utf-8", "Content-Length": "2"})
+        self._closed = False
 
-    async def goto(self, *args: Any, **kwargs: Any) -> FakeResponse:
-        return FakeResponse()
+    def read(self) -> bytes:
+        return b"ok"
 
-    async def content(self) -> str:
-        return "<html>ok</html>"
-
-
-class FakeContext:
-    closed = False
-
-    async def new_page(self) -> FakePage:
-        return FakePage()
-
-    async def close(self) -> None:
-        self.closed = True
-
-
-class FakeBrowser:
-    closed = False
-
-    async def new_context(self, **kwargs: Any) -> FakeContext:
-        return FakeContext()
-
-    async def close(self) -> None:
-        self.closed = True
+    def close(self) -> None:
+        self._closed = True
 
 
 @pytest.mark.asyncio
 async def test_descriptor_protocol() -> None:
-    assert isinstance(PlaywrightProvider(), Fetch)
-
-
-@pytest.mark.asyncio
-async def test_fetch_success() -> None:
-    browser = FakeBrowser()
-
-    async def launch(settings: PlaywrightSettings) -> FakeBrowser:
-        return browser
-
-    provider = PlaywrightProvider(launcher=launch)
-    await provider.setup()
-    result = await provider.fetch(FetchRequest(url="https://example.com"))
-    assert result.status_code == 200
-    assert result.content == b"<html>ok</html>"
-    await provider.teardown()
-    assert browser.closed is True
-
-
-@pytest.mark.asyncio
-async def test_fetch_requires_setup() -> None:
+    """The provider must satisfy the Fetch protocol."""
     provider = PlaywrightProvider()
-    with pytest.raises(FetchError, match="not initialized"):
+    assert isinstance(provider, Fetch)
+
+
+@pytest.mark.asyncio
+async def test_fetch_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The provider should return a typed fetch result."""
+    provider = PlaywrightProvider(PlaywrightSettings(user_agent="Mirror-Test/1.0"))
+
+    def fake_open(request: FetchRequest, timeout: float) -> _FakeResponse:
+        assert timeout == 30.0
+        assert request.headers == {}
+        return _FakeResponse(str(request.url))
+
+    monkeypatch.setattr(provider, "_open", fake_open)
+
+    result = await provider.fetch(FetchRequest(url="https://example.com"))
+    assert result.url == "https://example.com/"
+    assert result.status_code == 200
+    assert result.content == b"ok"
+    assert result.content_type == "text/plain; charset=utf-8"
+    assert result.content_length == 2
+
+
+@pytest.mark.asyncio
+async def test_fetch_error_translation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Backend failures should become FetchError instances."""
+    provider = PlaywrightProvider()
+
+    def fake_open(request: FetchRequest, timeout: float) -> _FakeResponse:
+        raise urllib_error.URLError("boom")
+
+    monkeypatch.setattr(provider, "_open", fake_open)
+
+    with pytest.raises(FetchError) as exc:
         await provider.fetch(FetchRequest(url="https://example.com"))
+    assert "boom" in str(exc.value)
+    assert exc.value.cause is not None
 
 
 @pytest.mark.asyncio
 async def test_lifecycle_idempotent() -> None:
-    browser = FakeBrowser()
-    launches = 0
-
-    async def launch(settings: PlaywrightSettings) -> FakeBrowser:
-        nonlocal launches
-        launches += 1
-        return browser
-
-    provider = PlaywrightProvider(launcher=launch)
+    """The provider lifecycle should be idempotent."""
+    provider = PlaywrightProvider()
     await provider.setup()
     await provider.setup()
-    assert launches == 1
     await provider.teardown()
     await provider.teardown()

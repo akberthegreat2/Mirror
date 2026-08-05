@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 from mirror_archive.exceptions import ArchiveError
-from mirror_archive.models import ArchivePayload, ArchiveRequest, ArchiveResult
+from mirror_archive.models import ArchiveRequest, ArchiveResult
 from mirror_archive.runner import archive_step
 
 
@@ -13,7 +13,7 @@ from mirror_archive.runner import archive_step
 async def test_archive_step_success():
     mock_provider = AsyncMock()
     resource_id = uuid4()
-    request = ArchiveRequest(resource_id=resource_id, payload=ArchivePayload(content=b"test", target_uri="https://example.com"))
+    request = ArchiveRequest(resource_id=resource_id, payload={"data": "test"})
     expected = ArchiveResult(
         archive_id=uuid4(),
         path="/data/test.warc",
@@ -31,7 +31,7 @@ async def test_archive_step_success():
 async def test_archive_step_raises_archive_error():
     mock_provider = AsyncMock()
     mock_provider.archive.side_effect = ArchiveError("provider error")
-    request = ArchiveRequest(resource_id=uuid4(), payload=ArchivePayload(content=b"test", target_uri="https://example.com"))
+    request = ArchiveRequest(resource_id=uuid4(), payload={"data": "test"})
 
     with pytest.raises(ArchiveError, match="provider error"):
         await archive_step(mock_provider, request)
@@ -41,7 +41,7 @@ async def test_archive_step_raises_archive_error():
 async def test_archive_step_wraps_unknown_error():
     mock_provider = AsyncMock()
     mock_provider.archive.side_effect = ValueError("unexpected")
-    request = ArchiveRequest(resource_id=uuid4(), payload=ArchivePayload(content=b"test", target_uri="https://example.com"))
+    request = ArchiveRequest(resource_id=uuid4(), payload={"data": "test"})
 
     with pytest.raises(ArchiveError) as exc:
         await archive_step(mock_provider, request)

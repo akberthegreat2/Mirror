@@ -1,22 +1,21 @@
 # Workers
 
-Workers are part of the frozen alpha core. They define how jobs are queued,
-claimed, checkpointed, completed, and resumed.
+Workers are the part of Mirror that actually run jobs.
 
-## Core contracts
+## Core contract
 
-- `WorkerBackend`
-- `ExecutionStore`
-- `CheckpointStore`
-- `ArtifactStore`
-- `LeaseManager`
+Mirror treats workers as a contract, not as one fixed implementation.
 
-## Alpha implementation
+The core ideas are:
 
-The repository ships an in-memory `InlineWorker` and in-memory stores for
-local development and tests.
+- submit a job;
+- claim a job;
+- checkpoint progress;
+- finish or fail a job;
+- resume later if needed.
 
-## Why it matters
+## Alpha setup
 
-The contracts let Mirror grow from one local process to a distributed system
-later without changing the application-level API.
+The repository uses a local worker path for development and tests.
+
+That keeps the project easy to run on a laptop while the beta backend work is still being built.

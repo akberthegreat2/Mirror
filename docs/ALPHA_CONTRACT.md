@@ -28,7 +28,7 @@ Mirror core must provide:
 - a pipeline compiler that produces an execution plan;
 - an execution engine that runs plans only;
 - `ExecutionRun` as per-run state, not shared executor state;
-- cancellation, retry, timeout, and skip semantics;
+- cancellation, retry, timeout, and fallback semantics;
 - pipeline, capability, and step middleware scopes;
 - signals for lifecycle and execution events;
 - worker contracts for execution, checkpoints, leases, and artifacts;
@@ -41,7 +41,7 @@ The repository must provide:
 - `mirror startproject`;
 - `mirror startapp`;
 - `mirror doctor`;
-- `mirror worker-check`;
+- `mirror worker`;
 - install-and-run smoke tests;
 - a readable project scaffold;
 - docs that explain the project without chat history.
@@ -55,13 +55,13 @@ The repository must include:
 - `CODE_OF_CONDUCT.md`;
 - `ROADMAP.md`;
 - `ALPHA_CHECKLIST.md`;
-- `docs/ARCHITECTURE.md`;
-- `docs/EXECUTION_SEMANTICS.md`;
-- `docs/MIDDLEWARE_CONTRACT.md`;
-- `docs/WORKER_CONTRACT.md`;
-- `docs/SIGNAL_CONTRACT.md`;
-- `docs/RELEASE_CHECKLIST.md`;
-- `docs/FUTURE.md`;
+- `ARCHITECTURE.md`;
+- `EXECUTION_SEMANTICS.md`;
+- `MIDDLEWARE_CONTRACT.md`;
+- `WORKER_CONTRACT.md`;
+- `SIGNAL_CONTRACT.md`;
+- `RELEASE_CHECKLIST.md`;
+- `FUTURE.md`;
 - concept docs;
 - tutorial docs;
 - reference docs;

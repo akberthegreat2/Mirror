@@ -35,7 +35,7 @@ The compiler/planner should resolve these before execution starts:
 - port bindings
 - conditions
 - middleware chain
-- retry/timeout policy
+- retry/timeout/fallback policy
 - typed dependencies
 
 Execution should not rediscover or re-resolve those values.
@@ -52,5 +52,6 @@ Execution should distinguish between:
 - abort
 - continue
 - skip
+- fallback
 
 A terminal failure must propagate from execution and must not be hidden behind a generic finished event.

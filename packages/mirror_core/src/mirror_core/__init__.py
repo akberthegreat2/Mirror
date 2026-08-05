@@ -5,7 +5,6 @@ about HTTP, parsing, archives, or any domain-specific concept.
 """
 
 from mirror_core.application import Application
-from mirror_core.components import ComponentManager
 from mirror_core.discovery import DiscoveryResult, discover
 from mirror_core.exceptions import (
     ApplicationError,
@@ -31,6 +30,22 @@ from mirror_core.registry import Registry
 from mirror_core.resource import BlobReference, ProducerRef, ResourceEnvelope
 from mirror_core.settings import MirrorSettings
 from mirror_core.signals import SignalBus
+from mirror_core.workers import (
+    ArtifactStore,
+    CheckpointStore,
+    ExecutionRecord,
+    ExecutionStore,
+    InMemoryArtifactStore,
+    InMemoryCheckpointStore,
+    InMemoryExecutionStore,
+    InMemoryLeaseManager,
+    InlineWorker,
+    JobState,
+    LeaseManager,
+    WorkerBackend,
+    WorkerJob,
+    WorkerLease,
+)
 
 __all__ = [
     # Exceptions
@@ -52,6 +67,21 @@ __all__ = [
     "Registry",
     # Signals
     "SignalBus",
+    # Workers
+    "JobState",
+    "WorkerJob",
+    "WorkerLease",
+    "ExecutionRecord",
+    "WorkerBackend",
+    "ExecutionStore",
+    "CheckpointStore",
+    "ArtifactStore",
+    "LeaseManager",
+    "InlineWorker",
+    "InMemoryExecutionStore",
+    "InMemoryCheckpointStore",
+    "InMemoryArtifactStore",
+    "InMemoryLeaseManager",
     # Middleware
     "Invocation",
     "Middleware",
@@ -77,5 +107,4 @@ __all__ = [
     "StepState",
     # Application
     "Application",
-    "ComponentManager",
 ]
