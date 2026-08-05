@@ -1,28 +1,26 @@
 # Signals
 
-Signals are announcements about what just happened.
+Signals announce facts about runtime progress. They are for observability,
+not control flow.
 
-They are for observation, not for control.
+## Core bus
 
-## Common uses
+`mirror_core.signals.SignalBus` provides named signal registration and
+emission for both sync and async receivers.
 
-- logging
-- metrics
-- tracing
-- progress reporting
-- audit trails
-
-## Typical signal names
+## Common signal names
 
 - `application.started`
+- `application.shutting_down`
+- `application.shutdown`
 - `pipeline.started`
+- `pipeline.finished`
 - `step.started`
-- `step.finished`
+- `step.succeeded`
 - `step.failed`
-- `worker.started`
-- `worker.stopped`
+- `step.skipped`
 
-## Rule of thumb
+## Guidance
 
-If you want to change what the pipeline does, use middleware.
-If you want to be told what happened, use signals.
+Receivers should be side-effect safe. Signal failures should be treated as
+observability problems, not a reason to change pipeline semantics.

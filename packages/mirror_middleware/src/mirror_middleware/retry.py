@@ -3,48 +3,58 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import random
 from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from mirror_core.middleware import Invocation, NextMiddleware
 from mirror_core.registry import MiddlewareConfig
 
 
+class RetrySettings(BaseModel):
+    """Validated settings for retry middleware."""
+
+    model_config = ConfigDict(frozen=True)
+
+    max_attempts: int = 3
+    base_delay: float = 1.0
+    max_delay: float = 30.0
+    backoff_factor: float = 2.0
+    jitter: float = 0.1
+    retryable_exception_names: tuple[str, ...] = Field(default_factory=tuple)
+
+
 class RetryMiddleware:
     """Retry failed invocations with exponential backoff and jitter.
 
-    Settings:
-        max_attempts (int): Maximum number of attempts (including first). Default: 3.
-        base_delay (float): Base delay in seconds. Default: 1.0.
-        max_delay (float): Maximum delay in seconds. Default: 30.0.
-        backoff_factor (float): Multiplier for exponential backoff. Default: 2.0.
-        jitter (float): Random jitter factor (0.0 = no jitter, 1.0 = full jitter). Default: 0.1.
-        retryable_exceptions (list[type]): Exception types that should trigger retry.
-            If None, any exception is retried (except CancelledError). Default: None.
+    The middleware accepts either a validated :class:`RetrySettings` instance
+    or keyword arguments matching that model, which keeps the Application
+    composition path and direct unit tests on the same contract.
     """
 
     def __init__(
         self,
-        max_attempts: int = 3,
-        base_delay: float = 1.0,
-        max_delay: float = 30.0,
-        backoff_factor: float = 2.0,
-        jitter: float = 0.1,
-        retryable_exceptions: list[type] | None = None,
+        settings: RetrySettings | None = None,
+        /,
+        **overrides: Any,
     ) -> None:
-        self.max_attempts = max_attempts
-        self.base_delay = base_delay
-        self.max_delay = max_delay
-        self.backoff_factor = backoff_factor
-        self.jitter = jitter
-        self.retryable_exceptions = retryable_exceptions
+        if settings is None:
+            settings = RetrySettings.model_validate(overrides)
+        elif overrides:
+            settings = settings.model_copy(update=overrides)
+        self.settings = settings
+        self.retryable_exceptions = self._resolve_retryable_exceptions(
+            self.settings.retryable_exception_names
+        )
 
     async def __call__(self, invocation: Invocation, next_middleware: NextMiddleware) -> Any:
         """Execute with retry logic."""
         last_exception: Exception | None = None
         attempt = 0
 
-        while attempt < self.max_attempts:
+        while attempt < self.settings.max_attempts:
             attempt += 1
             try:
                 return await next_middleware(invocation)
@@ -56,12 +66,14 @@ class RetryMiddleware:
                     isinstance(exc, exc_type) for exc_type in self.retryable_exceptions
                 ):
                     raise
-                if attempt >= self.max_attempts:
+                if attempt >= self.settings.max_attempts:
                     raise
-                delay = self.base_delay * (self.backoff_factor ** (attempt - 1))
-                delay = min(delay, self.max_delay)
-                if self.jitter > 0:
-                    jitter_amount = random.uniform(-self.jitter * delay, self.jitter * delay)
+                delay = self.settings.base_delay * (self.settings.backoff_factor ** (attempt - 1))
+                delay = min(delay, self.settings.max_delay)
+                if self.settings.jitter > 0:
+                    jitter_amount = random.uniform(
+                        -self.settings.jitter * delay, self.settings.jitter * delay
+                    )
                     delay = max(0.0, delay + jitter_amount)
                 await asyncio.sleep(delay)
 
@@ -69,11 +81,22 @@ class RetryMiddleware:
             raise last_exception
         raise RuntimeError("Unexpected retry loop exit")
 
+    @staticmethod
+    def _resolve_retryable_exceptions(names: tuple[str, ...]) -> tuple[type[BaseException], ...] | None:
+        if not names:
+            return None
+        resolved: list[type[BaseException]] = []
+        for name in names:
+            candidate = getattr(builtins, name, None)
+            if isinstance(candidate, type) and issubclass(candidate, BaseException):
+                resolved.append(candidate)
+        return tuple(resolved) if resolved else None
+
 
 middleware = MiddlewareConfig(
     name="retry",
     factory="mirror_middleware.retry:RetryMiddleware",
-    settings_model=None,
+    settings_model=RetrySettings,
     applies_to=None,
     before=["timeout", "ratelimit"],
     metadata={

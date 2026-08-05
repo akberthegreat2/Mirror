@@ -1,27 +1,23 @@
 # Mirror
 
-Mirror helps you build crawlers, archives, monitors, and other web products in Python.
+Mirror helps you crawl websites, save discovered URLs, archive pages, retry failures, and run recurring jobs from Python.
 
-Use Mirror when you want to:
+Use Mirror when you want to build:
 
-- discover and save URLs;
-- fetch pages with different backends;
-- archive content for later;
-- retry work automatically;
-- run jobs locally first, then grow into workers later;
-- build a SaaS or internal tool around web data.
+- a website crawler that keeps the URLs it finds
+- an archive service that stores pages and responses
+- a monitor that checks for change over time
+- an SEO or content platform on top of Django
+- a web SaaS that needs workers, scheduling, and storage
 
-Mirror is built as a small core plus optional packages. You install only the parts you need.
+Mirror splits the problem into a few small parts:
 
-## What you can build
-
-| Example | What Mirror gives you |
-|---|---|
-| Website crawler | Discover URLs, fetch pages, and keep the results |
-| Web archive | Store HTML, WARC, JSON, or other captured content |
-| Change monitor | Check pages on a schedule and compare results |
-| SEO tool | Crawl pages and keep a history of what changed |
-| Automation job | Run repeatable web work with retries and logs |
+- **pipelines** describe the work
+- **capabilities** define the contract
+- **providers** choose the implementation
+- **middleware** adds retries, logging, tracing, and rate limits
+- **workers** run the jobs
+- **storage** remembers metadata and blobs
 
 ## Quick start
 
@@ -30,33 +26,42 @@ pip install -e .[dev]
 
 mirror startproject demo
 cd demo
-
 mirror doctor
+mirror worker
+```
+
+You can start a reusable app inside the generated project:
+
+```bash
 mirror startapp monitor
 ```
 
-If you are working inside the monorepo checkout, the helper files in the
-repository root make the packages importable without extra setup.
+And you can run a pipeline from a settings file:
 
-## What ships in this repository
+```bash
+mirror run --config config/settings.toml --pipeline pipelines/crawl.toml
+```
 
-| Package | Purpose |
-|---|---|
-| `mirror-core` | Discovery, registries, lifecycle, planner, executor, resources, signals, middleware contracts |
-| `mirror-fetch` | Fetch capability contract |
-| `mirror-fetch-httpx` | HTTPX fetch backend |
-| `mirror-fetch-playwright` | Playwright browser fetch backend |
-| `mirror-archive` | Archive capability contract |
-| `mirror-archive-warc` | WARC archive backend |
-| `mirror-middleware` | Retry, timeout, rate-limit, logging, and tracing middleware |
-| `mirror-cli` | Project scaffolding and command-line tools |
-| `mirror-testing` | Contract-test helpers for providers and middleware |
+## What is already included
 
-## Read next
+- `mirror-core` — the capability-agnostic runtime kernel
+- `mirror-fetch` — fetch capability contract
+- `mirror-fetch-httpx` — HTTPX fetch provider
+- `mirror-fetch-playwright` — Playwright-style fetch provider
+- `mirror-archive` — archive capability contract
+- `mirror-archive-warc` — WARC archive provider
+- `mirror-middleware` — retry, timeout, rate limit, logging, and tracing middleware
+- `mirror-crawl` — crawl capability and local provider
+- `mirror-cli` — scaffold, doctor, run, worker, and discovery commands
+- `mirror-testing` — helper contracts for provider tests
+
+## Documentation
 
 - `docs/README.md` — documentation map
-- `docs/getting-started/quickstart.md` — the shortest path to a first project
-- `docs/ARCHITECTURE.md` — contributor contract and repository rules
-- `docs/CONSTITUTION.md` — documentation and contribution rules
-- `docs/adr/README.md` — architecture decisions
-- `docs/ALPHA_CONTRACT.md` — what “alpha” means in this repository
+- `docs/BETA_CONTRACT.md` — beta runtime contract
+- `docs/ARCHITECTURE.md` — contributor-facing framework contract
+- `docs/ALPHA_CONTRACT.md` — frozen alpha release contract
+- `docs/RELEASE_CHECKLIST.md` — what must pass before tagging
+
+Mirror's architecture is intentionally split so the framework stays stable while
+implementations can change.

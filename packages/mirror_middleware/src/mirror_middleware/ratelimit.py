@@ -7,31 +7,33 @@ import time
 from collections import defaultdict
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from mirror_core.middleware import Invocation, NextMiddleware
 from mirror_core.registry import MiddlewareConfig
 
 
+class RateLimitSettings(BaseModel):
+    """Validated settings for rate limiting middleware."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rate: float = 10.0
+    burst: int = 20
+    per_key: str | None = None
+
+
 class RateLimitMiddleware:
-    """Rate limit invocations using a token bucket algorithm.
+    """Rate limit invocations using a token bucket algorithm."""
 
-    Settings:
-        rate (float): Number of requests per second. Default: 10.0.
-        burst (int): Maximum burst size. Default: 20.
-        per_key (str | None): Key to use for rate limiting (e.g., "url", "domain").
-            If None, global rate limit applies. Default: None.
-    """
-
-    def __init__(
-        self,
-        rate: float = 10.0,
-        burst: int = 20,
-        per_key: str | None = None,
-    ) -> None:
-        self.rate = rate
-        self.burst = burst
-        self.per_key = per_key
+    def __init__(self, settings: RateLimitSettings | None = None, /, **overrides: Any) -> None:
+        if settings is None:
+            settings = RateLimitSettings.model_validate(overrides)
+        elif overrides:
+            settings = settings.model_copy(update=overrides)
+        self.settings = settings
         self._buckets: dict[str, tuple[float, float]] = defaultdict(
-            lambda: (time.monotonic(), burst)
+            lambda: (time.monotonic(), self.settings.burst)
         )
         self._lock = asyncio.Lock()
 
@@ -43,25 +45,25 @@ class RateLimitMiddleware:
                 last_checked, tokens = self._buckets[key]
                 now = time.monotonic()
                 elapsed = now - last_checked
-                tokens = min(self.burst, tokens + elapsed * self.rate)
+                tokens = min(self.settings.burst, tokens + elapsed * self.settings.rate)
                 if tokens >= 1:
                     self._buckets[key] = (now, tokens - 1)
                     break
-                wait_time = (1 - tokens) / self.rate
+                wait_time = (1 - tokens) / self.settings.rate
                 self._buckets[key] = (now, tokens)
             await asyncio.sleep(wait_time)
 
         return await next_middleware(invocation)
 
     def _resolve_key(self, invocation: Invocation) -> str:
-        if self.per_key is None:
+        if self.settings.per_key is None:
             return "global"
-        if self.per_key in invocation.context:
-            return str(invocation.context[self.per_key])
-        value = getattr(invocation.request, self.per_key, None)
+        if self.settings.per_key in invocation.context:
+            return str(invocation.context[self.settings.per_key])
+        value = getattr(invocation.request, self.settings.per_key, None)
         if value is not None:
             return str(value)
-        step_value = getattr(invocation.step, self.per_key, None)
+        step_value = getattr(invocation.step, self.settings.per_key, None)
         if step_value is not None:
             return str(step_value)
         return "default"
@@ -70,7 +72,7 @@ class RateLimitMiddleware:
 middleware = MiddlewareConfig(
     name="ratelimit",
     factory="mirror_middleware.ratelimit:RateLimitMiddleware",
-    settings_model=None,
+    settings_model=RateLimitSettings,
     applies_to=None,
     after=["retry", "timeout"],
     metadata={

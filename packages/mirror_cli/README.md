@@ -1,6 +1,6 @@
 # Mirror CLI
 
-Mirror CLI provides the commands for creating and inspecting projects.
+Command-line interface package for Mirror.
 
 ## Commands
 
@@ -10,8 +10,7 @@ Mirror CLI provides the commands for creating and inspecting projects.
 - `mirror list-capabilities` — inspect discovered capabilities.
 - `mirror list-providers` — inspect discovered providers.
 - `mirror status` — print a basic runtime status summary.
-- `mirror worker` — start the local worker backend for alpha development.
-- `mirror run` — experimental pipeline command in the alpha snapshot.
+- `mirror run` — run a pipeline file or start the configured runtime.
 
 The CLI package also ships the scaffolding templates used by the project
 initializer commands.

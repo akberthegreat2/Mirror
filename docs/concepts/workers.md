@@ -1,21 +1,34 @@
 # Workers
 
-Workers are the part of Mirror that actually run jobs.
+Workers run the jobs that Mirror schedules.
 
-## Core contract
+## What a worker does
 
-Mirror treats workers as a contract, not as one fixed implementation.
+A worker:
 
-The core ideas are:
+- claims work
+- runs a pipeline or task
+- records heartbeats
+- marks the job as done or failed
+- keeps state separate from the caller
 
-- submit a job;
-- claim a job;
-- checkpoint progress;
-- finish or fail a job;
-- resume later if needed.
+## Core contracts
 
-## Alpha setup
+- `WorkerBackend`
+- `ExecutionStore`
+- `CheckpointStore`
+- `ArtifactStore`
+- `LeaseManager`
 
-The repository uses a local worker path for development and tests.
+## Local beta implementations
 
-That keeps the project easy to run on a laptop while the beta backend work is still being built.
+Mirror ships:
+
+- `InlineWorker` for tests and quick starts
+- `SQLiteWorkerBackend` for one-machine beta setups
+- in-memory stores for development
+
+## Why it matters
+
+A crawl or monitor is only useful if Mirror can run it again later.
+Workers are the piece that makes that possible.

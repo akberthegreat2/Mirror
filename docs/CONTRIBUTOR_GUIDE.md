@@ -1,45 +1,48 @@
 # Contributor Guide
 
-This guide is for maintainers and future contributors.
+This guide is the entry point for new contributors and future reasoning models.
 
 ## Read first
 
 1. `README.md`
-2. `CONSTITUTION.md`
-3. `ARCHITECTURE.md`
-4. `ROADMAP.md`
-5. `ALPHA_CONTRACT.md`
-6. `EXECUTION_SEMANTICS.md`
-7. `MIDDLEWARE_CONTRACT.md`
-8. `WORKER_CONTRACT.md`
-9. `SIGNAL_CONTRACT.md`
+2. `ARCHITECTURE.md`
+3. `ROADMAP.md`
+4. `ALPHA_CHECKLIST.md`
+5. `docs/ALPHA_CONTRACT.md`
+6. `docs/EXECUTION_SEMANTICS.md`
+7. `docs/MIDDLEWARE_CONTRACT.md`
+8. `docs/WORKER_CONTRACT.md`
+9. `docs/SIGNAL_CONTRACT.md`
 10. The relevant ADRs
 11. The relevant package README
 
-## Rules
+## What to change
 
 - Keep `mirror_core` capability-agnostic.
-- Add or update tests for every behavior change.
-- Update docs for every public API or developer-facing command.
+- Add tests with every behavior change.
+- Update docs for every public API or developer command.
 - Record architectural decisions in ADRs.
-- Keep user docs friendly.
-- Keep architecture docs strict.
-- Keep reference docs exact.
+- Record behavior changes in PR notes.
+
+## What not to change casually
+
+- package boundaries;
+- discovery namespaces;
+- runtime contract shape;
+- middleware semantics;
+- worker semantics;
+- signal semantics;
+- configuration precedence.
 
 ## Required quality gates
 
-Run the test suite before sending a change:
+When available in your environment, run:
 
 ```bash
 pytest
-```
-
-When available in your environment, also run:
-
-```bash
+mypy --strict .
 ruff check .
 ruff format --check .
-mypy --strict .
 ```
 
 ## Release rule

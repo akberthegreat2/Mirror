@@ -9,6 +9,12 @@ Middleware is a core contract. It wraps execution and may observe, transform, sh
 - capability middleware
 - step middleware
 
+## Construction contract
+
+Middleware is instantiated from a validated settings model, the same way providers are.
+The application bootstrap resolves the descriptor, validates settings, and creates
+one middleware instance per named middleware.
+
 ## What middleware may do
 
 - inspect the invocation

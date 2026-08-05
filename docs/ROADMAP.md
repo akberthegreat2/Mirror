@@ -26,9 +26,22 @@
 - [x] Better CLI help and diagnostics
 - [x] End-to-end developer guide
 
+## Phase Four — Beta Runtime Proof
+
+- [x] Metadata store contracts
+- [x] Blob store contracts
+- [x] Scheduler contracts
+- [x] SQLite worker backend
+- [x] Crawl package and persisted URL records
+- [x] Crawl tutorial and reference docs
+- [ ] Redis and Celery adapters for distributed workers
+- [ ] Django control plane / admin integration
+
 ## Beta / Later
 
-- [ ] Distributed workers
-- [ ] Dashboard / Django integration
-- [ ] Scheduling service
-- [ ] SaaS features
+- [ ] Distributed workers at scale
+- [ ] Dashboard / Django admin control plane
+- [ ] SaaS multi-tenancy
+- [ ] Billing
+- [ ] Kubernetes orchestration
+- [ ] Cluster scheduling

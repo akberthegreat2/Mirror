@@ -4,16 +4,15 @@ Mirror is a modular application framework. The repository is the source of truth
 
 ## Before you change code
 
-- Read `docs/ARCHITECTURE.md`.
-- Read `docs/ROADMAP.md`.
+- Read `ARCHITECTURE.md`.
+- Read `ROADMAP.md`.
 - Read `docs/ALPHA_CONTRACT.md`.
 - Read `docs/EXECUTION_SEMANTICS.md`.
 - Read `docs/MIDDLEWARE_CONTRACT.md`.
 - Read `docs/WORKER_CONTRACT.md`.
 - Read `docs/SIGNAL_CONTRACT.md`.
 - Read `docs/RELEASE_CHECKLIST.md`.
-- Read `docs/CONSTITUTION.md`.
-- Read the relevant ADRs in `docs/adr/`.
+- Read the relevant ADRs.
 - Keep `mirror_core` capability-agnostic.
 - Add or update tests for every behavior change.
 - Update docs for every public API or developer-facing command.

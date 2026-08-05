@@ -1,53 +1,38 @@
 # Quickstart
 
-This is the fastest way to see Mirror working.
+Mirror is for people who want to crawl websites, keep the results, and build
+something useful on top.
 
-## 1. Install the repository
-
-```bash
-pip install -e .[dev]
-```
-
-## 2. Create a project
+## 1. Create a project
 
 ```bash
 mirror startproject demo
 cd demo
 ```
 
-Mirror creates a familiar project layout with:
-
-- `manage.py`
-- `config/settings.py`
-- `config/asgi.py`
-- `config/wsgi.py`
-- `config/urls.py`
-- `apps/core/`
-- `tests/`
-- `docs/`
-
-## 3. Check the scaffold
+## 2. Check that the scaffold is healthy
 
 ```bash
 mirror doctor
 ```
 
-`doctor` checks that the project structure looks healthy and that Mirror can see
-the current project.
+## 3. Start the local worker
 
-## 4. Add a reusable app
+```bash
+mirror worker
+```
+
+## 4. Add an app
 
 ```bash
 mirror startapp monitor
 ```
 
-This adds an app under `apps/` for pipelines, tasks, middleware, signals, and
-worker hooks.
+## What you should see
 
-## 5. Keep going
+- a `manage.py` file in the project root
+- a `config/` folder with settings and entry points
+- an `apps/` folder for reusable work
+- a `docs/` folder for project notes
 
-At this point you can add your own pipeline, choose a provider, and start
-building a real web product.
-
-Mirror is designed to stay out of your business logic while still handling the
-repeated work around it.
+That is enough to start building a real Mirror project.

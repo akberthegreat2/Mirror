@@ -2,8 +2,7 @@
 
 ## `mirror startproject <name>`
 
-Create a project scaffold with a `manage.py` file, config directory, app
-directory, tests, and docs.
+Create a Django-style Mirror project scaffold.
 
 ## `mirror startapp <name>`
 
@@ -32,5 +31,6 @@ Start the default local worker backend for alpha development.
 
 ## `mirror run`
 
-Reserved for pipeline execution. In this alpha snapshot it is still treated as
-an experimental command and should not be used as the primary user workflow.
+Run a pipeline or start the runtime from the current project settings.
+When a pipeline file is supplied, Mirror loads it and executes the compiled DAG.
+When no pipeline file is supplied, Mirror starts and stops the configured runtime as a health check.

@@ -1,14 +1,17 @@
 # Providers
 
-A provider is the part that does the actual work behind a capability.
+Providers implement capability contracts.
 
-Mirror keeps the task the same and lets the backend change.
+Mirror keeps the capability contract stable and lets the implementation vary.
+That is how one pipeline can run against multiple backends without changing the
+pipeline itself.
 
 ## Example
 
 The Fetch capability can use different providers:
 
-- `mirror-fetch-httpx` for plain HTTP requests
-- `mirror-fetch-playwright` for browser-based fetching
+- `mirror-fetch-httpx`
+- `mirror-fetch-playwright`
 
-That means you can keep the same pipeline and change the engine under it.
+Both packages expose a `ProviderConfig` descriptor through entry points. Mirror
+Core resolves the selected provider at runtime from settings.

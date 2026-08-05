@@ -17,3 +17,7 @@ Mirror's worker layer is split into contracts and local implementations.
 - `InMemoryCheckpointStore`
 - `InMemoryArtifactStore`
 - `InMemoryLeaseManager`
+
+## SQLite implementation
+
+- `SQLiteWorkerBackend`

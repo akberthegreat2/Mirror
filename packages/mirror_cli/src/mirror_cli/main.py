@@ -12,7 +12,7 @@ from rich.table import Table
 
 from mirror_core.application import Application
 from mirror_core.settings import MirrorSettings
-from mirror_core.workers import InlineWorker
+from mirror_core.workers import InlineWorker, SQLiteWorkerBackend
 from mirror_cli.scaffold import (
     collect_project_checks,
     create_app,
@@ -137,25 +137,80 @@ def run(
         help="Path to pipeline definition file",
     ),
 ) -> None:
-    """Run a pipeline."""
-    console.print("[bold]Running pipeline...[/bold]")
-    if config:
-        console.print(f"Config: {config}")
-    if pipeline:
-        console.print(f"Pipeline: {pipeline}")
-    console.print("[yellow]Not implemented yet[/yellow]")
+    """Run a pipeline or start the runtime in place."""
+    async def _run() -> None:
+        settings = MirrorSettings.from_file(config) if config is not None else MirrorSettings()
+        app_obj = Application(settings=settings)
+        await app_obj.start()
+        try:
+            console.print("[bold]Running pipeline...[/bold]")
+            if config is not None:
+                console.print(f"Config: {config}")
+            if pipeline is None:
+                console.print("[yellow]No pipeline file supplied; runtime started successfully.[/yellow]")
+                return
+            pipeline_obj = _load_pipeline(pipeline)
+            result = await app_obj.run_pipeline_detailed(pipeline_obj)
+            console.print(f"[green]Pipeline finished[/green] {result.outcome.value}")
+        finally:
+            await app_obj.shutdown()
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
 
+
+def _load_pipeline(path: Path):
+    """Load a pipeline definition from JSON, TOML, or YAML."""
+    from mirror_core.pipeline import Pipeline
+
+    if path.suffix in {".yaml", ".yml"}:
+        try:
+            import yaml
+        except ImportError as exc:
+            raise RuntimeError("YAML pipeline files require the 'yaml' extra") from exc
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    elif path.suffix == ".toml":
+        import tomllib
+
+        data = tomllib.loads(path.read_text(encoding="utf-8"))
+    elif path.suffix == ".json":
+        import json
+
+        data = json.loads(path.read_text(encoding="utf-8"))
+    else:
+        raise RuntimeError(f"Unsupported pipeline format: {path.suffix}")
+    return Pipeline.model_validate(data)
+
+
+def _build_worker_backend(settings: MirrorSettings) -> InlineWorker | SQLiteWorkerBackend:
+    """Build the configured worker backend for the current runtime."""
+    backend = settings.worker_backend.lower()
+    if backend == "sqlite":
+        database_path = settings.worker_settings.get("database_path", "mirror-worker.sqlite3")
+        return SQLiteWorkerBackend(database_path)
+    return InlineWorker()
 
 @app.command()
-def worker() -> None:
+def worker(
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to Mirror settings file",
+    ),
+) -> None:
     """Start the default local worker backend for alpha development."""
 
     async def _run() -> None:
-        backend = InlineWorker()
+        settings = MirrorSettings.from_file(config) if config is not None else MirrorSettings()
+        backend = _build_worker_backend(settings)
         await backend.start()
         await backend.stop()
-        console.print("[bold]Worker backend ready[/bold] (inline)")
+        console.print(f"[bold]Worker backend ready[/bold] ({backend.__class__.__name__.replace('SQLiteWorkerBackend', 'sqlite').replace('InlineWorker', 'inline').lower()})")
 
     try:
         asyncio.run(_run())

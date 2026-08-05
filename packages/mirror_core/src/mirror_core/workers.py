@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from collections import deque
+import json
+import sqlite3
+from pathlib import Path
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -217,6 +220,189 @@ class InlineWorker:
             return self._jobs_by_id[job_id]
         except KeyError as exc:
             raise KeyError(f"Unknown job: {job_id}") from exc
+
+
+class SQLiteWorkerBackend:
+    """SQLite-backed worker backend for beta development."""
+
+    def __init__(self, path: str | Path) -> None:
+        self._path = Path(path)
+        self._conn: sqlite3.Connection | None = None
+        self._started = False
+
+    async def start(self) -> None:
+        if self._conn is None:
+            self._conn = sqlite3.connect(self._path)
+            self._conn.row_factory = sqlite3.Row
+            self._ensure_schema()
+        self._started = True
+
+    async def stop(self) -> None:
+        self._started = False
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
+
+    async def submit(self, job: WorkerJob) -> WorkerJob:
+        self._ensure_started()
+        stored = job.model_copy(update={"state": JobState.QUEUED})
+        conn = self._connection()
+        conn.execute(
+            """
+            INSERT INTO jobs(job_id, kind, payload, state, worker_id, error, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(job_id)
+            DO UPDATE SET kind = excluded.kind,
+                          payload = excluded.payload,
+                          state = excluded.state,
+                          worker_id = excluded.worker_id,
+                          error = excluded.error,
+                          metadata = excluded.metadata
+            """,
+            (
+                str(stored.job_id),
+                stored.kind,
+                json.dumps(stored.payload, sort_keys=True),
+                stored.state.value,
+                stored.worker_id,
+                stored.error,
+                json.dumps(stored.metadata, sort_keys=True),
+            ),
+        )
+        conn.commit()
+        return stored
+
+    async def claim(self, worker_id: str) -> WorkerJob | None:
+        self._ensure_started()
+        conn = self._connection()
+        row = conn.execute(
+            "SELECT * FROM jobs WHERE state = ? ORDER BY rowid LIMIT 1",
+            (JobState.QUEUED.value,),
+        ).fetchone()
+        if row is None:
+            return None
+        claimed = self._row_to_job(row).model_copy(
+            update={"state": JobState.RUNNING, "worker_id": worker_id}
+        )
+        conn.execute(
+            "UPDATE jobs SET state = ?, worker_id = ? WHERE job_id = ?",
+            (claimed.state.value, worker_id, str(claimed.job_id)),
+        )
+        conn.commit()
+        return claimed
+
+    async def heartbeat(self, worker_id: str, job_id: UUID | None = None) -> None:
+        self._ensure_started()
+        conn = self._connection()
+        conn.execute(
+            "INSERT INTO heartbeats(worker_id, job_id, heartbeat_at) VALUES (?, ?, ?)",
+            (
+                worker_id,
+                str(job_id) if job_id is not None else None,
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
+
+    async def complete(self, job_id: UUID) -> WorkerJob:
+        self._ensure_started()
+        job = self._require_job(job_id)
+        completed = job.model_copy(update={"state": JobState.SUCCEEDED, "error": None})
+        self._store_job(completed)
+        return completed
+
+    async def fail(self, job_id: UUID, error: str) -> WorkerJob:
+        self._ensure_started()
+        job = self._require_job(job_id)
+        failed = job.model_copy(update={"state": JobState.FAILED, "error": error})
+        self._store_job(failed)
+        return failed
+
+    @property
+    def jobs(self) -> list[WorkerJob]:
+        conn = self._connection()
+        rows = conn.execute("SELECT * FROM jobs ORDER BY rowid").fetchall()
+        return [self._row_to_job(row) for row in rows]
+
+    def _ensure_started(self) -> None:
+        if not self._started or self._conn is None:
+            raise RuntimeError("Worker backend is not started")
+
+    def _connection(self) -> sqlite3.Connection:
+        self._ensure_started()
+        assert self._conn is not None
+        return self._conn
+
+    def _ensure_schema(self) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS jobs (
+                job_id TEXT PRIMARY KEY,
+                kind TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                state TEXT NOT NULL,
+                worker_id TEXT,
+                error TEXT,
+                metadata TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS heartbeats (
+                worker_id TEXT NOT NULL,
+                job_id TEXT,
+                heartbeat_at TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.commit()
+
+    def _store_job(self, job: WorkerJob) -> None:
+        conn = self._connection()
+        conn.execute(
+            """
+            INSERT INTO jobs(job_id, kind, payload, state, worker_id, error, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(job_id)
+            DO UPDATE SET kind = excluded.kind,
+                          payload = excluded.payload,
+                          state = excluded.state,
+                          worker_id = excluded.worker_id,
+                          error = excluded.error,
+                          metadata = excluded.metadata
+            """,
+            (
+                str(job.job_id),
+                job.kind,
+                json.dumps(job.payload, sort_keys=True),
+                job.state.value,
+                job.worker_id,
+                job.error,
+                json.dumps(job.metadata, sort_keys=True),
+            ),
+        )
+        conn.commit()
+
+    def _require_job(self, job_id: UUID) -> WorkerJob:
+        conn = self._connection()
+        row = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (str(job_id),)).fetchone()
+        if row is None:
+            raise KeyError(f"Unknown job: {job_id}")
+        return self._row_to_job(row)
+
+    @staticmethod
+    def _row_to_job(row: sqlite3.Row) -> WorkerJob:
+        return WorkerJob(
+            job_id=UUID(row["job_id"]),
+            kind=row["kind"],
+            payload=json.loads(row["payload"]),
+            state=JobState(row["state"]),
+            worker_id=row["worker_id"],
+            error=row["error"],
+            metadata=json.loads(row["metadata"]),
+        )
 
 
 class InMemoryExecutionStore:

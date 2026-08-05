@@ -1,59 +1,59 @@
-# Mirror documentation map
+# Mirror documentation index
 
-If you are new to Mirror, start here:
+This documentation is organized for three audiences:
 
-1. `../README.md`
-2. `getting-started/quickstart.md`
-3. `tutorials/first_project.md`
+- **users** who want to build something with Mirror
+- **developers** who want tutorials and examples
+- **contributors** who need the frozen architecture and release rules
 
-## User docs
-
-These are written for people using Mirror to build things.
+## Start here
 
 - [Quickstart](getting-started/quickstart.md)
 - [First project](tutorials/first_project.md)
+- [First crawl](tutorials/first_crawl.md)
+- [Scheduled crawl](tutorials/scheduled_crawl.md)
 - [Provider swap](tutorials/provider_swap.md)
 
-## Concepts
+## User guides
 
-These explain the main ideas without diving into internal code.
-
-- [Developer experience](concepts/developer-experience.md)
-- [Execution](concepts/execution.md)
+- [Crawling](concepts/crawling.md)
+- [Storage](concepts/storage.md)
+- [Scheduling](concepts/scheduling.md)
+- [Workers](concepts/workers.md)
 - [Middleware](concepts/middleware.md)
+- [Execution](concepts/execution.md)
 - [Providers](concepts/providers.md)
 - [Signals](concepts/signals.md)
-- [Workers](concepts/workers.md)
+- [Developer experience](concepts/developer-experience.md)
 
 ## Reference
 
-These pages describe commands and packages exactly.
-
-- [CLI reference](reference/cli.md)
-- [Execution reference](reference/execution.md)
-- [Middleware reference](reference/middleware.md)
-- [mirror-core reference](reference/mirror_core.md)
-- [Signals reference](reference/signals.md)
-- [Worker reference](reference/workers.md)
+- [CLI](reference/cli.md)
+- [Execution](reference/execution.md)
+- [Middleware](reference/middleware.md)
+- [Storage](reference/storage.md)
+- [Scheduler](reference/scheduler.md)
+- [Workers](reference/workers.md)
+- [Signals](reference/signals.md)
+- [mirror-core](reference/mirror_core.md)
+- [mirror-crawl](reference/mirror_crawl.md)
 - [mirror-fetch-playwright](reference/mirror_fetch_playwright.md)
 
-## Contributor docs
+## Constitution and release
 
-These are for maintainers and future contributors.
-
-- [Documentation constitution](CONSTITUTION.md)
 - [Architecture](ARCHITECTURE.md)
+- [Beta contract](BETA_CONTRACT.md)
 - [Alpha contract](ALPHA_CONTRACT.md)
-- [Execution semantics](EXECUTION_SEMANTICS.md)
-- [Middleware contract](MIDDLEWARE_CONTRACT.md)
-- [Worker contract](WORKER_CONTRACT.md)
-- [Signal contract](SIGNAL_CONTRACT.md)
 - [Release checklist](RELEASE_CHECKLIST.md)
-- [Future work](FUTURE.md)
 - [Contributor guide](CONTRIBUTOR_GUIDE.md)
-- [Architecture decisions](adr/README.md)
+- [Future work](FUTURE.md)
+
+## ADRs
+
+- [ADR index](adr/README.md)
 
 ## Implementation notes
 
 - [Core hardening phase 1](implementation/core-hardening-phase-1.md)
 - [Phase three developer experience](implementation/phase-three-developer-experience.md)
+- [Phase two runtime proof](implementation/phase-two-runtime-proof.md)

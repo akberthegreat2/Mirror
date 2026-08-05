@@ -1,30 +1,24 @@
 # Middleware
 
-Middleware is the layer that sits around a task and can observe or change what
-happens.
+Middleware is a core Mirror contract. It wraps capability invocation and may
+observe, modify, short-circuit, retry, or annotate execution.
 
-## What middleware is good for
+## Contract
 
-- retries
-- timeouts
-- rate limits
-- logging
-- tracing
-- cache hits
-- test doubles
-- request enrichment
+The core middleware API uses the `Invocation` model and the `Middleware`
+protocol from `mirror_core.middleware`. Middleware descriptors also carry a
+validated settings model so the application bootstrap can construct middleware
+through the same descriptor-driven path as providers.
 
 ## What middleware may do
 
-A middleware can:
-
-- inspect the current step;
-- change the request or the result;
-- stop the call early;
-- retry the call;
-- add logging or trace data.
+- inspect the resolved step and request;
+- attach context for tracing or metrics;
+- short-circuit with a cached or mock result;
+- retry or raise;
+- pass control to the next middleware in the chain.
 
 ## What middleware should not do
 
-Middleware should not choose the project structure or re-discover packages.
-Those jobs belong to the application and the planner.
+Middleware should not discover providers or mutate the application registry.
+Those responsibilities belong to the application bootstrap and planner.

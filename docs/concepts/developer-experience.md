@@ -1,31 +1,29 @@
 # Developer experience
 
-Mirror uses a Django-style project scaffold so you start from a known layout
-instead of inventing one for every app.
+Mirror uses a Django-style project scaffold so contributors can start from a
+known layout instead of inventing one for every application.
 
-## What `mirror startproject` gives you
+## The project scaffold
 
-- `manage.py` for project-local commands
-- `config/settings.py` for project settings
-- `config/asgi.py` and `config/wsgi.py` for future interface hooks
-- `config/urls.py` for future routing hooks
-- `apps/core/` as the default app bundle
-- `tests/` for project tests
-- `docs/` for project notes and decisions
+`mirror startproject <name>` creates a project directory with:
 
-## What `mirror startapp` gives you
+- `manage.py` for CLI entry points;
+- `config/settings.py` for project-level Mirror configuration;
+- `config/asgi.py` and `config/wsgi.py` as reserved interface hooks;
+- `config/urls.py` as a reserved routing hook;
+- `apps/core/` as the default application bundle;
+- `apps/core/workers.py` as the default worker registration hook;
+- `tests/` for project smoke tests;
+- `docs/` for project-specific documentation.
 
-- `config.py`
-- `pipelines.py`
-- `tasks.py`
-- `middleware.py`
-- `signals.py`
-- `workers.py`
-- `README.md`
-- `tests.py`
+## The app scaffold
 
-## Why it helps
+`mirror startapp <name>` adds a reusable application package under `apps/`.
+The generated app includes configuration, pipeline, middleware, signal, worker, task,
+and smoke-test files.
 
-Mirror keeps the layout stable even when the internals change. That makes it
-easier to add new products, swap backends, and hand the project to another
-contributor later.
+## Why this matters
+
+The scaffold keeps the project layout stable while the runtime evolves. A future
+contributor can add capabilities, providers, or interfaces without guessing where
+project settings or app code should live.
