@@ -1,26 +1,16 @@
-"""Tests for metadata and blob storage contracts."""
+"""Tests for the pre-beta SQLite/filesystem storage backends."""
 
 from __future__ import annotations
 
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
-from mirror_core.beta.storage import (
-    FileSystemBlobStore,
-    InMemoryBlobStore,
-    InMemoryMetadataStore,
-    MetadataRecord,
-    SQLiteMetadataStore,
-)
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)
+    from mirror_core.beta.storage import FileSystemBlobStore, SQLiteMetadataStore
 
-
-def test_in_memory_metadata_store_round_trip() -> None:
-    """The metadata store should preserve structured records in memory."""
-    store = InMemoryMetadataStore()
-    record = MetadataRecord(namespace="crawl.urls", key="https://example.com", payload={"depth": 0})
-    store.put(record)
-    assert store.get("crawl.urls", "https://example.com") == record
-    assert store.list("crawl.urls") == [record]
+from mirror_core.storage import MetadataRecord
 
 
 def test_sqlite_metadata_store_round_trip(tmp_path: Path) -> None:
@@ -36,15 +26,6 @@ def test_sqlite_metadata_store_round_trip(tmp_path: Path) -> None:
     assert store.get("crawl.urls", "https://example.com/about") == record
     assert store.list() == [record]
     store.close()
-
-
-def test_in_memory_blob_store_round_trip() -> None:
-    """The in-memory blob store should round-trip bytes."""
-    store = InMemoryBlobStore()
-    store.put_bytes("pages/index.html", b"payload")
-    assert store.get_bytes("pages/index.html") == b"payload"
-    store.delete("pages/index.html")
-    assert store.get_bytes("pages/index.html") is None
 
 
 def test_filesystem_blob_store_round_trip(tmp_path: Path) -> None:

@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import importlib
 import logging
 import types
 from contextlib import AsyncExitStack
 from typing import Any, cast
 
 from pydantic import BaseModel
+
+from mirror_core.components import ComponentManager
 
 from mirror_core.discovery import DiscoveryResult, DiscoverySource, discover
 from mirror_core.exceptions import ApplicationError, ExecutionError
@@ -25,10 +26,6 @@ from mirror_core.signals import SignalBus
 logger = logging.getLogger(__name__)
 
 
-class EmptySettings(BaseModel):
-    """Settings model used by components with no configuration."""
-
-
 class Application:
     """Own and compose one isolated Mirror runtime."""
 
@@ -43,7 +40,7 @@ class Application:
         self._registry = Registry()
         self._signal_bus = SignalBus()
         self._executor: Executor | None = None
-        self._components: dict[tuple[str, str], Any] = {}
+        self._component_manager = ComponentManager(self._registry, self.settings)
         self._lifecycle_stack: AsyncExitStack | None = None
         self._started = False
 
@@ -81,9 +78,9 @@ class Application:
             self._register_descriptors()
             self._registry.freeze()
             middleware_chains = await self._build_middleware_chains(stack)
-            await self._initialize_components(stack)
+            await self._component_manager.initialize(stack)
             self._executor = Executor(
-                components=self._components,
+                components=self._component_manager.instances,
                 max_concurrency=self.settings.max_concurrency,
                 signal_bus=self._signal_bus,
                 middleware_chains=middleware_chains,
@@ -135,7 +132,7 @@ class Application:
             await stack.aclose()
         self._started = False
         self._executor = None
-        self._components.clear()
+        self._component_manager.clear()
         await self._emit("application.shutdown", application=self)
 
     def _register_descriptors(self) -> None:
@@ -150,29 +147,6 @@ class Application:
             self._registry.register_middleware(middleware)
         for interface in result.interfaces:
             self._registry.register_interface(interface)
-
-    async def _initialize_components(self, stack: AsyncExitStack) -> None:
-        for capability_name, selection in self.settings.components.items():
-            provider_name = selection.get("provider")
-            if not isinstance(provider_name, str) or not provider_name:
-                raise ApplicationError(f"No provider selected for {capability_name!r}")
-            capability = self._registry.resolve_capability(capability_name)
-            provider = self._registry.resolve_provider(capability, provider_name)
-            factory = self._import_symbol(provider.factory)
-            settings_model = self._resolve_settings_model(provider.settings_model)
-            raw_settings = self.settings.component_settings.get(capability_name, {}).get(
-                provider_name, {}
-            )
-            instance = factory(settings_model.model_validate(raw_settings))
-            if capability.protocol is not None and not isinstance(instance, capability.protocol):
-                raise ApplicationError(
-                    f"Provider {provider.name!r} does not implement capability "
-                    f"protocol {capability.name!r}"
-                )
-            if isinstance(instance, AsyncLifecycle):
-                stack.push_async_callback(instance.teardown)
-                await instance.setup()
-            self._components[(capability_name, provider_name)] = instance
 
     async def _build_middleware_chains(
         self, stack: AsyncExitStack
@@ -189,8 +163,8 @@ class Application:
         instances: dict[str, Middleware] = {}
         for name in self._order_middleware(list(configs.values())):
             config = configs[name.name]
-            factory = self._import_symbol(config.factory)
-            settings_model = self._resolve_settings_model(config.settings_model)
+            factory = ComponentManager.import_symbol(config.factory)
+            settings_model = ComponentManager.resolve_settings_model(config.settings_model)
             raw_settings = self.settings.middleware_settings.get(config.name, {})
             instance = factory(settings_model.model_validate(raw_settings))
             if isinstance(instance, AsyncLifecycle):
@@ -238,35 +212,21 @@ class Application:
                 remaining.remove(name)
         return ordered
 
-    @staticmethod
-    def _import_symbol(path: str) -> Any:
-        module_name, separator, symbol_name = path.rpartition(":")
-        if not separator:
-            raise ApplicationError(f"Invalid import path: {path!r}")
-        try:
-            return getattr(importlib.import_module(module_name), symbol_name)
-        except (ImportError, AttributeError) as exc:
-            raise ApplicationError(f"Unable to import {path!r}", cause=exc) from exc
-
-    @classmethod
-    def _resolve_settings_model(cls, value: type[BaseModel] | str | None) -> type[BaseModel]:
-        if value is None:
-            return EmptySettings
-        resolved = cls._import_symbol(value) if isinstance(value, str) else value
-        if not isinstance(resolved, type) or not issubclass(resolved, BaseModel):
-            raise ApplicationError("Component settings model must be a Pydantic model")
-        return resolved
-
     def _reset_runtime_state(self) -> None:
         self._registry = Registry()
         self._signal_bus = SignalBus()
         self._executor = None
-        self._components = {}
+        self._component_manager = ComponentManager(self._registry, self.settings)
         self._discovery_result = None
         self._started = False
 
     async def _emit(self, signal: str, **kwargs: Any) -> None:
         await self._signal_bus.emit(signal, **kwargs)
+
+    @property
+    def component_manager(self) -> ComponentManager:
+        """Return the provider lifecycle owner for this runtime."""
+        return self._component_manager
 
     @property
     def registry(self) -> Registry:

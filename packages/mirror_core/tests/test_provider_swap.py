@@ -82,6 +82,15 @@ async def test_same_pipeline_can_swap_fetch_providers(monkeypatch: pytest.Monkey
     monkeypatch.setattr(HTTPXProvider, "fetch", httpx_fetch)
     monkeypatch.setattr(PlaywrightProvider, "fetch", playwright_fetch)
 
+    async def playwright_setup(self: PlaywrightProvider) -> None:
+        self._browser = object()
+
+    async def playwright_teardown(self: PlaywrightProvider) -> None:
+        self._browser = None
+
+    monkeypatch.setattr(PlaywrightProvider, "setup", playwright_setup)
+    monkeypatch.setattr(PlaywrightProvider, "teardown", playwright_teardown)
+
     pipeline = Pipeline(
         id="swap-fetch",
         inputs={"url": "str"},
