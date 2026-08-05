@@ -19,8 +19,19 @@ known layout instead of inventing one for every application.
 ## The app scaffold
 
 `mirror startapp <name>` adds a reusable application package under `apps/`.
-The generated app includes configuration, pipeline, middleware, signal, worker, task,
-and smoke-test files.
+The generated app includes configuration, pipeline, middleware, signal, worker,
+task, and smoke-test files.
+
+## Workspace bootstrap
+
+The repository root also contains two helper files that make the source checkout
+pleasant to use:
+
+- `conftest.py` adds every `packages/*/src` directory to pytest imports.
+- `sitecustomize.py` does the same for plain Python sessions.
+
+These files exist only to make source-checkout development easier. They are not
+product features.
 
 ## Why this matters
 

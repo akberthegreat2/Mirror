@@ -1,13 +1,14 @@
-# ADR-0014: scheduler contract
+# ADR 0014 — Scheduler contract
 
-Status: Accepted
+## Status
+Accepted
+
+## Context
+Recurring work must be a first-class concept.
 
 ## Decision
+Scheduling SHALL be implemented as a backend contract that submits future work,
+pause jobs, and resume jobs. It MUST NOT own business logic.
 
-Mirror defines a scheduler contract that can list due jobs, pause and resume
-entries, and mark a job as run.
-
-## Reason
-
-The framework needs recurring crawls and monitors without hard-coding a single
-queue engine.
+## Consequences
+Recurring jobs become observable and replaceable.

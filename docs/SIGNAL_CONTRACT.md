@@ -32,3 +32,9 @@ Receivers should not be the only place where a runtime guarantee exists.
 ## Event payloads
 
 Payloads should be typed, stable, and documented alongside the signal names they belong to.
+
+
+## Rule
+
+Signals observe the system. Signals MUST NOT change execution flow. Middleware
+controls flow; signals report what happened.

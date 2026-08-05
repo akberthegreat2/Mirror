@@ -1,13 +1,14 @@
-# ADR-0015: crawl persistence
+# ADR 0015 — Crawl persistence
 
-Status: Accepted
+## Status
+Accepted
+
+## Context
+A crawler that does not remember discovered URLs is not useful for SaaS.
 
 ## Decision
+A crawler SHALL be able to persist discovered URLs and fetched results when the
+pipeline or settings request it.
 
-A crawl MUST be able to persist discovered URLs on user demand.
-A crawl MAY also store page bodies in blob storage.
-
-## Reason
-
-The legacy behavior that discarded crawl results was not good enough for SaaS
-workflows. The beta path needs durable crawl metadata.
+## Consequences
+Crawling becomes useful for monitoring, archiving, and product workflows.

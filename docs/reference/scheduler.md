@@ -1,9 +1,10 @@
 # Scheduler reference
 
-The scheduler contract lets Mirror store recurring jobs, pause them, resume
-them, and ask which jobs are due.
+A scheduler decides when jobs should run.
 
-Implemented backends:
+Mirror currently treats scheduling as a backend contract. The scheduler can:
 
-- `InMemoryScheduler`
-- `SQLiteScheduler`
+- queue a job for later;
+- pause a job;
+- resume a job;
+- hand work to workers.

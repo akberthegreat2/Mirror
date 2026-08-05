@@ -12,7 +12,7 @@ from rich.table import Table
 
 from mirror_core.application import Application
 from mirror_core.settings import MirrorSettings
-from mirror_core.workers import InlineWorker, SQLiteWorkerBackend
+from mirror_core.workers import InlineWorker
 from mirror_cli.scaffold import (
     collect_project_checks,
     create_app,
@@ -186,31 +186,15 @@ def _load_pipeline(path: Path):
     return Pipeline.model_validate(data)
 
 
-def _build_worker_backend(settings: MirrorSettings) -> InlineWorker | SQLiteWorkerBackend:
-    """Build the configured worker backend for the current runtime."""
-    backend = settings.worker_backend.lower()
-    if backend == "sqlite":
-        database_path = settings.worker_settings.get("database_path", "mirror-worker.sqlite3")
-        return SQLiteWorkerBackend(database_path)
-    return InlineWorker()
-
 @app.command()
-def worker(
-    config: Path | None = typer.Option(
-        None,
-        "--config",
-        "-c",
-        help="Path to Mirror settings file",
-    ),
-) -> None:
+def worker() -> None:
     """Start the default local worker backend for alpha development."""
 
     async def _run() -> None:
-        settings = MirrorSettings.from_file(config) if config is not None else MirrorSettings()
-        backend = _build_worker_backend(settings)
+        backend = InlineWorker()
         await backend.start()
         await backend.stop()
-        console.print(f"[bold]Worker backend ready[/bold] ({backend.__class__.__name__.replace('SQLiteWorkerBackend', 'sqlite').replace('InlineWorker', 'inline').lower()})")
+        console.print("[bold]Worker backend ready[/bold] (inline)")
 
     try:
         asyncio.run(_run())

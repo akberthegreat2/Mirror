@@ -1,9 +1,17 @@
 # Storage reference
 
-Mirror storage is split into:
+Mirror separates metadata storage from blob storage.
 
-- `MetadataStore` for structured records
-- `BlobStore` for binary content
+## Metadata storage
 
-The core package includes in-memory and SQLite-backed metadata stores plus an
-in-memory and filesystem blob store.
+Metadata storage holds small records such as runs, steps, schedules, and URL
+records.
+
+## Blob storage
+
+Blob storage holds large payloads such as HTML, WARC, screenshots, or exports.
+
+## Why this split exists
+
+The split keeps the database fast and makes large payloads easy to move between
+local development and production backends.

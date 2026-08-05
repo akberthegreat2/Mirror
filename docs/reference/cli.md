@@ -31,6 +31,5 @@ Start the default local worker backend for alpha development.
 
 ## `mirror run`
 
-Run a pipeline or start the runtime from the current project settings.
-When a pipeline file is supplied, Mirror loads it and executes the compiled DAG.
-When no pipeline file is supplied, Mirror starts and stops the configured runtime as a health check.
+Load the configured settings and optionally a pipeline file, then start the
+runtime and execute the pipeline.

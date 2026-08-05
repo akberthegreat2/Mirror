@@ -26,3 +26,9 @@ The worker contract lets Mirror grow from a single-process runtime into a distri
 - remote worker pools
 - multi-host lease coordination
 - SaaS worker orchestration
+
+
+## Beta backends
+
+The beta phase adds the SQLite worker backend, then the production Celery/Redis
+backend. The control plane later moves into Django.

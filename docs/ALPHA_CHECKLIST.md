@@ -2,7 +2,8 @@
 
 Mirror reaches alpha when all of the following are true.
 
-Read this together with `docs/ALPHA_CONTRACT.md` and `docs/RELEASE_CHECKLIST.md`.
+Read this together with `docs/ALPHA_CONTRACT.md`, `docs/ARCHITECTURE.md`, and
+`docs/RELEASE_CHECKLIST.md`.
 
 - [x] `mirror_core` imports no capability-specific package.
 - [x] Discovery works through entry points.

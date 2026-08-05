@@ -1,13 +1,10 @@
 # mirror-crawl reference
 
-`mirror-crawl` adds the first crawl workflow on top of Mirror Fetch.
+The crawl capability discovers URLs, fetches pages, and can persist the results
+when configured to do so.
 
-It provides:
+Use it when you need to:
 
-- `CrawlRequest`
-- `CrawlResult`
-- `CrawlSettings`
-- `LocalCrawlProvider`
-- `crawl_site()`
-
-The crawl provider can use HTTPX or Playwright fetch backends.
+- discover page links;
+- keep a record of discovered URLs;
+- feed archiving, monitoring, or SEO workflows.

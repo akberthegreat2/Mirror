@@ -5,16 +5,18 @@ This guide is the entry point for new contributors and future reasoning models.
 ## Read first
 
 1. `README.md`
-2. `ARCHITECTURE.md`
-3. `ROADMAP.md`
-4. `ALPHA_CHECKLIST.md`
+2. `docs/ARCHITECTURE.md`
+3. `docs/ROADMAP.md`
+4. `docs/ALPHA_CHECKLIST.md`
 5. `docs/ALPHA_CONTRACT.md`
-6. `docs/EXECUTION_SEMANTICS.md`
-7. `docs/MIDDLEWARE_CONTRACT.md`
-8. `docs/WORKER_CONTRACT.md`
-9. `docs/SIGNAL_CONTRACT.md`
-10. The relevant ADRs
-11. The relevant package README
+6. `docs/BETA_CONTRACT.md`
+7. `docs/EXECUTION_SEMANTICS.md`
+8. `docs/MIDDLEWARE_CONTRACT.md`
+9. `docs/WORKER_CONTRACT.md`
+10. `docs/SIGNAL_CONTRACT.md`
+11. `docs/adr/README.md`
+12. The relevant PR note in `docs/PRs/`
+13. The relevant package README
 
 ## What to change
 

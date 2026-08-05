@@ -2,9 +2,7 @@
 
 ## Problem
 
-The repository could prove the runtime in tests, but it did not yet give a new
-contributor a standard project/app layout or a quick way to verify a fresh
-scaffold.
+The repository could prove the runtime in tests, but it did not yet give a new contributor a standard project/app layout or a quick way to verify a fresh scaffold.
 
 ## Decision
 
@@ -21,6 +19,7 @@ Add a Django-style developer experience layer to the CLI:
 - Added doctor health checks.
 - Added CLI tests for the new commands.
 - Added developer-experience docs and a CLI reference.
+- Documented the repo-local `conftest.py` and `sitecustomize.py` bootstrap files.
 
 ## Validation
 

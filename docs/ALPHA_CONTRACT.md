@@ -62,6 +62,8 @@ The repository must include:
 - `docs/SIGNAL_CONTRACT.md`;
 - `docs/RELEASE_CHECKLIST.md`;
 - `docs/FUTURE.md`;
+- `docs/adr/README.md`;
+- `docs/PRs/README.md`;
 - concept docs;
 - tutorial docs;
 - reference docs;

@@ -11,6 +11,7 @@
 - scaffolded application layout
 - CLI tests for the scaffold commands
 - repository docs for the developer workflow
+- repository bootstrap files (`conftest.py`, `sitecustomize.py`)
 
 ## Notes
 

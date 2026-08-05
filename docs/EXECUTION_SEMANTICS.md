@@ -55,3 +55,10 @@ Execution should distinguish between:
 - fallback
 
 A terminal failure must propagate from execution and must not be hidden behind a generic finished event.
+
+
+## Note on beta runtime
+
+The beta runtime will add crawler persistence, scheduler support, and durable
+worker backends. Those pieces are documented in `BETA_CONTRACT.md` and the
+phase-four implementation note.

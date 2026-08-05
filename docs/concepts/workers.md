@@ -1,16 +1,7 @@
 # Workers
 
-Workers run the jobs that Mirror schedules.
-
-## What a worker does
-
-A worker:
-
-- claims work
-- runs a pipeline or task
-- records heartbeats
-- marks the job as done or failed
-- keeps state separate from the caller
+Workers are part of the frozen alpha core. They define how jobs are queued,
+claimed, checkpointed, completed, and resumed.
 
 ## Core contracts
 
@@ -20,15 +11,12 @@ A worker:
 - `ArtifactStore`
 - `LeaseManager`
 
-## Local beta implementations
+## Alpha implementation
 
-Mirror ships:
-
-- `InlineWorker` for tests and quick starts
-- `SQLiteWorkerBackend` for one-machine beta setups
-- in-memory stores for development
+The repository ships an in-memory `InlineWorker` and in-memory stores for
+local development and tests.
 
 ## Why it matters
 
-A crawl or monitor is only useful if Mirror can run it again later.
-Workers are the piece that makes that possible.
+The contracts let Mirror grow from one local process to a distributed system
+later without changing the application-level API.

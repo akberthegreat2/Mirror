@@ -1,18 +1,14 @@
-# ADR-0013: storage and blob boundaries
+# ADR 0013 — Storage and blob boundaries
 
-Status: Accepted
+## Status
+Accepted
 
-Mirror stores two different kinds of data.
+## Context
+Mirror needs to separate metadata from large payloads.
 
 ## Decision
+Metadata SHALL live in the database. Payloads, archives, and large binary
+outputs SHALL live in blob storage or filesystem-backed development storage.
 
-- metadata goes into a metadata store
-- large content goes into a blob store
-- the metadata store MUST support typed records
-- the blob store MUST support binary payloads
-
-## Reason
-
-Crawling, archiving, and monitoring all produce metadata and large content.
-Keeping them separate keeps the framework simple to run locally and simple to
-scale later.
+## Consequences
+Database rows stay lightweight and operational data stays manageable.

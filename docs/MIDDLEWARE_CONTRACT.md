@@ -46,3 +46,10 @@ That is a supported control-flow decision, not an error.
 
 Retry, timeout, fallback, and cancellation are execution policies.
 Middleware may enforce them, but the policy definition belongs to the core runtime contract.
+
+
+## Construction rule
+
+Middleware and providers are constructed through descriptor-backed settings
+objects. The repository uses one contract for plugin construction so tests can
+exercise the same path that Application uses.

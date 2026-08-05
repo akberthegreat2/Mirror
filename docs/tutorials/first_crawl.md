@@ -1,34 +1,10 @@
 # First crawl
 
-This tutorial shows the smallest useful crawl.
+This tutorial shows the simplest useful Mirror crawl:
 
-## What you need
+1. Start from one URL.
+2. Discover links on the page.
+3. Save the discovered URLs.
+4. Inspect the stored results.
 
-- a Mirror project
-- a fetch provider
-- a place to store discovered URLs
-
-## Example
-
-```python
-from mirror_core.storage import InMemoryBlobStore, InMemoryMetadataStore
-from mirror_crawl.models import CrawlRequest
-from mirror_crawl.provider import LocalCrawlProvider
-
-provider = LocalCrawlProvider()
-metadata_store = InMemoryMetadataStore()
-blob_store = InMemoryBlobStore()
-
-result = await provider.crawl(
-    CrawlRequest(url="https://example.com", max_depth=1),
-)
-```
-
-Mirror will:
-
-- fetch the first page
-- follow same-host links
-- save the URLs it found
-- store page content when requested
-
-That is enough to build a crawler-backed SaaS workflow.
+You can use this as the seed for an archive, a monitor, or an SEO workflow.

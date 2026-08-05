@@ -1,29 +1,35 @@
-# Beta contract
+# Mirror Beta Contract
 
-Mirror beta is the point where the framework must run real workloads, not just
+This document defines the next release stage after the frozen alpha. Beta is the
+first stage where Mirror is expected to support real SaaS workloads, not just
 prove its architecture.
 
-## Beta requires
+## Beta means
 
-- a crawl capability that saves discovered URLs when asked
-- worker backends that can run jobs locally and from SQLite state
-- a scheduler that can produce due jobs again and again
-- metadata storage for runs, URLs, schedules, and checkpoints
-- blob storage for HTML and other large payloads
-- retry and timeout policies that affect execution
-- documentation that explains the product in plain language
+Mirror beta must provide:
 
-## Beta stack
+- crawl persistence for discovered URLs and fetched results;
+- worker backends suitable for local development and production queues;
+- scheduler support for recurring jobs;
+- metadata storage in a real database;
+- blob storage for payloads and archives;
+- a Django control plane for users, auth, and admin operations;
+- docs, ADRs, tests, and PR notes for every user-facing promise.
 
-Mirror officially supports:
+## Beta runtime guarantees
 
-- SQLite for development metadata
-- PostgreSQL for production metadata
-- filesystem storage for development blobs
-- S3-compatible storage for production blobs
-- local workers for tests and examples
-- SQLite-backed workers for single-machine beta setups
+- Crawlers MUST save discovered URLs when configured to do so.
+- Workers MUST be able to resume work from persisted state.
+- Scheduler jobs MUST be repeatable and observable.
+- Metadata MUST live in a database; blobs MUST live in object storage or the
+  filesystem backend used by development.
+- Redis MAY be used for cache, queue, and lease coordination.
+- Django admin MUST be able to read and manage stored metadata.
 
-Redis and Celery remain the default distributed path for later production work,
-but beta focuses first on the single-machine stack that contributors can run
-anywhere.
+## Deferred to later releases
+
+- cluster-scale distributed execution
+- advanced SaaS tenancy and billing
+- higher-level search products
+- integration with multiple external task systems beyond the supported beta
+  backends

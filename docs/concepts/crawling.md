@@ -1,24 +1,18 @@
 # Crawling
 
-Mirror can walk through a website from a starting URL and remember what it finds.
+Crawling means Mirror follows links, discovers pages, and saves the results when
+you ask it to.
 
-A crawl can:
+A crawler can:
 
-- visit the first page
-- follow links on the page
-- save the discovered URLs
-- store page content in blob storage
-- stop after a depth or page limit
+- start from one URL;
+- discover more URLs;
+- save the discovered URLs;
+- fetch page content;
+- hand results to later steps such as archiving or monitoring.
 
-Why this matters:
+Example use cases:
 
-- a crawler that forgets what it saw is hard to build a SaaS on
-- saved URLs let you re-run checks later
-- stored pages let you compare changes over time
-
-Example:
-
-> Start at `https://example.com`, follow links on the same host, save every URL,
-> and keep the HTML for later.
-
-That is the kind of job Mirror is meant to handle.
+- save every URL on a site;
+- monitor a section of a site for changes;
+- build an archive of pages you care about.

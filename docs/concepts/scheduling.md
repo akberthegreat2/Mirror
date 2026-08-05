@@ -1,20 +1,16 @@
 # Scheduling
 
-Mirror can run jobs immediately or on a schedule.
+Scheduling means Mirror runs work again later without you manually starting it.
 
-A schedule says:
+A schedule can be:
 
-- what should run
-- when it should run
-- whether it repeats
-- whether it is paused
+- once a day;
+- every hour;
+- every few minutes;
+- paused and resumed.
 
-Why this matters:
+Example use cases:
 
-- crawlers and monitors usually run again and again
-- scheduling lets you build recurring jobs without custom cron scripts
-- workers can pull due jobs and execute them safely
-
-A simple schedule might say:
-
-> Crawl `https://example.com` every six hours and save the URLs it finds.
+- crawl a site every night;
+- re-check a price every hour;
+- run an archive job on a fixed cadence.

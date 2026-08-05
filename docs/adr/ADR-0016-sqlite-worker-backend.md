@@ -1,13 +1,13 @@
-# ADR-0016: SQLite worker backend
+# ADR 0016 — SQLite worker backend
 
-Status: Accepted
+## Status
+Accepted
+
+## Context
+Contributors need a zero-dependency worker backend for development and CI.
 
 ## Decision
+SQLite SHALL be the official local-development worker backend.
 
-Mirror ships a SQLite-backed worker backend for single-machine beta setups.
-
-## Reason
-
-SQLite is good enough for development, demos, and small deployments. It gives
-contributors a real persistence path without requiring Redis or Celery on day
-one.
+## Consequences
+Worker semantics can be verified without Redis or Celery.
