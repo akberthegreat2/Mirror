@@ -78,10 +78,12 @@ class MirrorSettings(BaseSettings):
                 with path.open("r", encoding="utf-8") as stream:
                     data = yaml.safe_load(stream) or {}
             elif path.suffix == ".toml":
-                import tomllib
-
+                try:
+                    from mirror_core._toml import load as toml_load
+                except ModuleNotFoundError as exc:
+                    raise ConfigurationError(str(exc)) from exc
                 with path.open("rb") as stream:
-                    data = tomllib.load(stream)
+                    data = toml_load(stream)
             elif path.suffix == ".json":
                 with path.open("r", encoding="utf-8") as stream:
                     data = json.load(stream)

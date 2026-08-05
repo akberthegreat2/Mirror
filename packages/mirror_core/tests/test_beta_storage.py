@@ -1,17 +1,26 @@
-cat > /home/claude/mirror/mirror-main/packages/mirror_core/tests/test_beta_storage.py << 'PYEOF'
-"""Tests for the pre-beta SQLite/filesystem storage backends."""
+"""Tests for metadata and blob storage contracts."""
 
 from __future__ import annotations
 
-import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", FutureWarning)
-    from mirror_core.beta.storage import FileSystemBlobStore, SQLiteMetadataStore
+from mirror_core.beta.storage import (
+    FileSystemBlobStore,
+    InMemoryBlobStore,
+    InMemoryMetadataStore,
+    MetadataRecord,
+    SQLiteMetadataStore,
+)
 
-from mirror_core.storage import MetadataRecord
+
+def test_in_memory_metadata_store_round_trip() -> None:
+    """The metadata store should preserve structured records in memory."""
+    store = InMemoryMetadataStore()
+    record = MetadataRecord(namespace="crawl.urls", key="https://example.com", payload={"depth": 0})
+    store.put(record)
+    assert store.get("crawl.urls", "https://example.com") == record
+    assert store.list("crawl.urls") == [record]
 
 
 def test_sqlite_metadata_store_round_trip(tmp_path: Path) -> None:
@@ -29,6 +38,15 @@ def test_sqlite_metadata_store_round_trip(tmp_path: Path) -> None:
     store.close()
 
 
+def test_in_memory_blob_store_round_trip() -> None:
+    """The in-memory blob store should round-trip bytes."""
+    store = InMemoryBlobStore()
+    store.put_bytes("pages/index.html", b"payload")
+    assert store.get_bytes("pages/index.html") == b"payload"
+    store.delete("pages/index.html")
+    assert store.get_bytes("pages/index.html") is None
+
+
 def test_filesystem_blob_store_round_trip(tmp_path: Path) -> None:
     """The filesystem blob store should round-trip bytes."""
     store = FileSystemBlobStore(tmp_path / "blobs")
@@ -36,5 +54,3 @@ def test_filesystem_blob_store_round_trip(tmp_path: Path) -> None:
     assert store.get_bytes("pages/index.html") == b"<html></html>"
     store.delete("pages/index.html")
     assert store.get_bytes("pages/index.html") is None
-PYEOF
-echo done

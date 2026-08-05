@@ -41,10 +41,16 @@ packages/
 ├── mirror_fetch_playwright/# Playwright fetch provider
 ├── mirror_archive/         # Archive capability contract
 ├── mirror_archive_warc/    # WARC archive provider
+├── mirror_crawl/           # Crawl capability contract and local provider
 ├── mirror_middleware/      # Core middleware implementations
 ├── mirror_cli/             # CLI interface and scaffolding
 └── mirror_testing/         # Contract-testing utilities
 ```
+
+`mirror_control_django` also exists in `packages/` as a Django-facing
+control-plane manifest package; it is tracked separately in
+`docs/ROADMAP.md` Phase 3 rather than here, since its scope and status are
+still being resolved (see the open question in that phase).
 
 ## 4. Current core subsystems
 
@@ -62,6 +68,19 @@ packages/
 | Executor | Runs plans with isolated execution state. |
 | Resource | Immutable provenance-bearing resource envelopes. |
 | Worker contracts | Protocols for local and distributed execution. |
+| Storage contracts | `MetadataStore`/`BlobStore` protocols plus in-memory implementations, following the same frozen-contract-plus-dev-implementation pattern as worker contracts. `mirror_crawl` depends on the protocol types directly. |
+| Scheduler contract | `SchedulerBackend` protocol plus an in-memory implementation, same pattern as above. |
+
+### `mirror_core.beta`
+
+`mirror_core.beta` is an explicitly pre-beta staging area, not part of the
+frozen alpha contract. It currently holds production-lean backends
+(`SQLiteMetadataStore`, `FileSystemBlobStore`, `SQLiteScheduler`) that
+implement the stable contracts above but are themselves unstable. Importing
+it emits a `FutureWarning`. Nothing in the alpha-scoped packages imports it
+unconditionally. See the module docstring in
+`packages/mirror_core/src/mirror_core/beta/__init__.py` for the rules
+governing what may live there and how it must graduate out.
 
 ## 5. Dependency rules
 

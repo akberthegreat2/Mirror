@@ -10,6 +10,8 @@ Signals announce facts about runtime progress. They are for observability, not c
 
 ## Common signal names
 
+### Core (`mirror_core`)
+
 - `application.started`
 - `application.shutting_down`
 - `application.shutdown`
@@ -23,6 +25,30 @@ Signals announce facts about runtime progress. They are for observability, not c
 - `worker.stopped`
 - `worker.heartbeat`
 - `resource.created`
+
+### Capability-level signals
+
+Capability packages define their own signal names, under the same rules as
+core signals (observe only, typed payloads, non-critical by default). These
+are just as stable a promise as the core list above — a name changing here
+is a breaking change like any other.
+
+`mirror_crawl` (`mirror_crawl.signals`):
+
+- `crawl.started`
+- `crawl.page.discovered`
+- `crawl.page.stored`
+- `crawl.finished`
+
+`mirror_archive` (`mirror_archive.signals`):
+
+- `archive.started`
+- `archive.succeeded`
+- `archive.failed`
+
+A test in each capability package (`test_signal_contract_names_match_docs`)
+asserts these string values match this file, so this section cannot drift
+from the code silently.
 
 ## Receiver guidance
 

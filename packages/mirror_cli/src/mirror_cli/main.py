@@ -1,4 +1,3 @@
-
 """Mirror CLI main entry point."""
 
 from __future__ import annotations
@@ -174,9 +173,9 @@ def _load_pipeline(path: Path):
             raise RuntimeError("YAML pipeline files require the 'yaml' extra") from exc
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     elif path.suffix == ".toml":
-        import tomllib
+        from mirror_core._toml import loads as toml_loads
 
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
+        data = toml_loads(path.read_text(encoding="utf-8"))
     elif path.suffix == ".json":
         import json
 
@@ -187,17 +186,53 @@ def _load_pipeline(path: Path):
 
 
 @app.command()
-def worker() -> None:
-    """Start the default local worker backend for alpha development."""
+def worker(
+    worker_id: str = typer.Option(
+        "inline-worker-1",
+        "--id",
+        help="Identifier this worker reports in heartbeats and claimed jobs.",
+    ),
+    poll_interval: float = typer.Option(
+        1.0,
+        "--poll-interval",
+        min=0.1,
+        help="Seconds to wait between claim attempts when the queue is empty.",
+    ),
+) -> None:
+    """Run the default local worker backend until interrupted (Ctrl+C).
+
+    This claims and runs jobs submitted to the process-local inline queue.
+    It is a single-process development backend, not a distributed worker —
+    see docs/WORKER_CONTRACT.md for what's deferred to beta.
+    """
 
     async def _run() -> None:
         backend = InlineWorker()
         await backend.start()
-        await backend.stop()
-        console.print("[bold]Worker backend ready[/bold] (inline)")
+        console.print(f"[bold]Worker backend running[/bold] (inline, id={worker_id})")
+        console.print("[dim]Press Ctrl+C to stop.[/dim]")
+        try:
+            while True:
+                await backend.heartbeat(worker_id)
+                job = await backend.claim(worker_id)
+                if job is None:
+                    await asyncio.sleep(poll_interval)
+                    continue
+                console.print(f"Claimed job {job.job_id} ({job.kind})")
+                try:
+                    await backend.complete(job.job_id)
+                    console.print(f"[green]Completed[/green] {job.job_id}")
+                except Exception as exc:  # noqa: BLE001 - job failures must not kill the worker loop
+                    await backend.fail(job.job_id, str(exc))
+                    console.print(f"[red]Failed[/red] {job.job_id}: {exc}")
+        finally:
+            await backend.stop()
+            console.print("[bold]Worker backend stopped[/bold]")
 
     try:
         asyncio.run(_run())
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Worker interrupted by user[/yellow]")
     except Exception as exc:
         console.print(f"[red]Error: {exc}[/red]")
         raise typer.Exit(code=1) from exc
@@ -222,9 +257,16 @@ def list_providers() -> None:
 
 @app.command()
 def status() -> None:
-    """Show application status."""
+    """Show application status.
+
+    Not yet implemented: Mirror has no persistent process registry to query
+    in-alpha, so there is no live state to report. This intentionally does
+    not print a fixed "not running" claim, since that would be misleading
+    for an application that IS running in another process.
+    """
     console.print("[bold]Mirror Status[/bold]")
-    console.print("Application: Not running")
+    console.print("[yellow]Status inspection is not implemented yet.[/yellow]")
+    console.print("There is no cross-process registry of running applications in alpha.")
 
 
 @app.callback()
