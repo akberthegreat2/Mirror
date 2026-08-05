@@ -1,0 +1,34 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # Local hooks use your system environment (not isolated)
+  - repo: local
+    hooks:
+      - id: type
+        name: Type check all packages
+        entry: make type
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: pytest
+        name: Run tests
+        entry: pytest packages/mirror_core/tests packages/mirror_fetch/tests packages/mirror_fetch_httpx/tests packages/mirror_archive/tests packages/mirror_archive_warc/tests packages/mirror_cli/tests
+        language: system
+        pass_filenames: false
+        always_run: true
