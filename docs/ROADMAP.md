@@ -19,13 +19,17 @@
 - [x] `mirror_fetch_playwright` package
 - [x] Provider documentation
 
-## Phase 3 — Developer experience
+## Phase 3 — Django control plane
 
 - [x] `mirror startapp`
 - [x] Project template polish
 - [x] Better CLI help and diagnostics
 - [x] Workspace bootstrap docs (`conftest.py`, `sitecustomize.py`)
 - [x] End-to-end developer guide
+- [ ] Django control-plane package
+- [ ] Django admin metadata models
+- [ ] Auth and roles for operators
+- [ ] Admin views for runs, workers, crawled URLs, and archives
 
 ## Phase 4 — Beta runtime
 
@@ -34,6 +38,5 @@
 - [ ] SQLite worker backend
 - [ ] PostgreSQL / MySQL metadata store
 - [ ] Blob storage adapters
-- [ ] Django control plane
 - [ ] Redis-backed queue / cache integration
 - [ ] Beta release checklist

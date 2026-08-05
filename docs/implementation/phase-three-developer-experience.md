@@ -1,6 +1,6 @@
-# Phase three: developer experience
+# Phase three: developer experience (historical foundation)
 
-**Status:** Implemented in the current workspace snapshot.
+**Status:** Implemented as the foundation for the later Django control-plane phase.
 
 ## Delivered
 
@@ -16,12 +16,11 @@
 ## Notes
 
 The scaffold is intentionally lightweight. It reserves the configuration,
-application, and interface directories without committing to a dashboard or
-Django integration yet.
+application, and interface directories. The Django control-plane work now
+builds on this scaffold instead of replacing it.
 
 ## Deferred
 
 - distributed workers
-- dashboard / Django integration
 - SaaS features
 - beta-only runtime services

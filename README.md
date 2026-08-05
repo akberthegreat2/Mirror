@@ -9,7 +9,7 @@ Use Mirror when you need to:
 - archive pages and responses;
 - monitor pages for changes;
 - run recurring jobs with workers and a scheduler;
-- build a web control plane with Django admin later;
+- build a web control plane with Django admin;
 - keep the business logic separate from the backend implementation.
 
 Mirror splits the problem into:
@@ -17,7 +17,7 @@ Mirror splits the problem into:
 - a capability-agnostic core;
 - installable capabilities such as fetch and archive;
 - replaceable providers such as HTTPX and Playwright;
-- middleware, worker contracts, signals, and storage contracts.
+- middleware, worker contracts, signals, storage contracts, and the Django control plane package.
 
 ## Quick start
 
@@ -54,6 +54,7 @@ Read the explanation here: `docs/reference/testing_bootstrap.md`.
 - `docs/RELEASE_CHECKLIST.md` — the checks before tagging a release.
 - `docs/FUTURE.md` — deferred and experimental ideas.
 - `docs/PRs/` — implementation notes for the major phases.
+- `packages/mirror_control_django/` — the Django control-plane contract package.
 - `docs/adr/` — architecture decision records.
 - `CONTRIBUTING.md` — contributor workflow and quality requirements.
 - `docs/README.md` — the documentation index.

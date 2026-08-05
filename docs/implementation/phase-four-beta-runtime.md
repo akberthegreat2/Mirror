@@ -13,11 +13,11 @@ recurring jobs, and store metadata and blobs in durable backends.
 - scheduler contract
 - SQLite worker backend
 - metadata and blob storage boundaries
-- beta documentation and PR notes
+- documentation for the bootstrap files that keep the workspace importable
+- user-facing tutorials for crawling and scheduling
 
 ## Deferred to later phases
 
-- Django control plane
 - Redis and Celery production backends
 - cluster-scale execution
 - SaaS admin polish

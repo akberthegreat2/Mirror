@@ -23,3 +23,8 @@ contracts.
 - ADR-0017 django control plane
 - ADR-0018 celery and redis workers
 - ADR-0019 metadata store
+
+- ADR-0020 django control-plane contract
+- ADR-0021 control-plane metadata models
+- ADR-0022 admin visibility and roles
+- ADR-0023 optional Django dependency

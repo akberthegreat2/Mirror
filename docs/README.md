@@ -25,6 +25,7 @@ history.
 ## Concepts
 
 - [Developer experience](concepts/developer-experience.md)
+- [Control plane](concepts/control_plane.md)
 - [Crawling](concepts/crawling.md)
 - [Execution](concepts/execution.md)
 - [Middleware](concepts/middleware.md)
@@ -40,6 +41,7 @@ history.
 - [First crawl](tutorials/first_crawl.md)
 - [Scheduled crawl](tutorials/scheduled_crawl.md)
 - [Provider swap](tutorials/provider_swap.md)
+- [Django control plane](tutorials/django_control_plane.md)
 
 ## Reference
 
@@ -54,9 +56,11 @@ history.
 - [Testing bootstrap](reference/testing_bootstrap.md)
 - [Worker reference](reference/workers.md)
 - [mirror-fetch-playwright](reference/mirror_fetch_playwright.md)
+- [mirror-control-django](reference/mirror_control_django.md)
 
 ## Implementation notes
 
 - [Core hardening phase 1](implementation/core-hardening-phase-1.md)
 - [Phase three developer experience](implementation/phase-three-developer-experience.md)
+- [Phase three Django control plane](implementation/phase-three-django-control-plane.md)
 - [Phase four beta runtime](implementation/phase-four-beta-runtime.md)
