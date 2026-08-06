@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 from mirror_core.exceptions import ExecutionError
 from mirror_core.executor import Executor, RunOutcome, StepState
-from mirror_core.middleware import Invocation, MiddlewareChain
+from mirror_core.middleware import MiddlewareChain, MiddlewareInvocation
 from mirror_core.pipeline import Pipeline, Step
 from mirror_core.planner import Planner
 from mirror_core.registry import CapabilityConfig, ProviderConfig, Registry
@@ -189,7 +189,7 @@ async def test_middleware_can_short_circuit_provider() -> None:
     provider = AsyncMock()
 
     class CacheMiddleware:
-        async def __call__(self, invocation: Invocation, next_middleware):
+        async def __call__(self, invocation: MiddlewareInvocation, next_middleware):
             return MockResult(content="cached")
 
     plan = make_plan(

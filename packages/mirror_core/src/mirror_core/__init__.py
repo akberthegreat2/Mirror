@@ -25,7 +25,6 @@ from mirror_core.executor import (
 )
 from mirror_core.lifecycle import AsyncLifecycle
 from mirror_core.middleware import (
-    Invocation,
     Middleware,
     MiddlewareChain,
     MiddlewareContext,
@@ -100,7 +99,6 @@ __all__ = [
     "InMemoryMetadataStore",
     "InMemoryScheduler",
     "InlineWorker",
-    "Invocation",
     "JobState",
     "LeaseManager",
     "LifecycleError",

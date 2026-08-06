@@ -16,19 +16,11 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  # Local hooks use your system environment (not isolated)
   - repo: local
     hooks:
-      - id: type
-        name: Type check all packages
-        entry: make type
-        language: system
-        pass_filenames: false
-        always_run: true
-
-      - id: pytest
-        name: Run tests
-        entry: pytest packages/mirror_core/tests packages/mirror_fetch/tests packages/mirror_fetch_httpx/tests packages/mirror_archive/tests packages/mirror_archive_warc/tests packages/mirror_cli/tests
+      - id: check-all
+        name: Run all checks (lint, format, type, test)
+        entry: make check
         language: system
         pass_filenames: false
         always_run: true
