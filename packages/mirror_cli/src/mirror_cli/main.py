@@ -8,6 +8,7 @@ from pathlib import Path
 
 import typer
 from mirror_core.application import Application
+from mirror_core.exceptions import ApplicationError
 from mirror_core.pipeline import Pipeline
 from mirror_core.settings import MirrorSettings
 from mirror_core.workers import WorkerBackend
@@ -77,6 +78,9 @@ async def _list_capabilities_async() -> None:
                 except KeyError:
                     pass
                 table.add_row(name, version, description)
+    except ApplicationError:
+        # No capabilities discovered; just print an empty table
+        pass
     except Exception as exc:
         console.print(f"[red]Failed to start application: {exc}[/red]")
         raise typer.Exit(code=1) from exc
@@ -100,6 +104,9 @@ async def _list_providers_async() -> None:
                     table.add_row(name, capability, str(config.priority))
                 except KeyError:
                     table.add_row(name, capability, "N/A")
+    except ApplicationError:
+        # No providers discovered; just print an empty table
+        pass
     except Exception as exc:
         console.print(f"[red]Failed to start application: {exc}[/red]")
         raise typer.Exit(code=1) from exc
@@ -192,13 +199,12 @@ def _load_mapping(path: Path) -> dict[str, object]:
     else:
         raise RuntimeError(f"Unsupported file format: {path.suffix}")
     if not isinstance(data, dict):
-        raise TypeError(f"Expected an object/mapping in {path}")  # TRY004
+        raise TypeError(f"Expected an object/mapping in {path}")
     return data
 
 
 def _load_pipeline(path: Path) -> Pipeline:
     """Load and validate a pipeline definition."""
-    from mirror_core.pipeline import Pipeline
 
     return Pipeline.model_validate(_load_mapping(path))
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
+from contextlib import AbstractAsyncContextManager
 from datetime import datetime, timezone
 from pathlib import Path
 from types import TracebackType
@@ -104,7 +105,9 @@ class ContentMonitor:
                 previous_sha256=previous_sha256,
             )
 
-    def _managed_client(self) -> _ClientManager | httpx.AsyncClient:
+    def _managed_client(
+        self,
+    ) -> _ClientManager | AbstractAsyncContextManager[httpx.AsyncClient]:
         if self._client is not None:
             return _ClientManager(self._client)
         return httpx.AsyncClient(follow_redirects=True, timeout=20.0)
@@ -120,7 +123,7 @@ class _ClientManager:
     async def __aexit__(
         self,
         exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: TracebackType | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
     ) -> None:
         return None
