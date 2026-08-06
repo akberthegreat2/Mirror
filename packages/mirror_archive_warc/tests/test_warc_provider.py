@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, ClassVar
 from uuid import uuid4
 
 import pytest
@@ -17,7 +17,7 @@ from mirror_archive_warc.settings import WARCSettings
 class FakeWARCWriter:
     """Small writer double that records create/write calls."""
 
-    instances: list[FakeWARCWriter] = []
+    instances: ClassVar[list[FakeWARCWriter]] = []
 
     def __init__(self, stream: BinaryIO, *, gzip: bool) -> None:
         self.stream = stream
@@ -146,7 +146,9 @@ async def test_serializes_concurrent_writes(tmp_path: Path) -> None:
     )
     await provider.setup()
 
-    results = await asyncio.gather(*(provider.archive(request(str(i).encode())) for i in range(20)))
+    results = await asyncio.gather(
+        *(provider.archive(request(str(i).encode())) for i in range(20))
+    )
 
     writer = FakeWARCWriter.instances[-1]
     assert len(writer.written) == 20

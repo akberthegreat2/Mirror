@@ -127,7 +127,7 @@ def discover(
     for name, loader in entries:
         try:
             obj = loader()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             result.errors.append((name, f"Failed to load entry point: {e}"))
             continue
 
@@ -135,7 +135,7 @@ def discover(
         if desc is None and callable(obj):
             try:
                 desc = classify_descriptor(obj())
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 result.errors.append(
                     (name, f"Failed to resolve callable descriptor: {exc}")
                 )

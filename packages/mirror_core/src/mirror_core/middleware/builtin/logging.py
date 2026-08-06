@@ -73,15 +73,14 @@ class LoggingMiddleware:
             return result
         except Exception as exc:
             duration = time.monotonic() - start
-            logger.error(
-                f"Capability '{capability}' step '{step_id}' failed after {duration:.3f}s: {exc}",
+            logger.exception(
+                f"Capability '{capability}' step '{step_id}' failed after {duration:.3f}s",
                 extra={
                     "step_id": step_id,
                     "capability": capability,
                     "duration": duration,
                     "error": str(exc),
                 },
-                exc_info=True,
             )
             raise
 

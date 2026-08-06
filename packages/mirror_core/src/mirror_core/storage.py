@@ -72,7 +72,7 @@ class InMemoryMetadataStore:
         return self._records.get((namespace, key))
 
     def list(self, namespace: str | None = None) -> list[MetadataRecord]:
-        records = self._records.values()
+        records = list(self._records.values())
         if namespace is not None:
             records = [record for record in records if record.namespace == namespace]
         return sorted(records, key=lambda record: (record.namespace, record.key))

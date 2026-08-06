@@ -6,9 +6,34 @@ from pathlib import Path
 
 import pytest
 from mirror_cli.main import app
+from mirror_core.discovery import (
+    DiscoveryResult,
+    DiscoverySource,
+)
 from typer.testing import CliRunner
 
 runner = CliRunner()
+
+
+class EmptyDiscoverySource(DiscoverySource):
+    """Discovery source that returns no entries."""
+
+    def iter_entry_points(self, group: str) -> list[tuple[str, callable]]:
+        return []
+
+
+@pytest.fixture(autouse=True)
+def patch_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure discovery returns empty results for CLI tests."""
+
+    def fake_discover(*args, **kwargs) -> DiscoveryResult:
+        return DiscoveryResult()
+
+    monkeypatch.setattr("mirror_cli.main.discover", fake_discover)
+    # Also ensure the Application uses the empty source
+    monkeypatch.setattr(
+        "mirror_core.discovery.DefaultDiscoverySource", EmptyDiscoverySource
+    )
 
 
 def test_list_capabilities() -> None:

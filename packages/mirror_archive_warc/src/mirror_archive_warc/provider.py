@@ -57,8 +57,10 @@ class WARCProvider(AsyncLifecycle, Archive):
         try:
             from warcio.warcwriter import WARCWriter
         except ImportError as exc:
-            raise ArchiveError("WARC provider requires the 'warcio' dependency") from exc
-        return WARCWriter
+            raise ArchiveError(
+                "WARC provider requires the 'warcio' dependency"
+            ) from exc
+        return WARCWriter  # type: ignore[no-any-return]
 
     async def setup(self) -> None:
         """Open an initial WARC segment.
@@ -96,12 +98,16 @@ class WARCProvider(AsyncLifecycle, Archive):
 
         async with self._lock:
             if self._writer is None or self._current_file is None:
-                raise ArchiveError("WARC provider is not initialized; call setup() first")
+                raise ArchiveError(
+                    "WARC provider is not initialized; call setup() first"
+                )
 
             try:
                 incoming_bytes = len(request.payload.content)
             except (AttributeError, TypeError) as exc:
-                raise ArchiveError("Archive request contains an invalid payload", cause=exc) from exc
+                raise ArchiveError(
+                    "Archive request contains an invalid payload", cause=exc
+                ) from exc
 
             if self._should_rotate(incoming_bytes):
                 await asyncio.to_thread(self._rotate_segment)
@@ -122,7 +128,9 @@ class WARCProvider(AsyncLifecycle, Archive):
         except Exception as exc:
             if file_obj is not None:
                 file_obj.close()
-            raise ArchiveError(f"Failed to open WARC segment {path}: {exc}", cause=exc) from exc
+            raise ArchiveError(
+                f"Failed to open WARC segment {path}: {exc}", cause=exc
+            ) from exc
 
         self._current_file = path
         self._file = file_obj
@@ -212,13 +220,18 @@ class WARCProvider(AsyncLifecycle, Archive):
         }
         combined_metadata: dict[str, Any] = {
             **request.metadata,
-            **{f"payload-header-{key}": value for key, value in request.payload.headers.items()},
+            **{
+                f"payload-header-{key}": value
+                for key, value in request.payload.headers.items()
+            },
         }
         for key, value in combined_metadata.items():
             safe_key = self._sanitize_header_name(str(key))
             if not safe_key:
                 continue
-            headers[f"{self._metadata_prefix}{safe_key}"] = self._sanitize_header_value(value)
+            headers[f"{self._metadata_prefix}{safe_key}"] = self._sanitize_header_value(
+                value
+            )
         return headers
 
     @staticmethod

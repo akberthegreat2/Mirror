@@ -7,12 +7,14 @@ from pathlib import Path
 
 import mirror_cli.main as cli_main
 import mirror_core.toml as core_toml
+import pytest
 from mirror_analyze import capability as analyze_capability
 from mirror_crawl_local.provider import LocalCrawlProvider
 from mirror_diff import capability as diff_capability
 from mirror_monitor import capability as monitor_capability
 from mirror_scrape import capability as scrape_capability
 from mirror_search import capability as search_capability
+from pydantic import ValidationError
 
 ROOT = Path(__file__).resolve().parents[3]
 CAPABILITY_PACKAGES = (
@@ -173,18 +175,12 @@ def test_resource_envelope_is_immutable() -> None:
     assert envelope.parents
     assert envelope.metadata["source"] == "test"
 
-    try:
+    with pytest.raises(ValidationError):
         envelope.parents += (uuid4(),)
-    except Exception:
-        pass
-    else:
         raise AssertionError("parents should be immutable")
 
-    try:
+    with pytest.raises(TypeError):
         envelope.metadata["source"] = "changed"  # type: ignore[index]
-    except Exception:
-        pass
-    else:
         raise AssertionError("metadata should be immutable")
 
     dumped = envelope.model_dump()

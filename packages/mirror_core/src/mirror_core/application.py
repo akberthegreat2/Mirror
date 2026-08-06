@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import logging
 import types
+from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from typing import Any, cast
-from typing_extensions import Self  # <-- added
+
+from typing_extensions import Self
 
 from mirror_core.components import ComponentManager
 from mirror_core.discovery import DiscoveryResult, DiscoverySource, discover
@@ -42,7 +44,7 @@ class Application:
         self._lifecycle_stack: AsyncExitStack | None = None
         self._started = False
 
-    async def __aenter__(self) -> Application:
+    async def __aenter__(self) -> Self:
         await self.start()
         return self
 
@@ -78,7 +80,10 @@ class Application:
             middleware_chains = await self._build_middleware_chains(stack)
             await self._component_manager.initialize(stack)
             self._executor = Executor(
-                components=self._component_manager.instances,
+                components=cast(
+                    Mapping[tuple[str, str] | str, Any],
+                    self._component_manager.instances,
+                ),
                 max_concurrency=self.settings.max_concurrency,
                 signal_bus=self._signal_bus,
                 middleware_chains=middleware_chains,
@@ -212,7 +217,7 @@ class Application:
     def _order_middleware(configs: list[MiddlewareConfig]) -> list[MiddlewareConfig]:
         """Topologically order middleware, using priority as a stable tie-breaker."""
         by_name = {config.name: config for config in configs}
-        dependencies = {config.name: set() for config in configs}
+        dependencies: dict[str, set[str]] = {config.name: set() for config in configs}
         for config in configs:
             for target in config.after:
                 if target in by_name:

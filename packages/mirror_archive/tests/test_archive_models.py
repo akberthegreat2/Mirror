@@ -6,7 +6,10 @@ from mirror_archive.models import ArchivePayload, ArchiveRequest, ArchiveResult
 
 
 def test_archive_request():
-    req = ArchiveRequest(resource_id=uuid4(), payload=ArchivePayload(content=b"test", target_uri="https://example.com"))
+    req = ArchiveRequest(
+        resource_id=uuid4(),
+        payload=ArchivePayload(content=b"test", target_uri="https://example.com"),
+    )
     assert req.resource_id is not None
     assert req.payload.content == b"test"
     assert req.payload.target_uri == "https://example.com"

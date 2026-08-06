@@ -47,5 +47,5 @@ mypy_path = ["src"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["tomllib", "tomli", "yaml"]
+module = ["tomllib", "tomli", "yaml", "warcio"]
 ignore_missing_imports = true

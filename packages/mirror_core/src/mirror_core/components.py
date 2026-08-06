@@ -128,7 +128,7 @@ class ComponentManager:
         target = factory.__init__ if inspect.isclass(factory) else factory
         try:
             hints = get_type_hints(target)
-        except Exception:
+        except Exception:  # noqa: BLE001
             hints = {}
 
         kwargs: dict[str, Any] = {}

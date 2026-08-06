@@ -262,7 +262,7 @@ class Executor:
             except asyncio.CancelledError:
                 run.states[step.id] = StepState.CANCELLED
                 raise
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
                 run.states[step.id] = StepState.FAILED
                 run.errors[step.id] = str(exc)
                 await self._emit("step.failed", run_id=run.run_id, step=step, error=exc)

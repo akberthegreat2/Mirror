@@ -50,7 +50,7 @@ class ResourceEnvelope(BaseModel):
     fingerprint: str
     metadata: Mapping[str, Any] = Field(default_factory=dict)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, __context: Any, /) -> None:
         object.__setattr__(self, "parents", tuple(self.parents))
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
 

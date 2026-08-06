@@ -263,9 +263,12 @@ class Planner:
             target_type = field.annotation if field is not None else None
         if source_type is None or target_type is None or source_type == target_type:
             return
-        if isinstance(source_type, type) and isinstance(target_type, type):
-            if issubclass(source_type, target_type):
-                return
+        if (
+            isinstance(source_type, type)
+            and isinstance(target_type, type)
+            and issubclass(source_type, target_type)
+        ):
+            return
         source_name = getattr(source_type, "__name__", str(source_type))
         target_name = getattr(target_type, "__name__", str(target_type))
         raise PlannerError(
@@ -276,8 +279,8 @@ class Planner:
     def _build_dependency_graph(
         self, pipeline: Pipeline
     ) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
-        dependencies = {step.id: set() for step in pipeline.steps}
-        reverse = {step.id: set() for step in pipeline.steps}
+        dependencies: dict[str, set[str]] = {step.id: set() for step in pipeline.steps}
+        reverse: dict[str, set[str]] = {step.id: set() for step in pipeline.steps}
         for step in pipeline.steps:
             for source in step.input.values():
                 source_step, _ = self._parse_binding(source, step.id)

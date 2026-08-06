@@ -1,7 +1,7 @@
 """Tests for transactional and restartable application lifecycle."""
 
 import sys
-from typing import Protocol, runtime_checkable
+from typing import ClassVar, Protocol, runtime_checkable
 
 import pytest
 from mirror_core.application import Application
@@ -21,7 +21,7 @@ class CapabilityProtocol(Protocol):
 
 
 class Provider:
-    instances: list["Provider"] = []
+    instances: ClassVar[list["Provider"]] = []
 
     def __init__(self, settings: ProviderSettings) -> None:
         self.settings = settings

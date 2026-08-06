@@ -68,10 +68,9 @@ class SignalBus:
                     extra={"handler": handler.__name__, "error": str(e)},
                 )
             except Exception as e:
-                logger.error(
+                logger.exception(
                     f"Signal handler raised unexpected exception: {signal_name}",
                     extra={"handler": handler.__name__, "error": str(e)},
-                    exc_info=True,
                 )
 
     def clear(self) -> None:

@@ -1,20 +1,19 @@
-"""Public TOML helpers for Mirror configuration and CLI loading."""
+"""TOML parsing compatibility layer."""
 
 from __future__ import annotations
 
+import sys
 from typing import Any, BinaryIO
 
-try:
-    import tomllib as _toml
-except ModuleNotFoundError:  # pragma: no cover - Python < 3.11
-    import tomli as _toml  # type: ignore[no-redef]
+if sys.version_info >= (3, 11):
+    import tomllib as tomli
+else:
+    import tomli  # type: ignore[import-not-found]
 
 
-def load(fp: BinaryIO) -> dict[str, Any]:
-    """Load TOML data from a binary file object."""
-    return _toml.load(fp)
+def loads(s: str) -> dict[str, Any]:
+    return tomli.loads(s)  # type: ignore[no-any-return]
 
 
-def loads(text: str) -> dict[str, Any]:
-    """Load TOML data from a string."""
-    return _toml.loads(text)
+def load(f: BinaryIO) -> dict[str, Any]:
+    return tomli.load(f)  # type: ignore[no-any-return]

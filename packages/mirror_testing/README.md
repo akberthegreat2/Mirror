@@ -10,6 +10,7 @@ lives at the package root to satisfy build metadata and wheel generation.
 ```python
 from mirror_testing import BaseContract
 
+
 class FetchContract(BaseContract):
     provider_class = HTTPXProvider
 ```

@@ -1,4 +1,4 @@
-.PHONY: install type lint format test clean
+.PHONY: install type lint format test clean check
 
 install:
 	@for pkg in packages/*/; do \
@@ -11,16 +11,16 @@ type:
 	@for pkg in packages/*/; do \
 		if [ -d "$$pkg/src" ]; then \
 			echo "Checking $$pkg"; \
-			(cd "$$pkg" && mypy src) || exit 1; \
+			(cd "$$pkg" && mypy --explicit-package-bases src) || exit 1; \
 		fi; \
 	done
 
 lint:
 	@echo "=== Running lints ==="
-	ruff check --fix packages/ 
+	@ruff check --fix packages/
 
 format:
-	ruff format packages/
+	@ruff format packages/
 
 test:
 	@echo "=== Running tests ==="
@@ -28,10 +28,10 @@ test:
 
 clean:
 	@echo "=== Cleaning ==="
-	find packages -type d -name "*.egg-info" -exec rm -rf {} +
-	find packages -type d -name "__pycache__" -exec rm -rf {} +
-	find packages -type d -name ".pytest_cache" -exec rm -rf {} +
-	find packages -type d -name ".mypy_cache" -exec rm -rf {} +
+	@find packages -type d -name "*.egg-info" -exec rm -rf {} +
+	@find packages -type d -name "__pycache__" -exec rm -rf {} +
+	@find packages -type d -name ".pytest_cache" -exec rm -rf {} +
+	@find packages -type d -name ".mypy_cache" -exec rm -rf {} +
 
 check: lint format type test
 	@echo "=== All checks passed ==="

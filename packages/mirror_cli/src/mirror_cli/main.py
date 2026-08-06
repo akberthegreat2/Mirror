@@ -8,7 +8,9 @@ from pathlib import Path
 
 import typer
 from mirror_core.application import Application
+from mirror_core.pipeline import Pipeline
 from mirror_core.settings import MirrorSettings
+from mirror_core.workers import WorkerBackend
 from rich.console import Console
 from rich.table import Table
 
@@ -27,6 +29,35 @@ app = typer.Typer(
 )
 console = Console()
 
+# Constants for CLI options/arguments (to avoid B008)
+ARG_NAME = typer.Argument(..., help="Project directory name")
+OPT_ROOT = typer.Option(
+    None, "--root", "-r", help="Parent directory for the generated project"
+)
+OPT_APP_ROOT = typer.Option(
+    None, "--root", "-r", help="Project root that contains apps/"
+)
+OPT_DOCTOR_ROOT = typer.Option(None, "--root", "-r", help="Project root to inspect")
+OPT_CONFIG = typer.Option(None, "--config", "-c", help="Path to Mirror settings file")
+OPT_PIPELINE = typer.Option(
+    ..., "--pipeline", "-p", help="Path to pipeline definition file"
+)
+OPT_INPUTS = typer.Option(
+    None, "--inputs", "-i", help="JSON/TOML/YAML runtime inputs file"
+)
+OPT_BACKEND = typer.Option(
+    "sqlite",
+    "--backend",
+    case_sensitive=False,
+    help="Worker backend to initialize (sqlite or inline)",
+)
+OPT_DATABASE = typer.Option(
+    None,
+    "--database",
+    "-d",
+    help="SQLite database path used when --backend sqlite is selected",
+)
+
 
 async def _list_capabilities_async() -> None:
     """List discovered capabilities without leaking application resources."""
@@ -35,16 +66,20 @@ async def _list_capabilities_async() -> None:
     table.add_column("Version", style="green")
     table.add_column("Description", style="white")
 
-    async with Application(settings=MirrorSettings()) as app_obj:
-        for cap in app_obj.registry.list_capabilities():
-            name, version = cap.split(":", 1)
-            description = "N/A"
-            try:
-                config = app_obj.registry.get_capability(name, version)
-                description = config.metadata.get("description", "N/A")
-            except Exception:
-                pass
-            table.add_row(name, version, description)
+    try:
+        async with Application(settings=MirrorSettings()) as app_obj:
+            for cap in app_obj.registry.list_capabilities():
+                name, version = cap.split(":", 1)
+                description = "N/A"
+                try:
+                    config = app_obj.registry.get_capability(name, version)
+                    description = config.metadata.get("description", "N/A")
+                except KeyError:
+                    pass
+                table.add_row(name, version, description)
+    except Exception as exc:
+        console.print(f"[red]Failed to start application: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
     console.print(table)
 
@@ -56,27 +91,26 @@ async def _list_providers_async() -> None:
     table.add_column("Capability", style="green")
     table.add_column("Priority", style="yellow")
 
-    async with Application(settings=MirrorSettings()) as app_obj:
-        for prov_key in app_obj.registry.list_providers():
-            capability, name = prov_key.split(":", 1)
-            try:
-                config = app_obj.registry.get_provider(capability, name)
-                table.add_row(name, capability, str(config.priority))
-            except Exception:
-                table.add_row(name, capability, "N/A")
+    try:
+        async with Application(settings=MirrorSettings()) as app_obj:
+            for prov_key in app_obj.registry.list_providers():
+                capability, name = prov_key.split(":", 1)
+                try:
+                    config = app_obj.registry.get_provider(capability, name)
+                    table.add_row(name, capability, str(config.priority))
+                except KeyError:
+                    table.add_row(name, capability, "N/A")
+    except Exception as exc:
+        console.print(f"[red]Failed to start application: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
     console.print(table)
 
 
 @app.command()
 def startproject(
-    name: str = typer.Argument(..., help="Project directory name"),
-    root: Path | None = typer.Option(
-        None,
-        "--root",
-        "-r",
-        help="Parent directory for the generated project",
-    ),
+    name: str = ARG_NAME,
+    root: Path | None = OPT_ROOT,
 ) -> None:
     """Create a Django-style Mirror project scaffold."""
     try:
@@ -90,12 +124,7 @@ def startproject(
 @app.command()
 def startapp(
     name: str = typer.Argument(..., help="Application package name"),
-    root: Path | None = typer.Option(
-        None,
-        "--root",
-        "-r",
-        help="Project root that contains apps/",
-    ),
+    root: Path | None = OPT_APP_ROOT,
 ) -> None:
     """Create a reusable Mirror application scaffold inside apps/."""
     try:
@@ -107,12 +136,7 @@ def startapp(
 
 @app.command()
 def doctor(
-    root: Path | None = typer.Option(
-        None,
-        "--root",
-        "-r",
-        help="Project root to inspect",
-    ),
+    root: Path | None = OPT_DOCTOR_ROOT,
 ) -> None:
     """Inspect a generated project scaffold and report health checks."""
     checks = collect_project_checks(root=root)
@@ -123,15 +147,9 @@ def doctor(
 
 @app.command()
 def run(
-    config: Path | None = typer.Option(
-        None, "--config", "-c", help="Path to Mirror settings file"
-    ),
-    pipeline: Path = typer.Option(
-        ..., "--pipeline", "-p", help="Path to pipeline definition file"
-    ),
-    inputs: Path | None = typer.Option(
-        None, "--inputs", "-i", help="JSON/TOML/YAML runtime inputs file"
-    ),
+    config: Path | None = OPT_CONFIG,
+    pipeline: Path = OPT_PIPELINE,
+    inputs: Path | None = OPT_INPUTS,
 ) -> None:
     """Compile and execute one pipeline with explicit runtime inputs."""
 
@@ -158,10 +176,10 @@ def run(
 def _load_mapping(path: Path) -> dict[str, object]:
     """Load a mapping from JSON, TOML, or YAML."""
     if not path.exists():
-        raise RuntimeError(f"File does not exist: {path}")
+        raise FileNotFoundError(f"File does not exist: {path}")
     if path.suffix in {".yaml", ".yml"}:
         try:
-            import yaml
+            import yaml  # type: ignore[import-untyped]
         except ImportError as exc:
             raise RuntimeError("YAML files require PyYAML") from exc
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -174,11 +192,11 @@ def _load_mapping(path: Path) -> dict[str, object]:
     else:
         raise RuntimeError(f"Unsupported file format: {path.suffix}")
     if not isinstance(data, dict):
-        raise RuntimeError(f"Expected an object/mapping in {path}")
+        raise TypeError(f"Expected an object/mapping in {path}")  # TRY004
     return data
 
 
-def _load_pipeline(path: Path):
+def _load_pipeline(path: Path) -> Pipeline:
     """Load and validate a pipeline definition."""
     from mirror_core.pipeline import Pipeline
 
@@ -187,23 +205,14 @@ def _load_pipeline(path: Path):
 
 @app.command()
 def worker(
-    backend: str = typer.Option(
-        "sqlite",
-        "--backend",
-        case_sensitive=False,
-        help="Worker backend to initialize (sqlite or inline)",
-    ),
-    database: Path | None = typer.Option(
-        None,
-        "--database",
-        "-d",
-        help="SQLite database path used when --backend sqlite is selected",
-    ),
+    backend: str = OPT_BACKEND,
+    database: Path | None = OPT_DATABASE,
 ) -> None:
     """Initialize the local worker backend and report readiness."""
 
     async def _run() -> None:
         backend_name = backend.lower()
+        worker_backend: WorkerBackend
         if backend_name == "inline":
             from mirror_core.workers import InlineWorker
 

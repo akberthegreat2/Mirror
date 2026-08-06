@@ -79,7 +79,7 @@ _PROJECT_FILES: dict[str, str] = {
         "[tool.setuptools.packages.find]",
         'where = ["."]',
         'include = ["config*", "apps*"]',
-        'namespaces = false',
+        "namespaces = false",
         "",
         "[tool.pytest.ini_options]",
         'testpaths = ["tests"]',
@@ -101,29 +101,29 @@ _PROJECT_FILES: dict[str, str] = {
         "",
         "from mirror_core.settings import MirrorSettings",
         "",
-        'settings = MirrorSettings(',
+        "settings = MirrorSettings(",
         '    application_name="{{PROJECT_NAME}}",',
         '    worker_backend="inline",',
-        ')',
+        ")",
     ),
     "config/asgi.py": _text(
         '"""ASGI placeholder for the Mirror project."""',
         "",
-        'from config.settings import settings as _settings',
+        "from config.settings import settings as _settings",
         "",
-        'application = None',
+        "application = None",
     ),
     "config/wsgi.py": _text(
         '"""WSGI placeholder for the Mirror project."""',
         "",
-        'from config.settings import settings as _settings',
+        "from config.settings import settings as _settings",
         "",
-        'application = None',
+        "application = None",
     ),
     "config/urls.py": _text(
         '"""URL placeholder for the Mirror project."""',
         "",
-        'urlpatterns: list[str] = []',
+        "urlpatterns: list[str] = []",
     ),
     "apps/__init__.py": _text('"""Application packages for the Mirror project."""'),
     "apps/core/__init__.py": _text(
@@ -161,7 +161,7 @@ _PROJECT_FILES: dict[str, str] = {
         "def list_tasks() -> Sequence[str]:",
         '    """Return registered task names for the scaffold app."""',
         "",
-        '    return ()',
+        "    return ()",
     ),
     "apps/core/middleware.py": _text(
         '"""Middleware registration helpers for the default Mirror app."""',
@@ -172,7 +172,7 @@ _PROJECT_FILES: dict[str, str] = {
         "def list_middleware() -> Sequence[str]:",
         '    """Return middleware names for the scaffold app."""',
         "",
-        '    return ()',
+        "    return ()",
     ),
     "apps/core/signals.py": _text(
         '"""Signal registration helpers for the default Mirror app."""',
@@ -183,7 +183,7 @@ _PROJECT_FILES: dict[str, str] = {
         "def list_signals() -> Sequence[str]:",
         '    """Return signal names for the scaffold app."""',
         "",
-        '    return ()',
+        "    return ()",
     ),
     "apps/core/workers.py": _text(
         '"""Worker registration helpers for the default Mirror app."""',
@@ -194,7 +194,7 @@ _PROJECT_FILES: dict[str, str] = {
         "def list_workers() -> Sequence[str]:",
         '    """Return worker names for the scaffold app."""',
         "",
-        '    return ()',
+        "    return ()",
     ),
     "tests/test_project_smoke.py": _text(
         '"""Smoke tests for the generated Mirror project scaffold."""',
@@ -205,15 +205,15 @@ _PROJECT_FILES: dict[str, str] = {
         "def test_project_settings_load() -> None:",
         '    """Project settings should import and expose the application name."""',
         "",
-        '    assert settings.application_name',
+        "    assert settings.application_name",
         '    assert settings.worker_backend == "inline"',
     ),
     "docs/README.md": _text(
-        '# Project documentation',
+        "# Project documentation",
         "",
-        'Use this directory for project-specific decisions, ADRs, and runbooks.',
+        "Use this directory for project-specific decisions, ADRs, and runbooks.",
         "Mirror's repository-level docs describe the framework; this folder is",
-        'where the generated project records its own implementation details.',
+        "where the generated project records its own implementation details.",
     ),
 }
 
@@ -251,7 +251,7 @@ _APP_FILES: dict[str, str] = {
         "def list_tasks() -> Sequence[str]:",
         '    """Return task names registered by the application scaffold."""',
         "",
-        '    return ()',
+        "    return ()",
     ),
     "middleware.py": _text(
         '"""Middleware helpers for {{APP_NAME}}."""',
@@ -262,7 +262,7 @@ _APP_FILES: dict[str, str] = {
         "def list_middleware() -> Sequence[str]:",
         '    """Return middleware names registered by the application scaffold."""',
         "",
-        '    return ()',
+        "    return ()",
     ),
     "signals.py": _text(
         '"""Signals for {{APP_NAME}}."""',
@@ -273,7 +273,7 @@ _APP_FILES: dict[str, str] = {
         "def list_signals() -> Sequence[str]:",
         '    """Return signal names registered by the application scaffold."""',
         "",
-        '    return ()',
+        "    return ()",
     ),
     "workers.py": _text(
         '"""Worker helpers for {{APP_NAME}}."""',
@@ -284,14 +284,14 @@ _APP_FILES: dict[str, str] = {
         "def list_workers() -> Sequence[str]:",
         '    """Return worker names registered by the application scaffold."""',
         "",
-        '    return ()',
+        "    return ()",
     ),
     "README.md": _text(
-        '# {{APP_NAME}}',
+        "# {{APP_NAME}}",
         "",
-        'Generated with `mirror startapp`.',
+        "Generated with `mirror startapp`.",
         "",
-        'Place pipelines, middleware, tasks, workers, and signals here.',
+        "Place pipelines, middleware, tasks, workers, and signals here.",
     ),
     "tests.py": _text(
         '"""Smoke tests for {{APP_NAME}}."""',
@@ -300,7 +300,7 @@ _APP_FILES: dict[str, str] = {
         "def test_app_importable() -> None:",
         '    """The scaffolded application module should import cleanly."""',
         "",
-        '    assert True',
+        "    assert True",
     ),
 }
 
@@ -382,7 +382,7 @@ def collect_project_checks(root: Path | None = None) -> list[DoctorCheck]:
     for module_name in ("mirror_core", "mirror_cli"):
         try:
             __import__(module_name)
-        except Exception as exc:  # pragma: no cover - environment-specific
+        except ImportError as exc:  # specific, not blind
             checks.append(
                 DoctorCheck(
                     name=f"import {module_name}",

@@ -12,6 +12,7 @@ from mirror_core.storage import BlobStore, MetadataRecord, MetadataStore
 from mirror_crawl.models import CrawlRecord, CrawlRequest, CrawlResult
 from mirror_fetch.models import FetchRequest, FetchResult
 from mirror_fetch.protocol import Fetch
+from pydantic import HttpUrl
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +86,8 @@ async def crawl_site(
             continue
         visited.append(current_url)
         try:
-            result = await fetcher.fetch(FetchRequest(url=current_url))
-        except Exception as exc:  # pragma: no cover - surfaced in the result list
+            result = await fetcher.fetch(FetchRequest(url=HttpUrl(current_url)))
+        except Exception as exc:  # noqa: BLE001 - surfaced in the result list
             logger.debug(
                 "crawl fetch failed", extra={"url": current_url, "error": str(exc)}
             )
