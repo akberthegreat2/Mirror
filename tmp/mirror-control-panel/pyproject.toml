@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirror-control-panel"
+version = "0.1.0"
+description = "Django control panel for Mirror - operational dashboard, auth, and metadata management"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Mirror Contributors"}]
+requires-python = ">=3.10"
+keywords = ["mirror", "crawler", "django", "control-panel", "dashboard"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: Django",
+]
+
+dependencies = [
+    "mirror-core>=0.1.0",
+    "Django>=4.2,<6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-django>=4.8.0",
+    "pytest-cov>=5.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+    "factory-boy>=3.3.0",
+    "psycopg2-binary>=2.9.0",
+    "django-debug-toolbar>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/mirror/mirror"
+Documentation = "https://mirror.readthedocs.io"
+Repository = "https://github.com/mirror/mirror"
+Issues = "https://github.com/mirror/mirror/issues"
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mirror_control_panel*"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-v --tb=short --strict-markers --cov=mirror_control_panel --cov-report=term-missing"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+DJANGO_SETTINGS_MODULE = "tests.settings"
+
+[tool.pytest.ini_options.asyncio_mode]
+mode = "strict"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+plugins = ["mypy_django_plugin.main"]
+explicit_package_bases = true
+mypy_path = ["src"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "*/migrations/*", "*/management/*"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

@@ -5,14 +5,13 @@ from __future__ import annotations
 from uuid import UUID
 
 import pytest
-
 from mirror_core.workers import (
     ExecutionRecord,
+    InlineWorker,
     InMemoryArtifactStore,
     InMemoryCheckpointStore,
     InMemoryExecutionStore,
     InMemoryLeaseManager,
-    InlineWorker,
     JobState,
     WorkerJob,
 )
@@ -23,7 +22,9 @@ async def test_inline_worker_lifecycle() -> None:
     """The inline worker should accept, claim, and finish jobs."""
     worker = InlineWorker()
     await worker.start()
-    job = await worker.submit(WorkerJob(kind="fetch", payload={"url": "https://example.com"}))
+    job = await worker.submit(
+        WorkerJob(kind="fetch", payload={"url": "https://example.com"})
+    )
     claimed = await worker.claim("worker-1")
     assert claimed is not None
     assert claimed.job_id == job.job_id

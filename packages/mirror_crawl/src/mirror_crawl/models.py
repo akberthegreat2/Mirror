@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Literal
-from urllib.parse import urlparse
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
@@ -20,8 +19,6 @@ class CrawlRequest(BaseModel):
     store_pages: bool = True
     metadata_namespace: str = "crawl.urls"
     blob_namespace: str = "crawl.pages"
-    fetch_provider: str = "httpx"
-    fetch_settings: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("metadata_namespace", "blob_namespace", mode="after")
     @classmethod
@@ -59,11 +56,10 @@ class CrawlResult(BaseModel):
 
 
 class CrawlSettings(BaseModel):
-    """Runtime settings for the local crawl provider."""
+    """Runtime settings for crawl orchestration."""
 
     model_config = ConfigDict(frozen=True)
 
-    fetch_provider: Literal["httpx", "playwright"] = "httpx"
-    fetch_settings: dict[str, Any] = Field(default_factory=dict)
     user_agent: str = "Mirror Crawl/0.1"
     extract_titles: bool = True
+    defaults: dict[str, Any] = Field(default_factory=dict)

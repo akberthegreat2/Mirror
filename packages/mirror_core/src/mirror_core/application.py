@@ -6,13 +6,11 @@ import logging
 import types
 from contextlib import AsyncExitStack
 from typing import Any, cast
-
-from pydantic import BaseModel
+from typing_extensions import Self  # <-- added
 
 from mirror_core.components import ComponentManager
-
 from mirror_core.discovery import DiscoveryResult, DiscoverySource, discover
-from mirror_core.exceptions import ApplicationError, ExecutionError
+from mirror_core.exceptions import ApplicationError
 from mirror_core.executor import ExecutionResult, Executor
 from mirror_core.lifecycle import AsyncLifecycle
 from mirror_core.middleware import Middleware, MiddlewareChain
@@ -111,13 +109,23 @@ class Application:
     ) -> ExecutionResult:
         """Compile and execute a pipeline and return its terminal run state."""
         if not self._started or self._executor is None:
-            raise ApplicationError("Application must be started before running pipelines")
+            raise ApplicationError(
+                "Application must be started before running pipelines"
+            )
         defaults = {
             capability: str(config["provider"])
             for capability, config in self.settings.components.items()
             if "provider" in config
         }
         plan = Planner(self._registry, default_providers=defaults).plan(pipeline)
+        if self._lifecycle_stack is None:
+            raise ApplicationError("Application lifecycle stack is unavailable")
+        for compiled in plan.steps.values():
+            await self._component_manager.ensure_provider(
+                compiled.capability.name,
+                compiled.provider.name,
+                self._lifecycle_stack,
+            )
         return await self._executor.execute_run(plan, inputs=inputs or {})
 
     async def shutdown(self) -> None:
@@ -159,12 +167,16 @@ class Application:
         if not requested_names or not capability_names:
             return {}
 
-        configs = {name: self._registry.get_middleware(name) for name in requested_names}
+        configs = {
+            name: self._registry.get_middleware(name) for name in requested_names
+        }
         instances: dict[str, Middleware] = {}
         for name in self._order_middleware(list(configs.values())):
             config = configs[name.name]
             factory = ComponentManager.import_symbol(config.factory)
-            settings_model = ComponentManager.resolve_settings_model(config.settings_model)
+            settings_model = ComponentManager.resolve_settings_model(
+                config.settings_model
+            )
             raw_settings = self.settings.middleware_settings.get(config.name, {})
             instance = factory(settings_model.model_validate(raw_settings))
             if isinstance(instance, AsyncLifecycle):
@@ -174,12 +186,20 @@ class Application:
 
         middleware_chains: dict[str, MiddlewareChain] = {}
         for capability in capability_names:
-            names = list(dict.fromkeys(self.settings.global_middleware + self.settings.middleware.get(capability, [])))
+            names = list(
+                dict.fromkeys(
+                    self.settings.global_middleware
+                    + self.settings.middleware.get(capability, [])
+                )
+            )
             ordered_configs = [configs[name] for name in names if name in configs]
             ordered = self._order_middleware(ordered_configs)
             chain_instances = []
             for config in ordered:
-                if config.applies_to is not None and capability not in config.applies_to:
+                if (
+                    config.applies_to is not None
+                    and capability not in config.applies_to
+                ):
                     raise ApplicationError(
                         f"Middleware {config.name!r} does not apply to capability {capability!r}"
                     )
@@ -203,9 +223,15 @@ class Application:
         ordered: list[MiddlewareConfig] = []
         remaining = set(by_name)
         while remaining:
-            ready = [name for name in remaining if not dependencies[name].intersection(remaining)]
+            ready = [
+                name
+                for name in remaining
+                if not dependencies[name].intersection(remaining)
+            ]
             if not ready:
-                raise ApplicationError("Middleware ordering constraints contain a cycle")
+                raise ApplicationError(
+                    "Middleware ordering constraints contain a cycle"
+                )
             ready.sort(key=lambda name: (-by_name[name].priority, name))
             for name in ready:
                 ordered.append(by_name[name])

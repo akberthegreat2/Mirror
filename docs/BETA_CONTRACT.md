@@ -10,19 +10,18 @@ Mirror beta must provide:
 
 - crawl persistence for discovered URLs and fetched results;
 - worker backends suitable for local development and production queues;
-- scheduler support for recurring jobs;
-- metadata storage in a real database;
-- blob storage for payloads and archives;
 - a Django control plane for users, auth, and admin operations;
 - docs, ADRs, tests, and PR notes for every user-facing promise.
+
+Scheduler support, metadata storage, and blob storage have already graduated into the stable core package (`mirror_core.scheduler` and `mirror_core.storage`).
 
 ## Beta runtime guarantees
 
 - Crawlers MUST save discovered URLs when configured to do so.
 - Workers MUST be able to resume work from persisted state.
 - Scheduler jobs MUST be repeatable and observable.
-- Metadata MUST live in a database; blobs MUST live in object storage or the
-  filesystem backend used by development.
+- Metadata and blob storage MUST use the stable core backends documented in
+  `mirror_core.storage`.
 - Redis MAY be used for cache, queue, and lease coordination.
 - Django admin MUST be able to read and manage stored metadata.
 

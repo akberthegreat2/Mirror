@@ -1,4 +1,4 @@
-"""Scheduling contracts and simple beta implementations."""
+"""Stable scheduling contracts and local persistence implementations."""
 
 from __future__ import annotations
 
@@ -40,23 +40,19 @@ class ScheduleRecord(BaseModel):
 class SchedulerBackend(Protocol):
     """Persistence and due-job contract for schedulers."""
 
-    def schedule(self, record: ScheduleRecord) -> ScheduleRecord:
-        ...
+    def schedule(self, record: ScheduleRecord) -> ScheduleRecord: ...
 
-    def due(self, now: datetime | None = None) -> list[ScheduleRecord]:
-        ...
+    def due(self, now: datetime | None = None) -> list[ScheduleRecord]: ...
 
-    def mark_run(self, schedule_id: UUID, *, ran_at: datetime | None = None) -> ScheduleRecord:
-        ...
+    def mark_run(
+        self, schedule_id: UUID, *, ran_at: datetime | None = None
+    ) -> ScheduleRecord: ...
 
-    def pause(self, schedule_id: UUID) -> ScheduleRecord:
-        ...
+    def pause(self, schedule_id: UUID) -> ScheduleRecord: ...
 
-    def resume(self, schedule_id: UUID) -> ScheduleRecord:
-        ...
+    def resume(self, schedule_id: UUID) -> ScheduleRecord: ...
 
-    def list(self) -> list[ScheduleRecord]:
-        ...
+    def list(self) -> list[ScheduleRecord]: ...
 
 
 class InMemoryScheduler:
@@ -71,13 +67,18 @@ class InMemoryScheduler:
 
     def due(self, now: datetime | None = None) -> list[ScheduleRecord]:
         now = now or datetime.now(timezone.utc)
-        return [
-            record
-            for record in self._records.values()
-            if record.state is ScheduleState.SCHEDULED and record.due_at <= now
-        ]
+        return sorted(
+            [
+                record
+                for record in self._records.values()
+                if record.state is ScheduleState.SCHEDULED and record.due_at <= now
+            ],
+            key=lambda record: (record.due_at, record.name, str(record.schedule_id)),
+        )
 
-    def mark_run(self, schedule_id: UUID, *, ran_at: datetime | None = None) -> ScheduleRecord:
+    def mark_run(
+        self, schedule_id: UUID, *, ran_at: datetime | None = None
+    ) -> ScheduleRecord:
         record = self._require(schedule_id)
         updated = record.model_copy(
             update={
@@ -86,6 +87,9 @@ class InMemoryScheduler:
                 + timedelta(seconds=record.interval_seconds or 0.0)
                 if record.interval_seconds is not None
                 else record.due_at,
+                "state": ScheduleState.SCHEDULED
+                if record.interval_seconds is not None
+                else ScheduleState.DONE,
             }
         )
         self._records[schedule_id] = updated
@@ -104,7 +108,10 @@ class InMemoryScheduler:
         return updated
 
     def list(self) -> list[ScheduleRecord]:
-        return list(self._records.values())
+        return sorted(
+            self._records.values(),
+            key=lambda record: (record.due_at, record.name, str(record.schedule_id)),
+        )
 
     def _require(self, schedule_id: UUID) -> ScheduleRecord:
         try:
@@ -114,10 +121,11 @@ class InMemoryScheduler:
 
 
 class SQLiteScheduler:
-    """SQLite-backed scheduler for local beta workflows."""
+    """SQLite-backed scheduler for durable local workflows."""
 
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self._path)
         self._conn.row_factory = sqlite3.Row
         self._ensure_schema()
@@ -143,7 +151,9 @@ class SQLiteScheduler:
                 record.interval_seconds,
                 json.dumps(record.payload, sort_keys=True),
                 record.state.value,
-                record.last_run_at.isoformat() if record.last_run_at is not None else None,
+                record.last_run_at.isoformat()
+                if record.last_run_at is not None
+                else None,
             ),
         )
         self._conn.commit()
@@ -155,13 +165,15 @@ class SQLiteScheduler:
             """
             SELECT * FROM schedules
             WHERE state = ? AND due_at <= ?
-            ORDER BY due_at, name
+            ORDER BY due_at, name, schedule_id
             """,
             (ScheduleState.SCHEDULED.value, now.isoformat()),
         ).fetchall()
         return [self._row_to_record(row) for row in rows]
 
-    def mark_run(self, schedule_id: UUID, *, ran_at: datetime | None = None) -> ScheduleRecord:
+    def mark_run(
+        self, schedule_id: UUID, *, ran_at: datetime | None = None
+    ) -> ScheduleRecord:
         record = self._require(schedule_id)
         updated = record.model_copy(
             update={
@@ -170,6 +182,9 @@ class SQLiteScheduler:
                 + timedelta(seconds=record.interval_seconds or 0.0)
                 if record.interval_seconds is not None
                 else record.due_at,
+                "state": ScheduleState.SCHEDULED
+                if record.interval_seconds is not None
+                else ScheduleState.DONE,
             }
         )
         self.schedule(updated)
@@ -188,7 +203,9 @@ class SQLiteScheduler:
         return updated
 
     def list(self) -> list[ScheduleRecord]:
-        rows = self._conn.execute("SELECT * FROM schedules ORDER BY due_at, name").fetchall()
+        rows = self._conn.execute(
+            "SELECT * FROM schedules ORDER BY due_at, name, schedule_id"
+        ).fetchall()
         return [self._row_to_record(row) for row in rows]
 
     def close(self) -> None:
@@ -224,9 +241,27 @@ class SQLiteScheduler:
         return ScheduleRecord(
             schedule_id=UUID(row["schedule_id"]),
             name=row["name"],
-            due_at=datetime.fromisoformat(row["due_at"]),
+            due_at=_parse_datetime(row["due_at"]),
             interval_seconds=row["interval_seconds"],
             payload=json.loads(row["payload"]),
             state=ScheduleState(row["state"]),
-            last_run_at=datetime.fromisoformat(row["last_run_at"]) if row["last_run_at"] else None,
+            last_run_at=_parse_datetime(row["last_run_at"])
+            if row["last_run_at"]
+            else None,
         )
+
+
+def _parse_datetime(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+__all__ = [
+    "InMemoryScheduler",
+    "SQLiteScheduler",
+    "ScheduleRecord",
+    "ScheduleState",
+    "SchedulerBackend",
+]

@@ -1,10 +1,16 @@
 # First crawl
 
-This tutorial shows the simplest useful Mirror crawl:
+This tutorial shows how to connect the crawl capability to Mirror Core without a
+bundle layer.
 
-1. Start from one URL.
-2. Discover links on the page.
-3. Save the discovered URLs.
-4. Inspect the stored results.
+Use the dedicated packages:
 
-You can use this as the seed for an archive, a monitor, or an SEO workflow.
+- `mirror_core`
+- `mirror_fetch_httpx`
+- `mirror_crawl`
+- `mirror_archive`
+
+The crawl package owns the crawl contract and the crawl-specific pipeline. The
+fetch package owns HTTP fetching. The archive package owns archive output.
+
+The important idea is the boundary, not the bundle.

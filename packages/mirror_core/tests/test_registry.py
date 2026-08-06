@@ -14,7 +14,9 @@ def test_register_capability():
 
 def test_register_provider():
     r = Registry()
-    prov = ProviderConfig(name="httpx", capability="fetch", capability_api="~=1.0", factory="a:b")
+    prov = ProviderConfig(
+        name="httpx", capability="fetch", capability_api="~=1.0", factory="a:b"
+    )
     r.register_provider(prov)
     assert r.get_provider("fetch", "httpx") is prov
 
@@ -29,9 +31,13 @@ def test_duplicate_capability():
 def test_duplicate_provider():
     r = Registry()
     r.register_provider(
-        ProviderConfig(name="httpx", capability="fetch", capability_api="~=1.0", factory="a:b")
+        ProviderConfig(
+            name="httpx", capability="fetch", capability_api="~=1.0", factory="a:b"
+        )
     )
     with pytest.raises(RegistryError):
         r.register_provider(
-            ProviderConfig(name="httpx", capability="fetch", capability_api="~=1.0", factory="a:b")
+            ProviderConfig(
+                name="httpx", capability="fetch", capability_api="~=1.0", factory="a:b"
+            )
         )

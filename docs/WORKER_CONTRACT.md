@@ -1,34 +1,38 @@
 # Worker Contract
 
-Workers define how runs are accepted, claimed, checkpointed, completed, and resumed.
+Workers are how Mirror accepts work, leases it to a runner, records progress,
+and stores results.
 
 ## Core contracts
 
-- `WorkerBackend`
-- `ExecutionStore`
-- `CheckpointStore`
-- `ArtifactStore`
-- `LeaseManager`
+- `WorkerBackend` — the queue/lease transport.
+- `ExecutionStore` — where completed runs are recorded.
+- `CheckpointStore` — where resumable step state is saved.
+- `ArtifactStore` — where large files and blobs are stored.
+- `LeaseManager` — how one worker keeps exclusive access to a job.
 
-## Alpha expectations
+## What the local runtime supports today
 
-The frozen alpha should include local implementations for development and tests.
-Distributed backends are intentionally deferred.
+Mirror ships two local worker backends:
+
+- `InlineWorker` for tests and single-process development.
+- `SQLiteWorkerBackend` for durable local workflows.
+
+These backends are intentionally small, but they are real. They let the test
+suite and the command line exercise the same lifecycle that a distributed queue
+will later use: submit, claim, heartbeat, complete, fail.
 
 ## Why the contract exists
 
-The worker contract lets Mirror grow from a single-process runtime into a distributed system later without changing the application API.
+The worker contract keeps the runtime honest. A future Redis or Celery adapter
+can plug in without changing how the application talks to workers.
 
-## What belongs in beta
+## Future adapters
+
+Later phases may add:
 
 - Redis-backed queues
-- cluster scheduling
 - remote worker pools
 - multi-host lease coordination
+- cluster scheduling
 - SaaS worker orchestration
-
-
-## Beta backends
-
-The beta phase adds the SQLite worker backend, then the production Celery/Redis
-backend. The control plane later moves into Django.

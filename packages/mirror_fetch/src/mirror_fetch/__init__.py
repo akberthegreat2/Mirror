@@ -6,15 +6,13 @@ from mirror_fetch.models import FetchRequest, FetchResult
 from mirror_fetch.protocol import Fetch
 from mirror_fetch.runner import fetch_step
 from mirror_fetch.settings import FetchSettings
-from mirror_fetch.signals import signals
 
 __all__ = [
     "Fetch",
+    "FetchError",
     "FetchRequest",
     "FetchResult",
     "FetchSettings",
-    "FetchError",
-    "fetch_step",
-    "signals",
     "capability",
+    "fetch_step",
 ]

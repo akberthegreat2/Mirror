@@ -45,7 +45,9 @@ class DiscoveryResult:
         self.middleware: list[MiddlewareConfig] = []
         self.interfaces: list[InterfaceConfig] = []
         self.errors: list[tuple[str, str]] = []  # (name, error_message)
-        self.duplicates: list[tuple[str, str, list[str]]] = []  # (type, identity, names)
+        self.duplicates: list[
+            tuple[str, str, list[str]]
+        ] = []  # (type, identity, names)
 
     @property
     def all_descriptors(self) -> list[ExtensionDescriptor]:
@@ -71,7 +73,9 @@ def classify_descriptor(obj: Any) -> ExtensionDescriptor | None:
     return None
 
 
-def detect_duplicates(descriptors: list[ExtensionDescriptor]) -> list[tuple[str, str, list[str]]]:
+def detect_duplicates(
+    descriptors: list[ExtensionDescriptor],
+) -> list[tuple[str, str, list[str]]]:
     """Return list of (descriptor_type, identity, duplicated_names)."""
     seen: dict[str, list[str]] = {}
     for desc in descriptors:
@@ -132,10 +136,14 @@ def discover(
             try:
                 desc = classify_descriptor(obj())
             except Exception as exc:
-                result.errors.append((name, f"Failed to resolve callable descriptor: {exc}"))
+                result.errors.append(
+                    (name, f"Failed to resolve callable descriptor: {exc}")
+                )
                 continue
         if desc is None:
-            result.errors.append((name, f"Unknown descriptor type: {type(obj).__name__}"))
+            result.errors.append(
+                (name, f"Unknown descriptor type: {type(obj).__name__}")
+            )
             continue
 
         if isinstance(desc, CapabilityConfig):

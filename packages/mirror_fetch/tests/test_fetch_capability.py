@@ -10,6 +10,3 @@ def test_capability_descriptor():
     assert capability.request_model == FetchRequest
     assert capability.result_model == FetchResult
     assert capability.runner == "mirror_fetch.runner:fetch_step"
-    assert "fetch.started" in capability.signals
-    assert "fetch.succeeded" in capability.signals
-    assert "fetch.failed" in capability.signals

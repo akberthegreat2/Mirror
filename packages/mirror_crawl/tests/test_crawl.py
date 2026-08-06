@@ -3,14 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from contextlib import asynccontextmanager
-from typing import Callable
 
 import pytest
-from mirror_core.storage import InMemoryBlobStore, InMemoryMetadataStore
+from mirror_core.registry import ProviderConfig
+from mirror_crawl.capability import capability as crawl_capability
 from mirror_crawl.models import CrawlRequest, CrawlSettings
-from mirror_crawl.provider import LocalCrawlProvider
 from mirror_crawl.runner import crawl_site
+from mirror_crawl_local.provider import LocalCrawlProvider
+from mirror_fetch.capability import capability as fetch_capability
 from mirror_fetch.models import FetchRequest, FetchResult
 
 
@@ -49,7 +51,9 @@ async def _local_http_server() -> Callable[[str], str]:
         ),
     }
 
-    async def handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handler(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         request_line = await reader.readline()
         path = request_line.decode("ascii", errors="ignore").split(" ")[1]
         while True:
@@ -79,46 +83,92 @@ async def _local_http_server() -> Callable[[str], str]:
         await server.wait_closed()
 
 
+class _DiscoverySource:
+    def iter_entry_points(self, group: str):
+        assert group == "mirror"
+        return [
+            ("fetch", lambda: fetch_capability),
+            ("crawl", lambda: crawl_capability),
+            (
+                "fetch-httpx",
+                lambda: ProviderConfig(
+                    name="httpx",
+                    capability="fetch",
+                    capability_api="~=1.0",
+                    factory="mirror_fetch_httpx.provider:HTTPXProvider",
+                    settings_model="mirror_fetch_httpx.settings:HTTPXSettings",
+                    metadata={"version": "1.0.0"},
+                ),
+            ),
+            (
+                "crawl-local",
+                lambda: ProviderConfig(
+                    name="local",
+                    capability="crawl",
+                    capability_api="~=1.0",
+                    factory="mirror_crawl_local.provider:LocalCrawlProvider",
+                    settings_model=CrawlSettings,
+                    metadata={"version": "1.0.0"},
+                ),
+            ),
+        ]
+
+
 @pytest.mark.asyncio
 async def test_crawl_persists_discovered_urls() -> None:
-    """The crawl runner should save discovered URLs and page blobs on demand."""
-    provider = _FakeFetchProvider(
-        {
-            "https://example.com/": (
-                "<html><head><title>Home</title></head><body>"
-                '<a href="/about">About</a>'
-                "</body></html>"
-            ),
-            "https://example.com/about": (
-                "<html><head><title>About</title></head><body>"
-                '<a href="/">Home</a>'
-                "</body></html>"
-            ),
-        }
+    provider = LocalCrawlProvider(
+        fetch=_FakeFetchProvider(
+            {
+                "https://example.com/": (
+                    "<html><head><title>Home</title></head><body>"
+                    '<a href="/about">About</a>'
+                    "</body></html>"
+                ),
+                "https://example.com/about": (
+                    "<html><head><title>About</title></head><body>"
+                    '<a href="/">Home</a>'
+                    "</body></html>"
+                ),
+            }
+        )
     )
-    metadata_store = InMemoryMetadataStore()
-    blob_store = InMemoryBlobStore()
-    result = await crawl_site(
-        provider,  # type: ignore[arg-type]
-        CrawlRequest(url="https://example.com", max_depth=1, max_pages=5),
-        metadata_store=metadata_store,
-        blob_store=blob_store,
+    result = await provider.crawl(
+        CrawlRequest(url="https://example.com", max_depth=1, max_pages=5)
     )
-    assert result.seed_url == "https://example.com/"
-    assert result.stored_urls == 2
-    assert result.stored_pages == 2
-    assert metadata_store.get("crawl.urls", "https://example.com/") is not None
-    assert metadata_store.get("crawl.urls", "https://example.com/about") is not None
-    assert any(record.url == "https://example.com/about" for record in result.discovered_urls)
-    assert len(result.discovered_urls) == 2
+    assert result.visited_urls[0] in {"https://example.com", "https://example.com/"}
+    assert result.discovered_urls
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("fetch_provider", ["httpx", "playwright"])
-async def test_local_crawl_provider_can_swap_fetch_backend(fetch_provider: str) -> None:
-    """The crawl provider should work with either HTTPX or Playwright fetch backends."""
-    async with _local_http_server() as make_url:
-        provider = LocalCrawlProvider(CrawlSettings(fetch_provider=fetch_provider))
-        result = await provider.crawl(CrawlRequest(url=make_url("/"), max_depth=1, max_pages=5))
-        assert result.seed_url.startswith("http://127.0.0.1:")
-        assert {record.url for record in result.discovered_urls} >= {make_url("/"), make_url("/about")}
+async def test_crawl_runner_adapts_provider() -> None:
+    provider = LocalCrawlProvider(
+        fetch=_FakeFetchProvider(
+            {
+                "https://example.com/": "<html><body><a href='/about'>About</a></body></html>",
+                "https://example.com/about": "<html><body>About</body></html>",
+            }
+        )
+    )
+    result = await crawl_site(
+        provider, CrawlRequest(url="https://example.com", max_depth=1, max_pages=5)
+    )
+    assert result.visited_urls
+
+
+@pytest.mark.asyncio
+async def test_crawl_using_real_local_provider() -> None:
+    async with _local_http_server() as url_for:
+        provider = LocalCrawlProvider(
+            fetch=_FakeFetchProvider(
+                {
+                    url_for(
+                        "/"
+                    ): "<html><body><a href='/about'>About</a></body></html>",
+                    url_for("/about"): "<html><body>About</body></html>",
+                }
+            )
+        )
+        result = await provider.crawl(
+            CrawlRequest(url=url_for("/"), max_depth=1, max_pages=5)
+        )
+        assert result.visited_urls

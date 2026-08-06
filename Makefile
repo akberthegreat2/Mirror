@@ -17,7 +17,7 @@ type:
 
 lint:
 	@echo "=== Running lints ==="
-	ruff check packages/
+	ruff check --fix packages/ 
 
 format:
 	ruff format packages/

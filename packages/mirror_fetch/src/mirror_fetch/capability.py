@@ -5,7 +5,6 @@ from mirror_core.registry import CapabilityConfig
 from mirror_fetch.models import FetchRequest, FetchResult
 from mirror_fetch.protocol import Fetch
 from mirror_fetch.settings import FetchSettings
-from mirror_fetch.signals import signals
 
 capability = CapabilityConfig(
     name="fetch",
@@ -17,7 +16,6 @@ capability = CapabilityConfig(
     runner="mirror_fetch.runner:fetch_step",
     input_ports={},
     output_ports={"result": FetchResult},
-    signals=signals,
     metadata={
         "description": "Retrieve web resources via HTTP",
         "examples": [

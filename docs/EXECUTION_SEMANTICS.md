@@ -20,6 +20,8 @@ The runtime should surface a terminal status for every run:
 - `CANCELLED`
 - `PARTIALLY_SUCCEEDED`
 
+`RunOutcome.PARTIAL` remains a temporary compatibility alias for older callers, but new code should use `PARTIALLY_SUCCEEDED`.
+
 A finished run does not automatically mean success; the terminal status must say so.
 
 ## Runtime inputs

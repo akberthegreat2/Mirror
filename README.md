@@ -28,7 +28,7 @@ mirror startproject demo
 cd demo
 mirror doctor
 mirror startapp monitor
-mirror worker
+mirror worker --backend sqlite
 ```
 
 If you are working from the monorepo checkout, the repository root contains two
@@ -45,7 +45,7 @@ Read the explanation here: `docs/reference/testing_bootstrap.md`.
 - `docs/ARCHITECTURE.md` — the contributor-facing architecture contract.
 - `docs/ROADMAP.md` — delivery phases and current status.
 - `docs/ALPHA_CHECKLIST.md` — the frozen alpha checklist.
-- `docs/BETA_CONTRACT.md` — the beta runtime contract.
+- `docs/BETA_CONTRACT.md` — the beta runtime contract for deferred features.
 - `docs/ALPHA_CONTRACT.md` — the release contract for contributors.
 - `docs/EXECUTION_SEMANTICS.md` — runtime behavior and terminal states.
 - `docs/MIDDLEWARE_CONTRACT.md` — middleware scopes and guarantees.
@@ -73,7 +73,7 @@ mirror startapp monitor
 mirror doctor
 mirror list-capabilities
 mirror list-providers
-mirror worker
+mirror worker --backend sqlite
 mirror run
 ```
 

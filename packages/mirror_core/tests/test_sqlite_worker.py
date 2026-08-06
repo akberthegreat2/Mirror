@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from mirror_core.workers import JobState, SQLiteWorkerBackend, WorkerJob
 
 
@@ -14,7 +13,9 @@ async def test_sqlite_worker_backend_round_trip(tmp_path: Path) -> None:
     """The SQLite backend should persist, claim, and complete jobs."""
     backend = SQLiteWorkerBackend(tmp_path / "jobs.sqlite3")
     await backend.start()
-    submitted = await backend.submit(WorkerJob(kind="crawl", payload={"url": "https://example.com"}))
+    submitted = await backend.submit(
+        WorkerJob(kind="crawl", payload={"url": "https://example.com"})
+    )
     assert submitted.state is JobState.QUEUED
     claimed = await backend.claim("worker-1")
     assert claimed is not None

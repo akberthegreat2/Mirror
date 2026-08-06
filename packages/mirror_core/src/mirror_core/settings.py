@@ -11,6 +11,7 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from mirror_core.exceptions import ConfigurationError
+from mirror_core.toml import load as toml_load
 
 
 class MirrorSettings(BaseSettings):
@@ -78,20 +79,19 @@ class MirrorSettings(BaseSettings):
                 with path.open("r", encoding="utf-8") as stream:
                     data = yaml.safe_load(stream) or {}
             elif path.suffix == ".toml":
-                try:
-                    from mirror_core._toml import load as toml_load
-                except ModuleNotFoundError as exc:
-                    raise ConfigurationError(str(exc)) from exc
-
                 with path.open("rb") as stream:
                     data = toml_load(stream)
             elif path.suffix == ".json":
                 with path.open("r", encoding="utf-8") as stream:
                     data = json.load(stream)
             else:
-                raise ConfigurationError(f"Unsupported configuration format: {path.suffix}")
+                raise ConfigurationError(
+                    f"Unsupported configuration format: {path.suffix}"
+                )
         except OSError as exc:
-            raise ConfigurationError(f"Unable to read configuration file: {path}") from exc
+            raise ConfigurationError(
+                f"Unable to read configuration file: {path}"
+            ) from exc
         return cls.model_validate(data)
 
     @classmethod

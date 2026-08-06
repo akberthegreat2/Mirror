@@ -3,14 +3,13 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from pydantic import BaseModel
-
 from mirror_core.exceptions import ExecutionError
 from mirror_core.executor import Executor, RunOutcome, StepState
 from mirror_core.middleware import Invocation, MiddlewareChain
 from mirror_core.pipeline import Pipeline, Step
 from mirror_core.planner import Planner
 from mirror_core.registry import CapabilityConfig, ProviderConfig, Registry
+from pydantic import BaseModel
 
 
 class MockRequest(BaseModel):
@@ -50,7 +49,7 @@ def make_plan(*steps: Step):
     return Planner(registry, default_providers={"fetch": "httpx"}).plan(pipeline)
 
 
-async def runner(provider, request, *, signal_bus=None, step_id=None):
+async def runner(provider, request):
     return await provider.fetch(request)
 
 
@@ -80,7 +79,31 @@ async def test_executor_uses_runtime_inputs_and_accurate_producer() -> None:
     assert envelope.producer.capability_version == "1.2"
     assert envelope.producer.provider == "httpx"
     assert envelope.producer.step_id == "fetch_page"
-    assert envelope.parents == []
+    assert envelope.parents == ()
+    provider.fetch.assert_awaited_once_with(MockRequest(url="https://example.com"))
+
+
+@pytest.mark.asyncio
+async def test_executor_does_not_force_keyword_arguments() -> None:
+    provider = AsyncMock()
+    provider.fetch = AsyncMock(return_value=MockResult(content="hello"))
+    plan = make_plan(
+        Step(
+            id="fetch_page",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+        ),
+    )
+    executor = Executor({("fetch", "httpx"): provider})
+
+    result = await executor.execute_run(
+        plan,
+        inputs={"url": "https://example.com"},
+        runner=runner,
+    )
+
+    assert result.outcome is RunOutcome.SUCCEEDED
     provider.fetch.assert_awaited_once_with(MockRequest(url="https://example.com"))
 
 
@@ -91,14 +114,23 @@ async def test_executor_tracks_only_direct_resource_parents() -> None:
         side_effect=[MockResult(content="a"), MockResult(content="b")]
     )
     plan = make_plan(
-        Step(id="a", capability="fetch", input={"url": "$pipeline.url"}, outputs=["result"]),
-        Step(id="b", capability="fetch", input={"url": "a.content"}, outputs=["result"]),
+        Step(
+            id="a",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+        ),
+        Step(
+            id="b", capability="fetch", input={"url": "a.content"}, outputs=["result"]
+        ),
     )
     executor = Executor({("fetch", "httpx"): provider}, max_concurrency=1)
 
-    result = await executor.execute_run(plan, inputs={"url": "https://example.com"}, runner=runner)
+    result = await executor.execute_run(
+        plan, inputs={"url": "https://example.com"}, runner=runner
+    )
 
-    assert result.results["b"].parents == [result.results["a"].resource_id]
+    assert result.results["b"].parents == (result.results["a"].resource_id,)
 
 
 @pytest.mark.asyncio
@@ -161,7 +193,12 @@ async def test_middleware_can_short_circuit_provider() -> None:
             return MockResult(content="cached")
 
     plan = make_plan(
-        Step(id="a", capability="fetch", input={"url": "$pipeline.url"}, outputs=["result"])
+        Step(
+            id="a",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+        )
     )
     executor = Executor(
         {("fetch", "httpx"): provider},
@@ -177,9 +214,16 @@ async def test_middleware_can_short_circuit_provider() -> None:
 @pytest.mark.asyncio
 async def test_concurrent_runs_do_not_share_state() -> None:
     provider = AsyncMock()
-    provider.fetch = AsyncMock(side_effect=lambda request: MockResult(content=request.url))
+    provider.fetch = AsyncMock(
+        side_effect=lambda request: MockResult(content=request.url)
+    )
     plan = make_plan(
-        Step(id="a", capability="fetch", input={"url": "$pipeline.url"}, outputs=["result"])
+        Step(
+            id="a",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+        )
     )
     executor = Executor({("fetch", "httpx"): provider})
 
@@ -191,6 +235,7 @@ async def test_concurrent_runs_do_not_share_state() -> None:
     assert first.run_id != second.run_id
     assert first.results["a"].payload.content == "one"
     assert second.results["a"].payload.content == "two"
+
 
 @pytest.mark.asyncio
 async def test_step_retry_policy_is_enforced() -> None:
@@ -264,10 +309,17 @@ async def test_cancel_stops_a_running_task() -> None:
 
     provider.fetch = blocking_fetch
     plan = make_plan(
-        Step(id="a", capability="fetch", input={"url": "$pipeline.url"}, outputs=["result"])
+        Step(
+            id="a",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+        )
     )
     executor = Executor({("fetch", "httpx"): provider})
-    task = asyncio.create_task(executor.execute_run(plan, inputs={"url": "x"}, runner=runner))
+    task = asyncio.create_task(
+        executor.execute_run(plan, inputs={"url": "x"}, runner=runner)
+    )
     await started.wait()
     run_id = next(iter(executor._active_runs))
     executor.cancel(run_id)

@@ -6,11 +6,13 @@ wrapped in an envelope carrying provenance metadata.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
+from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer
 
 
 class ProducerRef(BaseModel):
@@ -34,7 +36,9 @@ class BlobReference(BaseModel):
 
 
 class ResourceEnvelope(BaseModel):
-    """Envelope wrapping a typed resource with provenance."""
+    """Immutable envelope wrapping a typed resource with provenance."""
+
+    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     resource_id: UUID = Field(default_factory=uuid4)
     resource_type: str  # e.g., "FetchResult", "ArchiveResult"
@@ -42,11 +46,21 @@ class ResourceEnvelope(BaseModel):
     payload: BaseModel
     created_at: datetime = Field(default_factory=datetime.now)
     producer: ProducerRef
-    parents: list[UUID] = Field(default_factory=list)
+    parents: tuple[UUID, ...] = Field(default_factory=tuple)
     fingerprint: str
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: Mapping[str, Any] = Field(default_factory=dict)
 
-    model_config = {"arbitrary_types_allowed": True}
+    def model_post_init(self, __context: Any) -> None:
+        object.__setattr__(self, "parents", tuple(self.parents))
+        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+
+    @field_serializer("parents")
+    def _serialize_parents(self, value: tuple[UUID, ...]) -> list[UUID]:
+        return list(value)
+
+    @field_serializer("metadata")
+    def _serialize_metadata(self, value: Mapping[str, Any]) -> dict[str, Any]:
+        return dict(value)
 
     @classmethod
     def create(
@@ -55,28 +69,31 @@ class ResourceEnvelope(BaseModel):
         schema_version: str,
         payload: BaseModel,
         producer: ProducerRef,
-        parents: list[UUID] | None = None,
-        metadata: dict[str, Any] | None = None,
+        parents: list[UUID] | tuple[UUID, ...] | None = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> ResourceEnvelope:
         """Create a new resource envelope with fingerprint."""
         import hashlib
         import json
 
         # Generate fingerprint from payload and metadata
+        normalized_metadata = dict(metadata or {})
         data = {
             "resource_type": resource_type,
             "schema_version": schema_version,
             "payload": payload.model_dump(mode="json"),
-            "metadata": metadata or {},
+            "metadata": normalized_metadata,
         }
-        fingerprint = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+        fingerprint = hashlib.sha256(
+            json.dumps(data, sort_keys=True).encode()
+        ).hexdigest()
 
         return cls(
             resource_type=resource_type,
             schema_version=schema_version,
             payload=payload,
             producer=producer,
-            parents=parents or [],
+            parents=tuple(parents or ()),
             fingerprint=fingerprint,
-            metadata=metadata or {},
+            metadata=normalized_metadata,
         )

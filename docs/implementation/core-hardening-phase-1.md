@@ -1,7 +1,7 @@
 # Core Hardening Phase 1
 
-**Status:** Implemented  
-**Scope:** `mirror-core` only  
+**Status:** Implemented
+**Scope:** `mirror-core` only
 **Architecture references:** Planner, Executor, Settings, Lifecycle, Resource Model
 
 ## Objective
@@ -52,7 +52,7 @@ Runtime values are no longer taken from `Pipeline.inputs`. `Pipeline.inputs` dec
 
 - `SUCCEEDED`;
 - `FAILED`;
-- `PARTIAL`;
+- `PARTIALLY_SUCCEEDED`;
 - `CANCELLED`.
 
 Abort failures are no longer swallowed. `Executor.execute()` raises `ExecutionError`; `execute_run()` returns the complete terminal state for interfaces that need structured failure reporting.
@@ -66,6 +66,8 @@ Every output envelope records the actual:
 - step identifier;
 - plan configuration fingerprint;
 - direct parent resources only.
+
+Resource envelopes are frozen, and their `parents`/`metadata` containers are normalized so provenance cannot be mutated in-place after creation.
 
 Parallel or unrelated outputs are not incorrectly recorded as parents.
 

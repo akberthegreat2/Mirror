@@ -24,21 +24,61 @@ from mirror_core.executor import (
     StepState,
 )
 from mirror_core.lifecycle import AsyncLifecycle
-from mirror_core.middleware import Invocation, Middleware, MiddlewareChain
+from mirror_core.middleware import (
+    Invocation,
+    Middleware,
+    MiddlewareChain,
+    MiddlewareContext,
+    MiddlewareInvocation,
+)
 from mirror_core.pipeline import ErrorPolicy, Pipeline, RetryPolicy, Step
 from mirror_core.planner import CompiledStep, ExecutionPlan, Planner
 from mirror_core.registry import Registry
 from mirror_core.resource import BlobReference, ProducerRef, ResourceEnvelope
+from mirror_core.scheduler import (
+    InMemoryScheduler,
+    SchedulerBackend,
+    ScheduleRecord,
+    ScheduleState,
+    SQLiteScheduler,
+)
 from mirror_core.settings import MirrorSettings
 from mirror_core.signals import SignalBus
+from mirror_core.storage import (
+    BlobStore,
+    FileSystemBlobStore,
+    InMemoryBlobStore,
+    InMemoryMetadataStore,
+    MetadataRecord,
+    MetadataStore,
+    SQLiteMetadataStore,
+)
+from mirror_core.workers import (
+    ArtifactStore,
+    CheckpointStore,
+    ExecutionRecord,
+    ExecutionStore,
+    InlineWorker,
+    InMemoryArtifactStore,
+    InMemoryCheckpointStore,
+    InMemoryExecutionStore,
+    InMemoryLeaseManager,
+    JobState,
+    LeaseManager,
+    SQLiteWorkerBackend,
+    WorkerBackend,
+    WorkerJob,
+    WorkerLease,
+)
 
+# Note: __all__ is sorted alphabetically within each logical group.
 __all__ = [
     # Exceptions
-    "MirrorError",
-    "ConfigurationError",
-    "LifecycleError",
     "ApplicationError",
+    "ConfigurationError",
     "DiscoveryError",
+    "LifecycleError",
+    "MirrorError",
     "RegistryError",
     "ValidationError",
     # Lifecycle
@@ -46,8 +86,8 @@ __all__ = [
     # Settings
     "MirrorSettings",
     # Discovery
-    "discover",
     "DiscoveryResult",
+    "discover",
     # Registry
     "Registry",
     # Signals
@@ -56,23 +96,55 @@ __all__ = [
     "Invocation",
     "Middleware",
     "MiddlewareChain",
+    "MiddlewareContext",
+    "MiddlewareInvocation",
     # Resource
-    "ResourceEnvelope",
-    "ProducerRef",
     "BlobReference",
+    "ProducerRef",
+    "ResourceEnvelope",
+    # Storage
+    "BlobStore",
+    "FileSystemBlobStore",
+    "InMemoryBlobStore",
+    "InMemoryMetadataStore",
+    "MetadataRecord",
+    "MetadataStore",
+    "SQLiteMetadataStore",
+    # Scheduler
+    "InMemoryScheduler",
+    "SchedulerBackend",
+    "ScheduleRecord",
+    "ScheduleState",
+    "SQLiteScheduler",
+    # Workers
+    "ArtifactStore",
+    "CheckpointStore",
+    "ExecutionRecord",
+    "ExecutionStore",
+    "InlineWorker",
+    "InMemoryArtifactStore",
+    "InMemoryCheckpointStore",
+    "InMemoryExecutionStore",
+    "InMemoryLeaseManager",
+    "JobState",
+    "LeaseManager",
+    "SQLiteWorkerBackend",
+    "WorkerBackend",
+    "WorkerJob",
+    "WorkerLease",
     # Pipeline
-    "Step",
+    "ErrorPolicy",
     "Pipeline",
     "RetryPolicy",
-    "ErrorPolicy",
+    "Step",
     # Planner
-    "Planner",
     "CompiledStep",
     "ExecutionPlan",
+    "Planner",
     # Executor
-    "Executor",
-    "ExecutionRun",
     "ExecutionResult",
+    "ExecutionRun",
+    "Executor",
     "RunOutcome",
     "StepState",
     # Application

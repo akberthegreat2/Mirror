@@ -1,4 +1,3 @@
-
 """Tests for CLI commands."""
 
 from __future__ import annotations
@@ -6,9 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from typer.testing import CliRunner
-
 from mirror_cli.main import app
+from typer.testing import CliRunner
 
 runner = CliRunner()
 
@@ -37,7 +35,9 @@ def test_run_requires_pipeline() -> None:
     assert result.exit_code == 2
 
 
-def test_startproject_creates_scaffold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_startproject_creates_scaffold(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The project scaffold command should create the expected layout."""
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["startproject", "demo"])
@@ -53,7 +53,9 @@ def test_startproject_creates_scaffold(tmp_path: Path, monkeypatch: pytest.Monke
     assert (project_root / "docs" / "README.md").exists()
 
 
-def test_startapp_creates_app_scaffold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_startapp_creates_app_scaffold(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The app scaffold command should create a reusable app package."""
     monkeypatch.chdir(tmp_path)
     assert runner.invoke(app, ["startproject", "demo"]).exit_code == 0
@@ -70,7 +72,9 @@ def test_startapp_creates_app_scaffold(tmp_path: Path, monkeypatch: pytest.Monke
     assert (app_root / "README.md").exists()
 
 
-def test_doctor_reports_healthy_scaffold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_doctor_reports_healthy_scaffold(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The doctor command should report success for a generated project."""
     monkeypatch.chdir(tmp_path)
     assert runner.invoke(app, ["startproject", "demo"]).exit_code == 0
@@ -79,7 +83,10 @@ def test_doctor_reports_healthy_scaffold(tmp_path: Path, monkeypatch: pytest.Mon
     assert "Mirror Doctor" in result.output
     assert "[OK]" in result.output
 
-def test_generated_manage_py_can_run_doctor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+
+def test_generated_manage_py_can_run_doctor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The generated manage.py should execute the doctor command."""
     import os
     import subprocess
@@ -107,6 +114,15 @@ def test_generated_manage_py_can_run_doctor(tmp_path: Path, monkeypatch: pytest.
     assert "Mirror Doctor" in result.stdout
     assert "[OK]" in result.stdout
 
+
+def test_worker_command_initializes_backend(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The worker command should initialize a local backend."""
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(app, ["worker", "--backend", "sqlite"])
+    assert result.exit_code == 0
+    assert "Worker backend ready" in result.output
 
 
 def test_worker_check_command() -> None:

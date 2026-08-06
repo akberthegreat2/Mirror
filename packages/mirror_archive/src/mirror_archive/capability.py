@@ -5,7 +5,6 @@ from mirror_core.registry import CapabilityConfig
 from mirror_archive.models import ArchiveRequest, ArchiveResult
 from mirror_archive.protocol import Archive
 from mirror_archive.settings import ArchiveSettings
-from mirror_archive.signals import signals
 
 capability = CapabilityConfig(
     name="archive",
@@ -17,7 +16,6 @@ capability = CapabilityConfig(
     runner="mirror_archive.runner:archive_step",
     input_ports={},
     output_ports={"result": ArchiveResult},
-    signals=signals,
     metadata={
         "description": "Persist resources durably to storage backends",
         "examples": [

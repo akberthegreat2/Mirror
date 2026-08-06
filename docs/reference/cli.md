@@ -27,7 +27,10 @@ Print a simple application status summary.
 
 ## `mirror worker`
 
-Start the default local worker backend for alpha development.
+Initialize the default local worker backend and confirm it is ready.
+
+Use `--backend inline` for the in-memory backend or `--backend sqlite` for the durable local backend.
+
 
 ## `mirror run`
 

@@ -11,6 +11,18 @@ from pydantic import BaseModel, ConfigDict, Field
 from mirror_core.exceptions import RegistryError
 
 
+class RequiredCapability(BaseModel):
+    """Machine-readable dependency on another capability contract."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    version: str | None = None
+
+    def __hash__(self) -> int:
+        return hash((self.name, self.version))
+
+
 class CapabilityConfig(BaseModel):
     """Immutable descriptor for a capability contract."""
 
@@ -25,10 +37,14 @@ class CapabilityConfig(BaseModel):
     runner: str | None = None
     input_ports: dict[str, type[BaseModel]] = Field(default_factory=dict)
     output_ports: dict[str, type[BaseModel]] = Field(default_factory=dict)
-    required_capabilities: list[str] = Field(default_factory=list)
-    optional_capabilities: list[str] = Field(default_factory=list)
-    signals: list[str] = Field(default_factory=list)
+    dependencies: list[RequiredCapability] = Field(default_factory=list)
+    events: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def required_capabilities(self) -> list[str]:
+        """Backward-compatible list of required capability names."""
+        return [dependency.name for dependency in self.dependencies]
 
     def __hash__(self) -> int:
         return hash((self.name, self.api_version))
@@ -79,7 +95,9 @@ class InterfaceConfig(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-ExtensionDescriptor = CapabilityConfig | ProviderConfig | MiddlewareConfig | InterfaceConfig
+ExtensionDescriptor = (
+    CapabilityConfig | ProviderConfig | MiddlewareConfig | InterfaceConfig
+)
 
 
 class Registry:
@@ -105,7 +123,9 @@ class Registry:
         self._validate_version(config.api_version, f"capability {config.name}")
         key = (config.name, config.api_version)
         if key in self._capabilities:
-            raise RegistryError(f"Duplicate capability: {config.name} {config.api_version}")
+            raise RegistryError(
+                f"Duplicate capability: {config.name} {config.api_version}"
+            )
         self._capabilities[key] = config
 
     def register_provider(self, config: ProviderConfig) -> None:
@@ -119,7 +139,9 @@ class Registry:
             ) from exc
         key = (config.capability, config.name)
         if key in self._providers:
-            raise RegistryError(f"Duplicate provider: {config.name} for {config.capability}")
+            raise RegistryError(
+                f"Duplicate provider: {config.name} for {config.capability}"
+            )
         self._providers[key] = config
 
     def register_middleware(self, config: MiddlewareConfig) -> None:
@@ -132,7 +154,9 @@ class Registry:
         self._ensure_mutable()
         key = (config.name, config.interface_type)
         if key in self._interfaces:
-            raise RegistryError(f"Duplicate interface: {config.name} {config.interface_type}")
+            raise RegistryError(
+                f"Duplicate interface: {config.name} {config.interface_type}"
+            )
         self._interfaces[key] = config
 
     def get_capability(self, name: str, api_version: str) -> CapabilityConfig:
@@ -141,15 +165,25 @@ class Registry:
         except KeyError as exc:
             raise RegistryError(f"Capability not found: {name} {api_version}") from exc
 
-    def resolve_capability(self, name: str, constraint: str | None = None) -> CapabilityConfig:
+    def resolve_capability(
+        self, name: str, constraint: str | None = None
+    ) -> CapabilityConfig:
         """Resolve the newest capability version satisfying an optional constraint."""
-        candidates = [config for (cap_name, _), config in self._capabilities.items() if cap_name == name]
+        candidates = [
+            config
+            for (cap_name, _), config in self._capabilities.items()
+            if cap_name == name
+        ]
         if not candidates:
             raise RegistryError(f"Capability not found: {name}")
         specifier = SpecifierSet(constraint or "")
-        compatible = [config for config in candidates if Version(config.api_version) in specifier]
+        compatible = [
+            config for config in candidates if Version(config.api_version) in specifier
+        ]
         if not compatible:
-            raise RegistryError(f"No compatible version of capability {name!r} for {constraint!r}")
+            raise RegistryError(
+                f"No compatible version of capability {name!r} for {constraint!r}"
+            )
         return max(compatible, key=lambda config: Version(config.api_version))
 
     def get_provider(self, capability: str, name: str) -> ProviderConfig:
@@ -167,7 +201,8 @@ class Registry:
         candidates = [
             provider
             for (cap_name, _), provider in self._providers.items()
-            if cap_name == capability.name and (provider_name is None or provider.name == provider_name)
+            if cap_name == capability.name
+            and (provider_name is None or provider.name == provider_name)
         ]
         compatible = [
             provider

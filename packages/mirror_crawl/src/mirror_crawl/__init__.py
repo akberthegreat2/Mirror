@@ -1,10 +1,9 @@
-"""Mirror Crawl capability — crawl and persist URLs."""
+"""Mirror Crawl capability package."""
 
-from mirror_crawl.capability import capability
-from mirror_crawl.models import CrawlRecord, CrawlRequest, CrawlResult, CrawlSettings
-from mirror_crawl.provider import LocalCrawlProvider, provider
-from mirror_crawl.runner import crawl_site
-from mirror_crawl.protocol import Crawl
+from .capability import capability
+from .models import CrawlRecord, CrawlRequest, CrawlResult, CrawlSettings
+from .protocol import Crawl
+from .runner import crawl_site
 
 __all__ = [
     "Crawl",
@@ -12,8 +11,6 @@ __all__ = [
     "CrawlRequest",
     "CrawlResult",
     "CrawlSettings",
-    "LocalCrawlProvider",
-    "crawl_site",
-    "provider",
     "capability",
+    "crawl_site",
 ]

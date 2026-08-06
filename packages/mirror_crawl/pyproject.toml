@@ -13,13 +13,10 @@ requires-python = ">=3.10"
 dependencies = [
     "mirror-core>=0.1.0",
     "mirror-fetch>=0.1.0",
-    "mirror-fetch-httpx>=0.1.0",
-    "mirror-fetch-playwright>=0.1.0",
 ]
 
 [project.entry-points."mirror"]
 crawl = "mirror_crawl:capability"
-local-crawl = "mirror_crawl:provider"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -1,10 +1,10 @@
 """Archive capability contract tests for the WARC provider."""
 
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, BinaryIO, Iterator
+from typing import Any, BinaryIO
 
 import pytest
-
 from mirror_archive.testing import ArchiveContract
 from mirror_archive_warc.provider import WARCProvider
 from mirror_archive_warc.settings import WARCSettings

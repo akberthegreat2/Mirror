@@ -77,13 +77,16 @@ class ExecutionPlan(BaseModel):
 class Planner:
     """Validate a pipeline and resolve all runtime identities exactly once."""
 
-    def __init__(self, registry: Registry, default_providers: dict[str, str] | None = None) -> None:
+    def __init__(
+        self, registry: Registry, default_providers: dict[str, str] | None = None
+    ) -> None:
         self._registry = registry
         self._default_providers = default_providers or {}
 
     def plan(self, pipeline: Pipeline) -> ExecutionPlan:
         self._validate_unique_step_ids(pipeline)
         capabilities = self._resolve_capabilities(pipeline)
+        self._validate_required_capabilities(capabilities)
         providers = self._resolve_providers(pipeline, capabilities)
         dependencies, reverse_dependencies = self._build_dependency_graph(pipeline)
         order = self._topological_sort(pipeline, dependencies, reverse_dependencies)
@@ -113,7 +116,9 @@ class Planner:
     @staticmethod
     def _validate_unique_step_ids(pipeline: Pipeline) -> None:
         step_ids = [step.id for step in pipeline.steps]
-        duplicates = sorted({step_id for step_id in step_ids if step_ids.count(step_id) > 1})
+        duplicates = sorted(
+            {step_id for step_id in step_ids if step_ids.count(step_id) > 1}
+        )
         if duplicates:
             raise PlannerError(f"Duplicate pipeline step IDs: {', '.join(duplicates)}")
 
@@ -128,6 +133,30 @@ class Planner:
                     cause=exc,
                 ) from exc
         return resolved
+
+    def _validate_required_capabilities(
+        self, capabilities: dict[str, CapabilityConfig]
+    ) -> None:
+        required = sorted(
+            {
+                (dependency.name, dependency.version)
+                for capability in capabilities.values()
+                for dependency in capability.dependencies
+            }
+        )
+        for dependency_name, dependency_version in required:
+            try:
+                self._registry.resolve_capability(dependency_name, dependency_version)
+            except Exception as exc:
+                constraint = (
+                    dependency_version
+                    if dependency_version is not None
+                    else "any version"
+                )
+                raise PlannerError(
+                    f"Required capability {dependency_name!r} ({constraint}) is not available",
+                    cause=exc,
+                ) from exc
 
     def _resolve_providers(
         self,
@@ -284,8 +313,10 @@ class Planner:
     ) -> list[list[str]]:
         level: dict[str, int] = {}
         for step_id in order:
-            level[step_id] = 0 if not dependencies[step_id] else 1 + max(
-                level[dependency] for dependency in dependencies[step_id]
+            level[step_id] = (
+                0
+                if not dependencies[step_id]
+                else 1 + max(level[dependency] for dependency in dependencies[step_id])
             )
         groups: dict[int, list[str]] = {}
         for step_id in order:

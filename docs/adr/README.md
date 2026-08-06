@@ -28,3 +28,4 @@ contracts.
 - ADR-0021 control-plane metadata models
 - ADR-0022 admin visibility and roles
 - ADR-0023 optional Django dependency
+- ADR-0024 capability package boundaries

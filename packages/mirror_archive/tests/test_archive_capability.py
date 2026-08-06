@@ -10,6 +10,3 @@ def test_capability_descriptor():
     assert capability.request_model == ArchiveRequest
     assert capability.result_model == ArchiveResult
     assert capability.runner == "mirror_archive.runner:archive_step"
-    assert "archive.started" in capability.signals
-    assert "archive.succeeded" in capability.signals
-    assert "archive.failed" in capability.signals

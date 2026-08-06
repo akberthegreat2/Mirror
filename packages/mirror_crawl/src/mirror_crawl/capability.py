@@ -1,6 +1,6 @@
 """Crawl capability descriptor."""
 
-from mirror_core.registry import CapabilityConfig
+from mirror_core.registry import CapabilityConfig, RequiredCapability
 
 from mirror_crawl.models import CrawlRequest, CrawlResult, CrawlSettings
 from mirror_crawl.protocol import Crawl
@@ -15,12 +15,6 @@ capability = CapabilityConfig(
     runner="mirror_crawl.runner:crawl_site",
     input_ports={},
     output_ports={"result": CrawlResult},
-    required_capabilities=["fetch"],
-    signals=[
-        "crawl.started",
-        "crawl.page.discovered",
-        "crawl.page.stored",
-        "crawl.finished",
-    ],
-    metadata={"description": "Crawl a website, persist discovered URLs, and store pages."},
+    dependencies=[RequiredCapability(name="fetch", version="~=1.0")],
+    metadata={"description": "Crawl a website and persist discovered URLs."},
 )

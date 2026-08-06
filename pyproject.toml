@@ -33,9 +33,11 @@ include = ["mirror_core*"]
 namespaces = false
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+# Discover every package test suite from the monorepo root.
+testpaths = ["packages"]
 python_files = "test_*.py"
 asyncio_mode = "auto"
+addopts = "--import-mode=importlib"
 
 [tool.mypy]
 python_version = "3.10"

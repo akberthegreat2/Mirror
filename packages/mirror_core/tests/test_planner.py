@@ -1,12 +1,16 @@
 """Tests for pipeline compilation."""
 
 import pytest
-from pydantic import BaseModel
-
 from mirror_core.exceptions import PlannerError
 from mirror_core.pipeline import Pipeline, Step
 from mirror_core.planner import Planner
-from mirror_core.registry import CapabilityConfig, ProviderConfig, Registry
+from mirror_core.registry import (
+    CapabilityConfig,
+    ProviderConfig,
+    Registry,
+    RequiredCapability,
+)
+from pydantic import BaseModel
 
 
 class TextInput(BaseModel):
@@ -29,9 +33,7 @@ def registry() -> Registry:
             output_ports={"result": TextOutput},
         )
     )
-    result.register_capability(
-        CapabilityConfig(name="fetch", api_version="1.9")
-    )
+    result.register_capability(CapabilityConfig(name="fetch", api_version="1.9"))
     result.register_provider(
         ProviderConfig(
             name="httpx",
@@ -69,8 +71,18 @@ def test_planner_detects_cycle() -> None:
     pipeline = Pipeline(
         id="test",
         steps=[
-            Step(id="a", capability="fetch", input={"value": "b.result"}, outputs=["result"]),
-            Step(id="b", capability="fetch", input={"value": "a.result"}, outputs=["result"]),
+            Step(
+                id="a",
+                capability="fetch",
+                input={"value": "b.result"},
+                outputs=["result"],
+            ),
+            Step(
+                id="b",
+                capability="fetch",
+                input={"value": "a.result"},
+                outputs=["result"],
+            ),
         ],
     )
 
@@ -94,6 +106,34 @@ def test_planner_rejects_undeclared_pipeline_input() -> None:
 
     with pytest.raises(PlannerError, match="undeclared pipeline input"):
         Planner(registry(), default_providers={"fetch": "httpx"}).plan(pipeline)
+
+
+def test_planner_validates_required_capabilities() -> None:
+    registry = Registry()
+    registry.register_capability(
+        CapabilityConfig(
+            name="crawl",
+            api_version="1.0",
+            request_model=TextInput,
+            result_model=TextOutput,
+            output_ports={"result": TextOutput},
+            dependencies=[RequiredCapability(name="fetch", version="~=1.0")],
+        )
+    )
+    registry.register_provider(
+        ProviderConfig(
+            name="crawl", capability="crawl", capability_api="~=1.0", factory="x:y"
+        )
+    )
+    pipeline = Pipeline(
+        id="deps",
+        steps=[Step(id="crawl", capability="crawl", outputs=["result"])],
+    )
+
+    with pytest.raises(
+        PlannerError, match=r"Required capability 'fetch' \(~=1.0\) is not available"
+    ):
+        Planner(registry).plan(pipeline)
 
 
 def test_port_assignability_is_directional() -> None:
@@ -132,10 +172,14 @@ def test_port_assignability_is_directional() -> None:
         )
     )
     registry.register_provider(
-        ProviderConfig(name="source", capability="source", capability_api="~=1.0", factory="x:y")
+        ProviderConfig(
+            name="source", capability="source", capability_api="~=1.0", factory="x:y"
+        )
     )
     registry.register_provider(
-        ProviderConfig(name="target", capability="target", capability_api="~=1.0", factory="x:y")
+        ProviderConfig(
+            name="target", capability="target", capability_api="~=1.0", factory="x:y"
+        )
     )
     pipeline = Pipeline(
         id="unsafe",

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[3]
 PACKAGE_PATHS = [
@@ -16,9 +16,18 @@ PACKAGE_PATHS = [
     ROOT / "packages" / "mirror_fetch",
     ROOT / "packages" / "mirror_fetch_httpx",
     ROOT / "packages" / "mirror_fetch_playwright",
-    ROOT / "packages" / "mirror_middleware",
+    ROOT / "packages" / "mirror_crawl",
+    ROOT / "packages" / "mirror_crawl_local",
     ROOT / "packages" / "mirror_testing",
 ]
+
+
+def _copy_package_tree(source: Path, destination: Path) -> Path:
+    """Copy a package tree into a temp directory without polluting the checkout."""
+
+    ignore = shutil.ignore_patterns("build", "dist", "*.egg-info", "__pycache__")
+    shutil.copytree(source, destination, ignore=ignore)
+    return destination
 
 
 def _bootstrap_source_paths() -> None:
@@ -36,6 +45,10 @@ def test_local_install_and_import_smoke(tmp_path: Path) -> None:
     target = tmp_path / "site-packages"
     target.mkdir()
 
+    copied_paths = [
+        _copy_package_tree(path, tmp_path / path.name) for path in PACKAGE_PATHS
+    ]
+
     install = [
         sys.executable,
         "-m",
@@ -45,7 +58,7 @@ def test_local_install_and_import_smoke(tmp_path: Path) -> None:
         "--no-build-isolation",
         "--target",
         str(target),
-        *(str(path) for path in PACKAGE_PATHS),
+        *(str(path) for path in copied_paths),
     ]
     subprocess.run(install, check=True, capture_output=True, text=True)
 
@@ -54,12 +67,13 @@ def test_local_install_and_import_smoke(tmp_path: Path) -> None:
             sys.executable,
             "-c",
             (
-                "import mirror_core, mirror_fetch, mirror_fetch_httpx, "
-                "mirror_fetch_playwright, mirror_middleware, mirror_testing; "
+                "import mirror_core, mirror_fetch, mirror_fetch_httpx, mirror_fetch_playwright, mirror_crawl, mirror_crawl_local, mirror_testing; "
+                "import mirror_core.middleware; "
                 "from mirror_fetch import capability; "
                 "from mirror_fetch_httpx import provider as httpx_provider; "
                 "from mirror_fetch_playwright import provider as playwright_provider; "
-                "print(capability.name, httpx_provider.name, playwright_provider.name)"
+                "from mirror_crawl_local import provider as crawl_provider; "
+                "print(capability.name, httpx_provider.name, playwright_provider.name, crawl_provider.name)"
             ),
         ],
         check=True,
@@ -68,22 +82,23 @@ def test_local_install_and_import_smoke(tmp_path: Path) -> None:
         env={**os.environ, "PYTHONPATH": str(target)},
     )
 
-    assert probe.stdout.strip() == "fetch httpx playwright"
+    assert probe.stdout.strip() == "fetch httpx playwright local"
 
 
 @pytest.mark.asyncio
-async def test_real_world_fetch_pipeline_uses_actual_packages(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_real_world_fetch_pipeline_uses_actual_packages(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Run a representative Fetch pipeline using the real core and provider packages."""
 
     _bootstrap_source_paths()
 
     from mirror_core.application import Application
     from mirror_core.pipeline import Pipeline, Step
-    from mirror_core.registry import CapabilityConfig, ProviderConfig
+    from mirror_core.registry import ProviderConfig
     from mirror_core.settings import MirrorSettings
     from mirror_fetch.capability import capability as fetch_capability
     from mirror_fetch.models import FetchRequest, FetchResult
-    from mirror_fetch.protocol import Fetch
     from mirror_fetch_httpx.provider import HTTPXProvider
     from mirror_fetch_playwright.provider import PlaywrightProvider
 
@@ -126,7 +141,9 @@ async def test_real_world_fetch_pipeline_uses_actual_packages(monkeypatch: pytes
             timestamp="2026-08-03T00:00:00+00:00",
         )
 
-    async def playwright_fetch(self: PlaywrightProvider, request: FetchRequest) -> FetchResult:
+    async def playwright_fetch(
+        self: PlaywrightProvider, request: FetchRequest
+    ) -> FetchResult:
         return FetchResult(
             url=str(request.url),
             status_code=200,
@@ -175,7 +192,9 @@ async def test_real_world_fetch_pipeline_uses_actual_packages(monkeypatch: pytes
         )
         await app.start()
         try:
-            result = await app.run_pipeline_detailed(pipeline, inputs={"url": "https://example.com"})
+            result = await app.run_pipeline_detailed(
+                pipeline, inputs={"url": "https://example.com"}
+            )
         finally:
             await app.shutdown()
         assert result.outcome.value == "succeeded"

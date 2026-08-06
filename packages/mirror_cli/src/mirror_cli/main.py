@@ -1,4 +1,3 @@
-
 """Mirror CLI main entry point."""
 
 from __future__ import annotations
@@ -8,11 +7,11 @@ import json
 from pathlib import Path
 
 import typer
+from mirror_core.application import Application
+from mirror_core.settings import MirrorSettings
 from rich.console import Console
 from rich.table import Table
 
-from mirror_core.application import Application
-from mirror_core.settings import MirrorSettings
 from mirror_cli.scaffold import (
     collect_project_checks,
     create_app,
@@ -124,18 +123,28 @@ def doctor(
 
 @app.command()
 def run(
-    config: Path | None = typer.Option(None, "--config", "-c", help="Path to Mirror settings file"),
-    pipeline: Path = typer.Option(..., "--pipeline", "-p", help="Path to pipeline definition file"),
-    inputs: Path | None = typer.Option(None, "--inputs", "-i", help="JSON/TOML/YAML runtime inputs file"),
+    config: Path | None = typer.Option(
+        None, "--config", "-c", help="Path to Mirror settings file"
+    ),
+    pipeline: Path = typer.Option(
+        ..., "--pipeline", "-p", help="Path to pipeline definition file"
+    ),
+    inputs: Path | None = typer.Option(
+        None, "--inputs", "-i", help="JSON/TOML/YAML runtime inputs file"
+    ),
 ) -> None:
     """Compile and execute one pipeline with explicit runtime inputs."""
 
     async def _run() -> None:
-        settings = MirrorSettings.from_file(config) if config is not None else MirrorSettings()
+        settings = (
+            MirrorSettings.from_file(config) if config is not None else MirrorSettings()
+        )
         pipeline_obj = _load_pipeline(pipeline)
         runtime_inputs = _load_mapping(inputs) if inputs is not None else {}
         async with Application(settings=settings) as app_obj:
-            result = await app_obj.run_pipeline_detailed(pipeline_obj, inputs=runtime_inputs)
+            result = await app_obj.run_pipeline_detailed(
+                pipeline_obj, inputs=runtime_inputs
+            )
         console.print(f"[green]Pipeline finished[/green] {result.outcome.value}")
         console.print(f"Run ID: {result.run_id}")
 
@@ -157,7 +166,8 @@ def _load_mapping(path: Path) -> dict[str, object]:
             raise RuntimeError("YAML files require PyYAML") from exc
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     elif path.suffix == ".toml":
-        from mirror_core._toml import loads as toml_loads
+        from mirror_core.toml import loads as toml_loads
+
         data = toml_loads(path.read_text(encoding="utf-8"))
     elif path.suffix == ".json":
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -171,13 +181,61 @@ def _load_mapping(path: Path) -> dict[str, object]:
 def _load_pipeline(path: Path):
     """Load and validate a pipeline definition."""
     from mirror_core.pipeline import Pipeline
+
     return Pipeline.model_validate(_load_mapping(path))
+
+
+@app.command()
+def worker(
+    backend: str = typer.Option(
+        "sqlite",
+        "--backend",
+        case_sensitive=False,
+        help="Worker backend to initialize (sqlite or inline)",
+    ),
+    database: Path | None = typer.Option(
+        None,
+        "--database",
+        "-d",
+        help="SQLite database path used when --backend sqlite is selected",
+    ),
+) -> None:
+    """Initialize the local worker backend and report readiness."""
+
+    async def _run() -> None:
+        backend_name = backend.lower()
+        if backend_name == "inline":
+            from mirror_core.workers import InlineWorker
+
+            worker_backend = InlineWorker()
+            label = "inline"
+        elif backend_name == "sqlite":
+            from mirror_core.workers import SQLiteWorkerBackend
+
+            db_path = database or Path(".mirror/worker.sqlite3")
+            worker_backend = SQLiteWorkerBackend(db_path)
+            label = f"sqlite:{db_path}"
+        else:
+            raise RuntimeError("backend must be 'sqlite' or 'inline'")
+
+        await worker_backend.start()
+        await worker_backend.stop()
+        console.print(f"[green]Worker backend ready[/green] {label}")
+
+    try:
+        asyncio.run(_run())
+    except Exception as exc:
+        console.print(f"[red]Error: {exc}[/red]")
+        raise typer.Exit(code=1) from exc
 
 
 @app.command("worker-check")
 def worker_check() -> None:
     """Report the status of the provisional local worker contracts."""
-    console.print("[yellow]Worker execution is experimental and not enabled in alpha.[/yellow]")
+    console.print(
+        "[yellow]Worker execution is experimental and not enabled in alpha.[/yellow]"
+    )
+
 
 @app.command()
 def list_capabilities() -> None:
@@ -208,8 +266,7 @@ def status() -> None:
 
 @app.callback()
 def callback() -> None:
-    """Mirror CLI – application framework for web infrastructure."""
-    pass
+    """Mirror CLI – application framework for Mirror."""
 
 
 if __name__ == "__main__":

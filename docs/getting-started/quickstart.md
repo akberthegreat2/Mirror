@@ -19,8 +19,11 @@ mirror doctor
 ## 3. Start the local worker
 
 ```bash
-mirror worker
+mirror worker --backend sqlite
 ```
+
+This initializes the durable local worker backend in `.mirror/worker.sqlite3`.
+
 
 ## 4. Add an app
 

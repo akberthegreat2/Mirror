@@ -4,22 +4,20 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from typing import Any, BinaryIO
 from uuid import uuid4
 
 import pytest
-
 from mirror_archive.exceptions import ArchiveError
 from mirror_archive.models import ArchivePayload, ArchiveRequest
 from mirror_archive_warc.provider import WARCProvider
 from mirror_archive_warc.settings import WARCSettings
 
-from typing import Any, BinaryIO
-
 
 class FakeWARCWriter:
     """Small writer double that records create/write calls."""
 
-    instances: list["FakeWARCWriter"] = []
+    instances: list[FakeWARCWriter] = []
 
     def __init__(self, stream: BinaryIO, *, gzip: bool) -> None:
         self.stream = stream

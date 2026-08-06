@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirror-crawl-local"
+version = "0.1.0"
+description = "Local crawl provider for Mirror Crawl"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Mirror Contributors"}]
+requires-python = ">=3.10"
+dependencies = [
+    "mirror-core>=0.1.0",
+    "mirror-fetch>=0.1.0",
+    "mirror-crawl>=0.1.0",
+]
+
+[project.entry-points."mirror"]
+crawl-local = "mirror_crawl_local:provider"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mirror_crawl_local*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+explicit_package_bases = true
+mypy_path = ["src"]

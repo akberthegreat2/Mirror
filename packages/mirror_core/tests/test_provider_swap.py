@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from mirror_core.application import Application
 from mirror_core.pipeline import Pipeline, Step
 from mirror_core.registry import MiddlewareConfig, ProviderConfig
@@ -47,8 +46,8 @@ class ProviderSwapDiscoverySource:
                 "retry",
                 lambda: MiddlewareConfig(
                     name="retry",
-                    factory="mirror_middleware.retry:RetryMiddleware",
-                    settings_model="mirror_middleware.retry:RetrySettings",
+                    factory="mirror_core.middleware.builtin.retry:RetryMiddleware",
+                    settings_model="mirror_core.middleware.builtin.retry:RetrySettings",
                     before=["timeout", "ratelimit"],
                 ),
             ),
@@ -56,7 +55,9 @@ class ProviderSwapDiscoverySource:
 
 
 @pytest.mark.asyncio
-async def test_same_pipeline_can_swap_fetch_providers(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_same_pipeline_can_swap_fetch_providers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The same pipeline should run against different fetch providers."""
 
     async def httpx_fetch(self: HTTPXProvider, request: FetchRequest) -> FetchResult:
@@ -69,7 +70,9 @@ async def test_same_pipeline_can_swap_fetch_providers(monkeypatch: pytest.Monkey
             timestamp="2026-08-03T00:00:00+00:00",
         )
 
-    async def playwright_fetch(self: PlaywrightProvider, request: FetchRequest) -> FetchResult:
+    async def playwright_fetch(
+        self: PlaywrightProvider, request: FetchRequest
+    ) -> FetchResult:
         return FetchResult(
             url=str(request.url),
             status_code=200,
@@ -118,7 +121,9 @@ async def test_same_pipeline_can_swap_fetch_providers(monkeypatch: pytest.Monkey
         )
         await app.start()
         try:
-            result = await app.run_pipeline_detailed(pipeline, inputs={"url": "https://example.com"})
+            result = await app.run_pipeline_detailed(
+                pipeline, inputs={"url": "https://example.com"}
+            )
         finally:
             await app.shutdown()
         assert result.outcome.value == "succeeded"

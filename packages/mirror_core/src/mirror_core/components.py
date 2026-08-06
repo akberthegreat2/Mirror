@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 from contextlib import AsyncExitStack
-from typing import Any
+from typing import Any, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 
@@ -25,6 +26,8 @@ class ComponentManager:
         self._registry = registry
         self._settings = settings
         self._instances: dict[tuple[str, str], Any] = {}
+        self._selected_providers: dict[str, str] = {}
+        self._initializing: set[str] = set()
 
     @property
     def instances(self) -> dict[tuple[str, str], Any]:
@@ -33,19 +36,65 @@ class ComponentManager:
 
     async def initialize(self, stack: AsyncExitStack) -> None:
         """Construct and start all configured providers transactionally."""
-        for capability_name, selection in self._settings.components.items():
-            provider_name = selection.get("provider")
-            if not isinstance(provider_name, str) or not provider_name:
-                raise ApplicationError(f"No provider selected for {capability_name!r}")
+        for capability_name in self._settings.components:
+            await self.ensure_capability(capability_name, stack)
+
+    async def ensure_capability(
+        self, capability_name: str, stack: AsyncExitStack
+    ) -> Any:
+        """Ensure one capability provider instance exists, initializing dependencies first."""
+        capability = self._registry.resolve_capability(capability_name)
+        provider_name = self._select_provider_name(capability_name, capability)
+        return await self._ensure_provider(capability_name, provider_name, stack)
+
+    async def ensure_provider(
+        self, capability_name: str, provider_name: str, stack: AsyncExitStack
+    ) -> Any:
+        """Ensure one explicit capability/provider pair exists."""
+        return await self._ensure_provider(capability_name, provider_name, stack)
+
+    async def _ensure_provider(
+        self,
+        capability_name: str,
+        provider_name: str,
+        stack: AsyncExitStack,
+    ) -> Any:
+        key = (capability_name, provider_name)
+        if key in self._instances:
+            self._selected_providers.setdefault(capability_name, provider_name)
+            return self._instances[key]
+
+        if capability_name in self._initializing:
+            raise ApplicationError(
+                f"Dependency cycle detected while initializing {capability_name!r}"
+            )
+
+        self._initializing.add(capability_name)
+        try:
             capability = self._registry.resolve_capability(capability_name)
             provider = self._registry.resolve_provider(capability, provider_name)
+            self._selected_providers[capability_name] = provider.name
+
+            dependency_instances: dict[str, Any] = {}
+            for dependency in capability.dependencies:
+                dependency_instance = await self.ensure_capability(
+                    dependency.name, stack
+                )
+                dependency_instances[dependency.name] = dependency_instance
+
             factory = self.import_symbol(provider.factory)
             settings_model = self.resolve_settings_model(provider.settings_model)
-            raw_settings = self._settings.component_settings.get(capability_name, {}).get(
-                provider_name, {}
+            raw_settings = self._settings.component_settings.get(
+                capability_name, {}
+            ).get(provider.name, {})
+            settings_instance = settings_model.model_validate(raw_settings)
+            instance = self._instantiate(
+                factory, settings_instance, dependency_instances
             )
-            instance = factory(settings_model.model_validate(raw_settings))
-            if capability.protocol is not None and not isinstance(instance, capability.protocol):
+
+            if capability.protocol is not None and not isinstance(
+                instance, capability.protocol
+            ):
                 raise ApplicationError(
                     f"Provider {provider.name!r} does not implement capability "
                     f"protocol {capability.name!r}"
@@ -53,7 +102,93 @@ class ComponentManager:
             if isinstance(instance, AsyncLifecycle):
                 stack.push_async_callback(instance.teardown)
                 await instance.setup()
-            self._instances[(capability_name, provider_name)] = instance
+            self._instances[key] = instance
+            return instance
+        finally:
+            self._initializing.discard(capability_name)
+
+    def _instantiate(
+        self,
+        factory: Any,
+        settings_instance: BaseModel,
+        dependency_instances: dict[str, Any],
+    ) -> Any:
+        """Instantiate a provider with settings plus any protocol dependencies."""
+        kwargs = self._build_dependency_kwargs(factory, dependency_instances)
+        try:
+            return factory(settings_instance, **kwargs)
+        except TypeError:
+            if kwargs:
+                raise
+            return factory(settings_instance)
+
+    def _build_dependency_kwargs(
+        self, factory: Any, dependency_instances: dict[str, Any]
+    ) -> dict[str, Any]:
+        target = factory.__init__ if inspect.isclass(factory) else factory
+        try:
+            hints = get_type_hints(target)
+        except Exception:
+            hints = {}
+
+        kwargs: dict[str, Any] = {}
+        try:
+            signature = inspect.signature(factory)
+        except (TypeError, ValueError):
+            signature = None
+
+        if signature is None:
+            return kwargs
+
+        for parameter in signature.parameters.values():
+            if parameter.name in {"settings", "self", "cls"}:
+                continue
+            if parameter.kind in {
+                inspect.Parameter.VAR_POSITIONAL,
+                inspect.Parameter.VAR_KEYWORD,
+            }:
+                continue
+
+            dependency = self._match_dependency(
+                parameter.name, hints.get(parameter.name), dependency_instances
+            )
+            if dependency is not None:
+                kwargs[parameter.name] = dependency
+        return kwargs
+
+    @staticmethod
+    def _match_dependency(
+        name: str, hint: Any, dependency_instances: dict[str, Any]
+    ) -> Any | None:
+        if name in dependency_instances:
+            return dependency_instances[name]
+
+        if hint is None:
+            return None
+
+        origin = get_origin(hint)
+        if origin is None:
+            candidates = [hint]
+        else:
+            candidates = [
+                candidate for candidate in get_args(hint) if candidate is not type(None)
+            ]
+
+        for candidate in candidates:
+            candidate_name = getattr(candidate, "__name__", None)
+            if isinstance(candidate_name, str):
+                resolved = dependency_instances.get(candidate_name.lower())
+                if resolved is not None:
+                    return resolved
+        return None
+
+    def _select_provider_name(self, capability_name: str, capability: Any) -> str:
+        configured = self._settings.components.get(capability_name, {}).get("provider")
+        provider_name = (
+            configured if isinstance(configured, str) and configured else None
+        )
+        provider = self._registry.resolve_provider(capability, provider_name)
+        return provider.name
 
     def get(self, capability: str, provider: str) -> Any:
         """Return one initialized provider instance."""
@@ -67,6 +202,8 @@ class ComponentManager:
     def clear(self) -> None:
         """Forget instances after their lifecycle stack has been closed."""
         self._instances.clear()
+        self._selected_providers.clear()
+        self._initializing.clear()
 
     @staticmethod
     def import_symbol(path: str) -> Any:

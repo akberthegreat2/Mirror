@@ -1,27 +1,105 @@
-"""Production-lean storage backends previewed ahead of the beta release.
+"""Stable storage contracts and local persistence implementations.
 
-The contract these implement (``MetadataStore``, ``BlobStore``,
-``MetadataRecord``) lives in ``mirror_core.storage`` and is stable, frozen
-core surface. These SQLite- and filesystem-backed implementations are not:
-see ``mirror_core.beta`` for what that means. Nothing in Mirror imports this
-module unconditionally; a project that wants durable local persistence ahead
-of beta opts in explicitly.
+Mirror's storage layer exposes typed contracts and development-friendly
+backends in the core package. The contracts are part of the stable surface:
+
+- ``MetadataRecord``
+- ``MetadataStore``
+- ``BlobStore``
+
+The built-in implementations are also stable and importable from here:
+
+- ``InMemoryMetadataStore``
+- ``InMemoryBlobStore``
+- ``SQLiteMetadataStore``
+- ``FileSystemBlobStore``
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, Protocol, runtime_checkable
 
-from mirror_core.storage import MetadataRecord
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class MetadataRecord(BaseModel):
+    """Immutable metadata envelope stored by crawl and control-plane code."""
+
+    model_config = ConfigDict(frozen=True)
+
+    namespace: str
+    key: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+@runtime_checkable
+class MetadataStore(Protocol):
+    """Persistence contract for structured metadata records."""
+
+    def put(self, record: MetadataRecord) -> None: ...
+
+    def get(self, namespace: str, key: str) -> MetadataRecord | None: ...
+
+    def list(self, namespace: str | None = None) -> list[MetadataRecord]: ...
+
+
+@runtime_checkable
+class BlobStore(Protocol):
+    """Persistence contract for binary blobs."""
+
+    def put_bytes(self, key: str, payload: bytes) -> None: ...
+
+    def get_bytes(self, key: str) -> bytes | None: ...
+
+    def delete(self, key: str) -> None: ...
+
+
+class InMemoryMetadataStore:
+    """In-memory metadata store for tests and local development."""
+
+    def __init__(self) -> None:
+        self._records: dict[tuple[str, str], MetadataRecord] = {}
+
+    def put(self, record: MetadataRecord) -> None:
+        self._records[(record.namespace, record.key)] = record
+
+    def get(self, namespace: str, key: str) -> MetadataRecord | None:
+        return self._records.get((namespace, key))
+
+    def list(self, namespace: str | None = None) -> list[MetadataRecord]:
+        records = self._records.values()
+        if namespace is not None:
+            records = [record for record in records if record.namespace == namespace]
+        return sorted(records, key=lambda record: (record.namespace, record.key))
+
+
+class InMemoryBlobStore:
+    """In-memory blob store for tests and local development."""
+
+    def __init__(self) -> None:
+        self._blobs: dict[str, bytes] = {}
+
+    def put_bytes(self, key: str, payload: bytes) -> None:
+        self._blobs[_normalize_blob_key(key)] = payload
+
+    def get_bytes(self, key: str) -> bytes | None:
+        return self._blobs.get(_normalize_blob_key(key))
+
+    def delete(self, key: str) -> None:
+        self._blobs.pop(_normalize_blob_key(key), None)
 
 
 class SQLiteMetadataStore:
-    """SQLite-backed metadata store for beta development."""
+    """SQLite-backed metadata store for durable local workflows."""
 
     def __init__(self, path: str | Path) -> None:
         self._path = Path(path)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(self._path)
         self._conn.row_factory = sqlite3.Row
         self._ensure_schema()
@@ -55,7 +133,7 @@ class SQLiteMetadataStore:
             namespace=row["namespace"],
             key=row["key"],
             payload=json.loads(row["payload"]),
-            created_at=row["created_at"],
+            created_at=_parse_datetime(row["created_at"]),
         )
 
     def list(self, namespace: str | None = None) -> list[MetadataRecord]:
@@ -78,7 +156,7 @@ class SQLiteMetadataStore:
                 namespace=row["namespace"],
                 key=row["key"],
                 payload=json.loads(row["payload"]),
-                created_at=row["created_at"],
+                created_at=_parse_datetime(row["created_at"]),
             )
             for row in rows
         ]
@@ -102,7 +180,7 @@ class SQLiteMetadataStore:
 
 
 class FileSystemBlobStore:
-    """Filesystem blob store for local beta workflows."""
+    """Filesystem blob store for durable local workflows."""
 
     def __init__(self, base_path: str | Path) -> None:
         self._base_path = Path(base_path)
@@ -125,7 +203,38 @@ class FileSystemBlobStore:
             path.unlink()
 
     def _resolve(self, key: str) -> Path:
-        parts = [part for part in Path(key).parts if part not in {"..", ".", ""}]
-        if not parts:
-            raise ValueError("Blob key must not be empty")
-        return self._base_path.joinpath(*parts)
+        return _resolve_blob_path(self._base_path, key)
+
+
+def _normalize_blob_key(key: str) -> str:
+    _resolve_blob_path(Path("."), key)
+    return key
+
+
+def _resolve_blob_path(base_path: Path, key: str) -> Path:
+    candidate = Path(key)
+    if (
+        candidate.is_absolute()
+        or any(part in {"..", "."} for part in candidate.parts)
+        or not candidate.parts
+    ):
+        raise ValueError("Blob key must be a relative path without traversal segments")
+    return base_path.joinpath(*candidate.parts)
+
+
+def _parse_datetime(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+__all__ = [
+    "BlobStore",
+    "FileSystemBlobStore",
+    "InMemoryBlobStore",
+    "InMemoryMetadataStore",
+    "MetadataRecord",
+    "MetadataStore",
+    "SQLiteMetadataStore",
+]
