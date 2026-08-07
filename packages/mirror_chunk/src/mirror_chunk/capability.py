@@ -1,4 +1,4 @@
-"""Capability descriptor for Chunking."""
+"""Capability manifest for Chunking."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

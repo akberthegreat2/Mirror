@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from .errors import EmbeddingError
 from .models import EmbeddingRequest, EmbeddingResult
 from .protocol import Embedder
 
 
-async def embed_step(provider: Embedder, request: EmbeddingRequest) -> EmbeddingResult:
+async def embed_step(
+    provider: Embedder,
+    request: EmbeddingRequest,
+    runner_context: RunnerContext | None = None,
+) -> EmbeddingResult:
     """Adapt an Embedder provider to the capability runner contract."""
 
     try:

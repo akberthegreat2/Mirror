@@ -1,4 +1,4 @@
-"""Capability descriptors for the analyze capability."""
+"""Capability manifests for the analyze capability."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

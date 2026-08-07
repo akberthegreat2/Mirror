@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from .errors import NormalizationError
 from .models import NormalizationRequest, NormalizationResult
 from .protocol import Normalizer
 
 
 async def normalize_step(
-    provider: Normalizer, request: NormalizationRequest
+    provider: Normalizer,
+    request: NormalizationRequest,
+    runner_context: RunnerContext | None = None,
 ) -> NormalizationResult:
     """Adapt a Normalizer provider to the capability runner contract."""
 

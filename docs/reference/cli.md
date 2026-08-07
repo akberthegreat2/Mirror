@@ -15,11 +15,11 @@ healthy.
 
 ## `mirror list-capabilities`
 
-Print the discovered capability descriptors.
+Print the discovered capability manifests.
 
 ## `mirror list-providers`
 
-Print the discovered provider descriptors.
+Print the discovered provider manifests.
 
 ## `mirror status`
 

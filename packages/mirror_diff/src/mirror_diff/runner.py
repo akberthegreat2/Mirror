@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from .errors import DiffError
 from .models import DiffRequest, DiffResult
 from .protocol import Diff
 
 
-async def diff_step(provider: Diff, request: DiffRequest) -> DiffResult:
+async def diff_step(
+    provider: Diff, request: DiffRequest, runner_context: RunnerContext | None = None
+) -> DiffResult:
     """Adapt a Diff provider to the capability runner contract."""
     try:
         return await provider.diff(request)

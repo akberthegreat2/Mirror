@@ -71,21 +71,18 @@ async def test_executor_passes_runtime_contexts_to_runners() -> None:
 
     seen: dict[str, object] = {}
 
-    async def runner(
-        provider,
-        request,
-        *,
-        execution_context=None,
-        capability_context=None,
-        middleware_context=None,
-        signal_bus=None,
-        step_id=None,
-    ):
-        seen["execution_context"] = execution_context
-        seen["capability_context"] = capability_context
-        seen["middleware_context"] = middleware_context
-        seen["signal_bus"] = signal_bus
-        seen["step_id"] = step_id
+    async def runner(provider, request, runner_context=None):
+        seen["execution_context"] = (
+            runner_context.execution_context if runner_context else None
+        )
+        seen["capability_context"] = (
+            runner_context.capability_context if runner_context else None
+        )
+        seen["middleware_context"] = (
+            runner_context.middleware_context if runner_context else None
+        )
+        seen["signal_bus"] = runner_context.signal_bus if runner_context else None
+        seen["step_id"] = runner_context.step_id if runner_context else None
         return await provider.fetch(request)
 
     result = await executor.execute_run(

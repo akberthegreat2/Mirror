@@ -1,4 +1,4 @@
-"""Capability descriptor for Retrieval."""
+"""Capability manifest for Retrieval."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

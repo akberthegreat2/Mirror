@@ -30,7 +30,7 @@ The extension model SHOULD follow these rules:
 
 - discovery is entry-point based or otherwise explicitly registered through Core;
 - installed does not mean activated; settings decide activation;
-- each extension family has a descriptor or manifest that declares its contract, version, settings schema, dependencies, and health-check surface where relevant;
+- each extension family has a manifest that declares its contract, version, settings schema, dependencies, and health-check surface where relevant;
 - capability packages define contracts and tests;
 - provider packages implement those contracts;
 - interface packages expose CLI, admin, API, or SDK surfaces;

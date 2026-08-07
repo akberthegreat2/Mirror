@@ -2,7 +2,7 @@
 
 Status: Planned
 
-Mirror currently carries a legacy registry language alongside the newer core extension model.
+Mirror currently carries a legacy registry language alongside the canonical manifest extension model.
 
 The beta gate for that migration is to:
 - identify every package still using the legacy registry API as a primary path;

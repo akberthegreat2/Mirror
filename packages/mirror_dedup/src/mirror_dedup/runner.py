@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from mirror_dedup.errors import DedupError
 from mirror_dedup.models import DedupRequest, DedupResult
 from mirror_dedup.protocol import Deduplicator
 
 
-async def dedup_step(provider: Deduplicator, request: DedupRequest) -> DedupResult:
+async def dedup_step(
+    provider: Deduplicator,
+    request: DedupRequest,
+    runner_context: RunnerContext | None = None,
+) -> DedupResult:
     """Adapt a Deduplicator provider to the capability runner contract."""
 
     try:

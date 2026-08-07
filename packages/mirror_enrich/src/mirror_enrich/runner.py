@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from mirror_enrich.errors import EnrichmentError
 from mirror_enrich.models import EnrichmentRequest, EnrichmentResult
 from mirror_enrich.protocol import Enricher
 
 
 async def enrich_step(
-    provider: Enricher, request: EnrichmentRequest
+    provider: Enricher,
+    request: EnrichmentRequest,
+    runner_context: RunnerContext | None = None,
 ) -> EnrichmentResult:
     """Adapt an Enricher provider to the capability runner contract."""
 

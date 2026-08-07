@@ -1,4 +1,4 @@
-"""Capability descriptors for the diff capability."""
+"""Capability manifests for the diff capability."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

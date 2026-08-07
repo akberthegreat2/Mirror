@@ -1,4 +1,4 @@
-"""Capability descriptor for Compliance."""
+"""Capability manifest for Compliance."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

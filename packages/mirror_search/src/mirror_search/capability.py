@@ -1,4 +1,4 @@
-"""Capability descriptor for Search."""
+"""Capability manifest for Search."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

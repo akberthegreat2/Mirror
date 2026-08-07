@@ -1,4 +1,4 @@
-"""Capability descriptors for the scrape capability."""
+"""Capability manifests for the scrape capability."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

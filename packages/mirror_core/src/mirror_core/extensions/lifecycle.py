@@ -58,7 +58,7 @@ class ExtensionLifecycleManager:
 
     The manager is intentionally small: it tracks lifecycle state, delegates
     manifest validation to the existing extension validators, and delegates
-    descriptor storage to the extension registry manager.
+    manifest storage to the extension registry manager.
     """
 
     _STATE_ORDER = {

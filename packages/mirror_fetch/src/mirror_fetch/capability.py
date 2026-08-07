@@ -1,4 +1,4 @@
-"""Capability descriptor for Fetch."""
+"""Capability manifest for Fetch."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

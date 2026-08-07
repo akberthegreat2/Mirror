@@ -4,7 +4,7 @@ from mirror_core.extensions.models import InterfaceManifest
 
 from mirror_cli.main import app
 
-# Interface descriptor for discovery
+# Interface manifest for discovery
 interface = InterfaceManifest(
     name="cli",
     interface_type="cli",

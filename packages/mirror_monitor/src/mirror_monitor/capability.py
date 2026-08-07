@@ -1,4 +1,4 @@
-"""Capability descriptors for the monitor capability."""
+"""Capability manifests for the monitor capability."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

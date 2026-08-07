@@ -6,7 +6,7 @@ This phase documents the audit required to move shipped packages onto the canoni
 
 ## Why this exists
 
-The repository still contains legacy registry vocabulary alongside the newer manifest/lifecycle extension path.
+The repository still contains legacy registry vocabulary alongside the canonical manifest extension path.
 
 That is acceptable while migration is in progress, but it must be visible in the repo so contributors know which path is canonical and which path is transitional.
 

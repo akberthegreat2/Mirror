@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from .errors import RetrievalError
 from .models import RetrievalRequest, RetrievalResult
 from .protocol import Retriever
 
 
 async def retrieval_step(
-    provider: Retriever, request: RetrievalRequest
+    provider: Retriever,
+    request: RetrievalRequest,
+    runner_context: RunnerContext | None = None,
 ) -> RetrievalResult:
     """Adapt a Retriever provider to the capability runner contract."""
 

@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-08-07
 - **Scope:** Optional capability families, provider packages, and ecosystem expansion beyond web infrastructure
-- **Related ADRs:** ADR-0001 Package Boundaries, ADR-0024 Capability Package Boundaries, ADR-0026 Knowledge Infrastructure Capability Model, ADR-0033 Enterprise Execution Pipeline & Runtime Semantics
+- **Related ADRs:** ADR-0001 Package Boundaries, ADR-0024 Capability Package Boundaries, ADR-0026 Knowledge Infrastructure Capability Model, ADR-0037 Enterprise Execution Pipeline & Runtime Semantics
 
 ## Context
 

@@ -10,7 +10,7 @@ Make the core runtime truthful before more capabilities are added. This phase re
 
 ## Implemented contracts
 
-### Descriptor registry
+### Manifest registry
 
 - Capability versions are parsed and ordered with `packaging.version.Version`.
 - Provider compatibility is validated with `packaging.specifiers.SpecifierSet`.
@@ -22,8 +22,8 @@ Make the core runtime truthful before more capabilities are added. This phase re
 `Planner.plan()` now produces immutable `CompiledStep` objects. Each compiled step contains:
 
 - the original step definition;
-- the resolved capability descriptor and API version;
-- the resolved provider descriptor;
+- the resolved capability manifest and API version;
+- the resolved provider manifest;
 - exact data dependencies.
 
 The plan validates:
@@ -77,7 +77,7 @@ Application startup now uses `AsyncExitStack`:
 
 - teardown is registered before setup starts;
 - a provider that partially initializes and then raises is still torn down;
-- descriptors are rejected when discovery reports duplicates;
+- manifests are rejected when discovery reports duplicates;
 - registries are frozen before component construction;
 - runtime state is recreated cleanly after shutdown;
 - the same `Application` instance supports a full start/shutdown/restart cycle.

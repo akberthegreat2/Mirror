@@ -24,7 +24,7 @@ Mirror reaches alpha when the repository satisfies all of the following:
 
 Mirror core must provide:
 
-- typed descriptors and typed execution boundaries;
+- typed manifests and typed execution boundaries;
 - a pipeline compiler that produces an execution plan;
 - an execution engine that runs plans only;
 - `ExecutionRun` as per-run state, not shared executor state;

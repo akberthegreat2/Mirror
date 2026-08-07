@@ -4,7 +4,7 @@
 
 The workspace had a healthy package split, but a few runtime and packaging edges still blocked a usable alpha:
 
-- middleware entry points exported functions/dicts instead of immutable descriptors;
+- middleware entry points exported functions/dicts instead of immutable manifests;
 - middleware invocations were untyped dictionaries;
 - WARC imports failed eagerly when warcio was unavailable;
 - CLI helper commands leaked event loops and application resources;
@@ -22,17 +22,17 @@ The workspace had a healthy package split, but a few runtime and packaging edges
 
 ### Middleware package
 
-- Replaced callable/dict middleware entry points with immutable MiddlewareConfig descriptors.
+- Replaced callable/dict middleware entry points with immutable MiddlewareManifest manifests.
 - Updated retry, timeout, ratelimit, logging, and tracing to use typed invocations.
-- Added descriptor objects for entry-point discovery.
-- Kept compatibility helpers that return the descriptor objects.
+- Added manifest objects for entry-point discovery.
+- Kept compatibility helpers that return the manifest objects.
 - Fixed rate limiting to avoid sleeping while holding the lock.
 - Fixed logging to read Step models instead of dictionary keys.
 - Added lightweight trace context propagation.
 
 ### Application and lifecycle
 
-- Built middleware chains from selected settings using the registry and descriptor ordering.
+- Built middleware chains from selected settings using the registry and manifest ordering.
 - Added capability-aware middleware chain selection.
 - Kept transactional startup and restartable shutdown behavior.
 

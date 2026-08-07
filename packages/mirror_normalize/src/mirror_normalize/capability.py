@@ -1,4 +1,4 @@
-"""Capability descriptor for Normalization."""
+"""Capability manifest for Normalization."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

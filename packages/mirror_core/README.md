@@ -1,6 +1,6 @@
 # mirror-core
 
-`mirror-core` is the capability-agnostic kernel of Mirror. It provides extension descriptors, immutable registries, a trusted pipeline compiler, isolated execution runs, middleware composition, signals, typed resource envelopes, deterministic settings, transactional application lifecycle, and a dedicated metadata contract in `mirror_core.metadata`.
+`mirror-core` is the capability-agnostic kernel of Mirror. It provides extension manifests, immutable registries, a trusted pipeline compiler, isolated execution runs, middleware composition, signals, typed resource envelopes, deterministic settings, transactional application lifecycle, and a dedicated metadata contract in `mirror_core.metadata`.
 
 Blob storage remains in `mirror_core.storage`, while metadata storage is exposed through `mirror_core.metadata` and re-exported from `mirror_core.storage` for compatibility.
 

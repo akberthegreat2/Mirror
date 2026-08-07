@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from mirror_core.executor_support import RunnerContext
 
 from mirror_archive.exceptions import ArchiveError
 from mirror_archive.models import ArchiveRequest, ArchiveResult
@@ -12,12 +12,9 @@ from mirror_archive.protocol import Archive
 async def archive_step(
     provider: Archive,
     request: ArchiveRequest,
-    settings: Any | None = None,
-    signal_bus: Any | None = None,
-    step_id: str | None = None,
+    runner_context: RunnerContext | None = None,
 ) -> ArchiveResult:
     """Adapt an Archive provider to the capability runner contract."""
-    del settings, signal_bus, step_id
     try:
         return await provider.archive(request)
     except ArchiveError:

@@ -1,4 +1,4 @@
-"""Capability descriptor for Enrichment."""
+"""Capability manifest for Enrichment."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

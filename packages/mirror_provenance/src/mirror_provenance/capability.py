@@ -1,4 +1,4 @@
-"""Capability descriptor for Provenance."""
+"""Capability manifest for Provenance."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

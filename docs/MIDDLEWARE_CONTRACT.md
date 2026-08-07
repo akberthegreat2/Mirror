@@ -10,7 +10,7 @@ Middleware is a core contract. It wraps execution and may observe, transform, sh
 ## Construction contract
 
 Middleware is instantiated from a validated settings model, the same way providers are.
-The application bootstrap resolves the descriptor, validates settings, and creates
+The application bootstrap resolves the manifest, validates settings, and creates
 one middleware instance per named middleware. Middleware invocations now carry
 ExecutionContext and CapabilityContext objects so cross-cutting concerns can
 observe the same runtime snapshot as the executor.
@@ -50,6 +50,6 @@ Middleware may enforce them, but the policy definition belongs to the core runti
 
 ## Construction rule
 
-Middleware and providers are constructed through descriptor-backed settings
+Middleware and providers are constructed through manifest-backed settings
 objects. The repository uses one contract for plugin construction so tests can
 exercise the same path that Application uses.

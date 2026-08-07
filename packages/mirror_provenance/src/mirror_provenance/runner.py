@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from mirror_provenance.errors import ProvenanceError
 from mirror_provenance.models import ProvenanceRequest, ProvenanceResult
 from mirror_provenance.protocol import Provenancer
 
 
 async def provenance_step(
-    provider: Provenancer, request: ProvenanceRequest
+    provider: Provenancer,
+    request: ProvenanceRequest,
+    runner_context: RunnerContext | None = None,
 ) -> ProvenanceResult:
     """Adapt a Provenancer provider to the capability runner contract."""
 

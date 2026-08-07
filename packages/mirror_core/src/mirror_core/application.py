@@ -74,10 +74,10 @@ class Application:
                 )
             if self._discovery_result.has_duplicates():
                 raise ApplicationError(
-                    "Duplicate extension descriptors discovered",
+                    "Duplicate extension manifests discovered",
                     details={"duplicates": self._discovery_result.duplicates},
                 )
-            self._register_descriptors()
+            self._register_manifests()
             self._registry.freeze()
             middleware_chains = await self._build_middleware_chains(stack)
             await self._component_manager.initialize(stack)
@@ -153,7 +153,7 @@ class Application:
         self._component_manager.clear()
         await self._emit("application.shutdown", application=self)
 
-    def _register_descriptors(self) -> None:
+    def _register_manifests(self) -> None:
         result = self._discovery_result
         if result is None:
             raise ApplicationError("Discovery result is unavailable")

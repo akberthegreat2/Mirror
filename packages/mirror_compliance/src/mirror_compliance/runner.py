@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from mirror_compliance.errors import ComplianceError
 from mirror_compliance.models import ComplianceRequest, ComplianceResult
 from mirror_compliance.protocol import ComplianceChecker
 
 
 async def compliance_step(
-    provider: ComplianceChecker, request: ComplianceRequest
+    provider: ComplianceChecker,
+    request: ComplianceRequest,
+    runner_context: RunnerContext | None = None,
 ) -> ComplianceResult:
     """Adapt a ComplianceChecker provider to the capability runner contract."""
 

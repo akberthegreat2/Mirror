@@ -21,7 +21,7 @@ The core rules are:
 - Core MUST NOT import Celery directly;
 - worker behavior MUST still honor execution state, leases, cancellation, terminal outcomes, and durable-state semantics defined by the runtime contract.
 
-A Celery backend SHOULD integrate with the same plan/run model used by local workers. It SHOULD accept an execution plan or run descriptor produced by Core and execute it through the same lifecycle rules as other workers.
+A Celery backend SHOULD integrate with the same plan/run model used by local workers. It SHOULD accept an execution plan or run manifest produced by Core and execute it through the same lifecycle rules as other workers.
 
 The scheduler SHOULD submit work to the worker abstraction rather than to Celery-specific APIs.
 

@@ -9,7 +9,7 @@ can prove backend swapping without changing pipeline definitions.
 - `PlaywrightSettings`
 - `provider`
 
-## Descriptor
+## Manifest
 
-The package registers a `ProviderConfig` named `playwright` for capability
+The package registers a `ProviderManifest` named `playwright` for capability
 `fetch`.

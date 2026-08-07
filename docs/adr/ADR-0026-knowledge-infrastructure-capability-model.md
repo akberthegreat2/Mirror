@@ -36,7 +36,7 @@ The initial capability families are expected to include:
 These capabilities should follow the same architectural rules as Fetch and
 Archive:
 
-- capabilities define contracts, models, descriptors, and tests;
+- capabilities define contracts, models, manifests, and tests;
 - providers implement those contracts;
 - the core kernel stays model-agnostic and vendor-agnostic;
 - the LLM or agent layer stays outside `mirror_core`.

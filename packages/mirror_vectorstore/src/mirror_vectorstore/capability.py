@@ -1,4 +1,4 @@
-"""Capability descriptor for Vector storage."""
+"""Capability manifest for Vector storage."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

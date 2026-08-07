@@ -5,7 +5,7 @@ from mirror_core.extensions.models import ProviderManifest
 from mirror_fetch_httpx.provider import HTTPXProvider
 from mirror_fetch_httpx.settings import HTTPXSettings
 
-# Provider descriptor for discovery
+# Provider manifest for discovery
 provider = ProviderManifest(
     name="httpx",
     capability="fetch",

@@ -1,4 +1,4 @@
-"""Capability descriptor for Archive."""
+"""Capability manifest for Archive."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

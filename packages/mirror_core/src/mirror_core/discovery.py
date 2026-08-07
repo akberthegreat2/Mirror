@@ -47,7 +47,7 @@ class DiscoveryResult:
         self.duplicates: list[tuple[str, str, list[str]]] = []
 
     @property
-    def all_descriptors(self) -> list[ExtensionManifest]:
+    def all_manifests(self) -> list[ExtensionManifest]:
         return self.capabilities + self.providers + self.middleware + self.interfaces
 
     def has_errors(self) -> bool:
@@ -57,8 +57,8 @@ class DiscoveryResult:
         return bool(self.duplicates)
 
 
-def classify_descriptor(obj: Any) -> ExtensionManifest | None:
-    """Classify an object as one of the descriptor types."""
+def classify_manifest(obj: Any) -> ExtensionManifest | None:
+    """Classify an object as one of the manifest types."""
     if isinstance(obj, ExtensionManifest):
         return obj
     return None
@@ -80,14 +80,14 @@ def discover(source: DiscoverySource | None = None) -> DiscoveryResult:
 
     classified: list[ExtensionManifest] = []
     for obj in manifests:
-        desc = classify_descriptor(obj)
+        desc = classify_manifest(obj)
         if desc is None:
             result.errors.append(
                 (
                     getattr(
                         obj, "extension_id", getattr(obj, "name", type(obj).__name__)
                     ),
-                    f"Unknown descriptor type: {type(obj).__name__}",
+                    f"Unknown manifest type: {type(obj).__name__}",
                 )
             )
             continue

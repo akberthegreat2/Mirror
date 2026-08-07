@@ -50,7 +50,7 @@ def make_plan(*steps: Step):
     return Planner(registry, default_providers={"fetch": "httpx"}).plan(pipeline)
 
 
-async def runner(provider, request):
+async def runner(provider, request, runner_context=None):
     return await provider.fetch(request)
 
 

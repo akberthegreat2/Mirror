@@ -64,7 +64,7 @@ A capability package owns:
 - its request/result models;
 - its error taxonomy;
 - its typed protocol;
-- its descriptor metadata;
+- its manifest metadata;
 - its runner adapter, if needed.
 
 A capability package MUST NOT:

@@ -92,3 +92,6 @@ Those ideas are catalogued in `docs/ecosystem/FUTURE_CAPABILITIES.md`.
 - ADR-0029 defines the runtime and worker semantics that the beta runtime builds on.
 - ADR-0030, ADR-0031, and ADR-0032 cover metadata, scheduler, and distributed worker work.
 - ADR-0033 defines the open-source-first provider policy.
+- ADR-0034 defines capability expansion and vertical ecosystem model.
+- ADR-0035 defines certification, smoke tests, and lab validation strategy.
+- ADR-0036 defines the operational development stack and deployment baseline.

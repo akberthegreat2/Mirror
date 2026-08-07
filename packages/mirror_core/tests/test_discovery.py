@@ -32,7 +32,7 @@ def test_discovery_unknown_type():
     fake = FakeSource([("unknown", {"some": "dict"})])
     result = discover(source=fake)
     assert len(result.errors) == 1
-    assert "Unknown descriptor type" in result.errors[0][1]
+    assert "Unknown manifest type" in result.errors[0][1]
 
 
 def test_discovery_duplicates():

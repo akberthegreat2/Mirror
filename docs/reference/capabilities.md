@@ -67,4 +67,4 @@ That is the separation Mirror follows now.
 
 ## Migration note
 
-This repository snapshot still contains legacy registry vocabulary in some places, alongside the newer core extension model. The canonical direction is the core extension path, and the migration audit is tracked in the roadmap and implementation notes.
+This repository snapshot still contains the canonical manifest extension model. The canonical direction is the core extension path, and the migration audit is tracked in the roadmap and implementation notes.

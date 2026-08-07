@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from .errors import VectorStoreError
 from .models import (
     VectorQueryRequest,
@@ -14,7 +16,9 @@ from .protocol import VectorStore
 
 
 async def vectorstore_step(
-    provider: VectorStore, request: VectorStoreRequest
+    provider: VectorStore,
+    request: VectorStoreRequest,
+    runner_context: RunnerContext | None = None,
 ) -> VectorStoreResult:
     """Adapt a VectorStore provider to the capability runner contract."""
 

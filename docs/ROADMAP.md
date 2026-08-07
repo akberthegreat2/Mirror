@@ -18,7 +18,7 @@
 - [x] Provider swap integration test
 - [x] `mirror_fetch_playwright` package
 - [x] Provider documentation
-- [ ] Extension-system migration audit from legacy registry language to the canonical extension API
+- [x] Extension-system migration audit from legacy registry language to the canonical extension API
 
 ## Phase 3 — Django control plane
 
@@ -69,7 +69,7 @@
 - [ ] Monitoring and webhook providers
 - [ ] AI/ML training and serving providers
 - [ ] Domain-specific long-tail capability catalogs
-- [ ] Open-source-first default provider guidance
+- [x] Open-source-first default provider guidance
 
 ## Proposed architecture directions
 
@@ -78,4 +78,5 @@ The following ideas are tracked as proposed ADRs rather than alpha commitments:
 - trusted execution pipeline;
 - extension model and plugin lifecycle;
 - distributed execution and Celery worker integration;
-- open-source-first provider policy.
+- open-source-first provider policy;
+- executor internal decomposition.

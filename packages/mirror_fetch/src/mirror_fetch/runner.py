@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from mirror_core.executor_support import RunnerContext
 
 from mirror_fetch.exceptions import FetchError
 from mirror_fetch.models import FetchRequest, FetchResult
@@ -12,12 +12,9 @@ from mirror_fetch.protocol import Fetch
 async def fetch_step(
     provider: Fetch,
     request: FetchRequest,
-    settings: Any | None = None,
-    signal_bus: Any | None = None,
-    step_id: str | None = None,
+    runner_context: RunnerContext | None = None,
 ) -> FetchResult:
     """Adapt a Fetch provider to the capability runner contract."""
-    del settings, signal_bus, step_id
     try:
         return await provider.fetch(request)
     except FetchError:

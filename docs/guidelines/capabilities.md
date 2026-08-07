@@ -9,7 +9,7 @@ A capability package should usually contain:
 - public models;
 - a protocol or contract;
 - errors;
-- a descriptor;
+- a manifest;
 - optional signal names;
 - optional helper types that describe the domain.
 

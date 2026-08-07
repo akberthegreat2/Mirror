@@ -38,11 +38,11 @@ class ApplicationError(MirrorError):
 
 
 class DiscoveryError(MirrorError):
-    """Raised when extension discovery fails (entry points, descriptors)."""
+    """Raised when extension discovery fails (entry points, manifests)."""
 
 
 class RegistryError(MirrorError):
-    """Raised when descriptor registration or lookup fails."""
+    """Raised when manifest registration or lookup fails."""
 
 
 class ValidationError(MirrorError):

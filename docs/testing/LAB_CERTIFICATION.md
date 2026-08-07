@@ -29,7 +29,7 @@ Examples:
 - capability manifest discovered
 - provider manifest discovered
 - settings validated
-- descriptor registered
+- manifest registered
 
 ## Level 3 — Contract smoke test
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from mirror_crawl.models import CrawlRequest, CrawlResult
 from mirror_crawl.protocol import Crawl
 
@@ -9,12 +11,7 @@ from mirror_crawl.protocol import Crawl
 async def crawl_site(
     provider: Crawl,
     request: CrawlRequest,
-    settings: object | None = None,
-    signal_bus: object | None = None,
-    step_id: str | None = None,
-    metadata_store: object | None = None,
-    blob_store: object | None = None,
+    runner_context: RunnerContext | None = None,
 ) -> CrawlResult:
     """Adapt a Crawl provider to the capability runner contract."""
-    del settings, signal_bus, step_id, metadata_store, blob_store
     return await provider.crawl(request)

@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+from mirror_core.executor_support import RunnerContext
+
 from .errors import ChunkError
 from .models import ChunkRequest, ChunkResult
 from .protocol import Chunker
 
 
-async def chunk_step(provider: Chunker, request: ChunkRequest) -> ChunkResult:
+async def chunk_step(
+    provider: Chunker,
+    request: ChunkRequest,
+    runner_context: RunnerContext | None = None,
+) -> ChunkResult:
     """Adapt a Chunker provider to the capability runner contract."""
 
     try:

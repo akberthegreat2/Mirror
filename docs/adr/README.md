@@ -35,15 +35,17 @@ contracts.
 - ADR-0027 trusted execution pipeline
 - ADR-0028 extension model and plugin lifecycle
 - ADR-0029 distributed execution and Celery worker integration
+- ADR-0030 metadata store architecture
+- ADR-0031 scheduler backend architecture
+- ADR-0032 distributed worker architecture
+- ADR-0037 enterprise execution pipeline & runtime semantics
+- ADR-0038 executor internal decomposition
 
 ## Future drafts
 
 Proposed ADR drafts preserved for later implementation work live in `docs/adr/future/`:
 
-- ADR-0030 — Metadata Store Architecture
-- ADR-0031 — Scheduler Backend Architecture
-- ADR-0032 — Distributed Worker Architecture
-- ADR-0033 — Enterprise Execution Pipeline & Runtime Semantics
+- ADR-0033 — Open-Source-First Provider Policy and Ecosystem Boundaries
 - ADR-0034 — Capability Expansion and Vertical Ecosystem Model
 - ADR-0035 — Certification, Smoke Tests, and Lab Validation Strategy
 - ADR-0036 — Operational Development Stack and Deployment Baseline

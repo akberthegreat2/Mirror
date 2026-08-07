@@ -1,4 +1,4 @@
-"""Capability descriptor for Deduplication."""
+"""Capability manifest for Deduplication."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

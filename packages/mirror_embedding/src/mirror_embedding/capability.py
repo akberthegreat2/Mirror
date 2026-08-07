@@ -1,4 +1,4 @@
-"""Capability descriptor for Embedding."""
+"""Capability manifest for Embedding."""
 
 from mirror_core.extensions.models import CapabilityManifest
 

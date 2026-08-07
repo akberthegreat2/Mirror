@@ -1,4 +1,4 @@
-"""Crawl capability descriptor."""
+"""Crawl capability manifest."""
 
 from mirror_core.extensions.models import CapabilityManifest, Dependency
 

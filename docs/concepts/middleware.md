@@ -6,9 +6,9 @@ observe, modify, short-circuit, retry, or annotate execution.
 ## Contract
 
 The core middleware API uses the `Invocation` model and the `Middleware`
-protocol from `mirror_core.middleware`. Middleware descriptors also carry a
+protocol from `mirror_core.middleware`. Middleware manifests also carry a
 validated settings model so the application bootstrap can construct middleware
-through the same descriptor-driven path as providers.
+through the same manifest-driven path as providers.
 
 ## What middleware may do
 

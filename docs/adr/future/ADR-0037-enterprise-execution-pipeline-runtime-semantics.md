@@ -1,6 +1,6 @@
-# ADR-0033: Enterprise Execution Pipeline & Runtime Semantics
+# ADR-0037: Enterprise Execution Pipeline & Runtime Semantics
 
-Status: Proposed
+Status: Implemented
 Date: 2026-08-07
 Scope: Pipeline compilation, execution semantics, middleware behavior, retries, cancellation, provenance, and runtime policy contracts
 Related ADRs: ADR-0001 Entry Points, ADR-0002 DAG Pipeline, ADR-0003 Resource Envelope, ADR-0004 Capability / Provider Model

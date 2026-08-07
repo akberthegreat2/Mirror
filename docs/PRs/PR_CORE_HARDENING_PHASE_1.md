@@ -31,7 +31,7 @@ The package split was structurally correct, but the runtime still had several co
 ### Planner
 
 - Introduce immutable CompiledStep and ExecutionPlan models.
-- Resolve exact capability/provider descriptors once.
+- Resolve exact capability/provider manifests once.
 - Validate duplicate IDs, bindings, input declarations, ports, and cycles.
 - Preserve exact dependencies for provenance and scheduling.
 
