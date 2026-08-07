@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from mirror_core.registry import ProviderConfig
+from mirror_core.extensions.models import ProviderManifest
 from mirror_scrape.models import ScrapeRequest, ScrapeResult
 from mirror_scrape.protocol import Scrape
 
@@ -14,7 +14,7 @@ class BasicScrapeProvider(Scrape):
         return ScrapeResult(document=Scraper().scrape(request.html, url=request.url))
 
 
-provider = ProviderConfig(
+provider = ProviderManifest(
     name="basic",
     capability="scrape",
     capability_api="~=1.0",

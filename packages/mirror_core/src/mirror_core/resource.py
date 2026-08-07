@@ -91,7 +91,7 @@ class ResourceEnvelope(BaseModel):
         return cls(
             resource_type=resource_type,
             schema_version=schema_version,
-            payload=payload,
+            payload=payload.model_copy(deep=True),
             producer=producer,
             parents=tuple(parents or ()),
             fingerprint=fingerprint,

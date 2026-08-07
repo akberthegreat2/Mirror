@@ -94,8 +94,8 @@ async def test_real_world_fetch_pipeline_uses_actual_packages(
     _bootstrap_source_paths()
 
     from mirror_core.application import Application
+    from mirror_core.extensions.models import ProviderManifest
     from mirror_core.pipeline import Pipeline, Step
-    from mirror_core.registry import ProviderConfig
     from mirror_core.settings import MirrorSettings
     from mirror_fetch.capability import capability as fetch_capability
     from mirror_fetch.models import FetchRequest, FetchResult
@@ -103,33 +103,26 @@ async def test_real_world_fetch_pipeline_uses_actual_packages(
     from mirror_fetch_playwright.provider import PlaywrightProvider
 
     class RealDiscoverySource:
-        def iter_entry_points(self, group: str):
-            assert group == "mirror"
+        def discover(self):
             return [
-                ("fetch", lambda: fetch_capability),
-                (
-                    "fetch-httpx",
-                    lambda: ProviderConfig(
-                        name="httpx",
-                        capability="fetch",
-                        capability_api="~=1.0",
-                        factory="mirror_fetch_httpx.provider:HTTPXProvider",
-                        settings_model="mirror_fetch_httpx.settings:HTTPXSettings",
-                        metadata={"version": "1.0.0"},
-                    ),
+                fetch_capability,
+                ProviderManifest(
+                    name="httpx",
+                    capability="fetch",
+                    capability_api="~=1.0",
+                    factory="mirror_fetch_httpx.provider:HTTPXProvider",
+                    settings_model="mirror_fetch_httpx.settings:HTTPXSettings",
+                    metadata={"version": "1.0.0"},
                 ),
-                (
-                    "fetch-playwright",
-                    lambda: ProviderConfig(
-                        name="playwright",
-                        capability="fetch",
-                        capability_api="~=1.0",
-                        factory="mirror_fetch_playwright.provider:PlaywrightProvider",
-                        settings_model="mirror_fetch_playwright.settings:PlaywrightSettings",
-                        metadata={"version": "1.0.0"},
-                    ),
+                ProviderManifest(
+                    name="playwright",
+                    capability="fetch",
+                    capability_api="~=1.0",
+                    factory="mirror_fetch_playwright.provider:PlaywrightProvider",
+                    settings_model="mirror_fetch_playwright.settings:PlaywrightSettings",
+                    metadata={"version": "1.0.0"},
                 ),
-            ]
+            ], []
 
     async def httpx_fetch(self: HTTPXProvider, request: FetchRequest) -> FetchResult:
         return FetchResult(

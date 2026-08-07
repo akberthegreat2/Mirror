@@ -4,6 +4,7 @@ Mirror execution is plan-driven.
 
 ## Objects
 
+- `PipelineCompiler`
 - `ExecutionPlan`
 - `CompiledStep`
 - `ExecutionRun`

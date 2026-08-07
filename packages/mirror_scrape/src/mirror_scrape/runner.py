@@ -8,6 +8,7 @@ from .protocol import Scrape
 
 
 async def scrape_step(provider: Scrape, request: ScrapeRequest) -> ScrapeResult:
+    """Adapt a Scrape provider to the capability runner contract."""
     try:
         return await provider.scrape(request)
     except ScrapeError:

@@ -15,7 +15,7 @@ dependencies = [
     "mirror-diff>=0.1.0",
 ]
 
-[project.entry-points."mirror"]
+[project.entry-points."mirror.providers"]
 text = "mirror_diff_text:provider"
 
 [tool.setuptools.packages.find]

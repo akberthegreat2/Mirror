@@ -1,12 +1,12 @@
 """Capability descriptor for Search."""
 
-from mirror_core.registry import CapabilityConfig
+from mirror_core.extensions.models import CapabilityManifest
 
 from .models import SearchRequest, SearchResult
 from .protocol import Search
 from .settings import SearchSettings
 
-capability = CapabilityConfig(
+capability = CapabilityManifest(
     name="search",
     api_version="1.0.0",
     protocol=Search,

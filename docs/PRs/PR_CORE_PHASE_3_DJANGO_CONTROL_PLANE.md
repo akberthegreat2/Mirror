@@ -8,20 +8,22 @@ and schedules.
 
 ## Decision
 
-Add a Django control-plane package that owns the metadata manifest and the
-future admin-facing model boundary.
+Document the future Django control-plane boundary without moving any of that
+responsibility into Mirror Core.
 
-## What changed
+## What this snapshot provides
 
-- Added a control-plane manifest package for Django projects.
-- Added Django settings fragment rendering for the Mirror control plane.
-- Added tests for the manifest and the Django-availability guard.
-- Added docs, ADRs, and tutorial/reference pages for the control plane.
+- control-plane ADRs and docs that describe the desired boundary;
+- a Django settings-fragment contract on paper;
+- metadata and admin model specs for projects, runs, steps, workers,
+  schedules, crawled URLs, archive records, and checkpoints;
+- tests and docs that keep the boundary explicit even while the package itself
+  remains out of this snapshot.
 
 ## Validation
 
-- The control-plane manifest tests pass without Django installed.
-- The generated Django settings fragment is copy-paste friendly.
+- the design stays optional and core-agnostic;
+- the repository can still be used and tested without Django installed.
 
 ## Deferred
 

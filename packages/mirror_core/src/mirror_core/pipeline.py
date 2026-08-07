@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-ErrorPolicy = Literal["abort", "continue", "skip"]
+ErrorPolicy = Literal["abort", "continue", "skip", "fallback"]
 
 
 class RetryPolicy(BaseModel):
@@ -29,6 +29,37 @@ class RetryPolicy(BaseModel):
         return delay
 
 
+class FallbackPolicy(BaseModel):
+    """Ordered provider fallbacks for a capability step."""
+
+    model_config = ConfigDict(frozen=True)
+
+    providers: tuple[str, ...] = Field(default_factory=tuple)
+
+    def model_post_init(self, __context: Any, /) -> None:
+        object.__setattr__(self, "providers", tuple(dict.fromkeys(self.providers)))
+
+
+class CheckpointPolicy(BaseModel):
+    """Checkpoint persistence policy for durable execution."""
+
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = True
+    per_step: bool = True
+
+
+class CompensationPolicy(BaseModel):
+    """Declarative compensation hooks for terminal failures."""
+
+    model_config = ConfigDict(frozen=True)
+
+    steps: tuple[str, ...] = Field(default_factory=tuple)
+
+    def model_post_init(self, __context: Any, /) -> None:
+        object.__setattr__(self, "steps", tuple(dict.fromkeys(self.steps)))
+
+
 class Step(BaseModel):
     """A single step in a pipeline DAG."""
 
@@ -41,6 +72,9 @@ class Step(BaseModel):
     outputs: list[str] = Field(default_factory=list)
     condition: str | None = None
     retry: RetryPolicy | None = None
+    fallback: FallbackPolicy | None = None
+    checkpoint: CheckpointPolicy | None = None
+    compensation: CompensationPolicy | None = None
     timeout: float | None = Field(default=None, gt=0.0)
     on_error: ErrorPolicy = "abort"
     metadata: dict[str, Any] = Field(default_factory=dict)

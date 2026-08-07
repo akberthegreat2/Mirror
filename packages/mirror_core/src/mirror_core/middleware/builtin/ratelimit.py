@@ -9,9 +9,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from mirror_core.extensions.models import MiddlewareManifest
 from mirror_core.middleware.contracts import NextMiddleware
 from mirror_core.middleware.invocation import MiddlewareInvocation
-from mirror_core.registry import MiddlewareConfig
 
 
 class RateLimitSettings(BaseModel):
@@ -73,7 +73,7 @@ class RateLimitMiddleware:
         return "default"
 
 
-middleware = MiddlewareConfig(
+middleware = MiddlewareManifest(
     name="ratelimit",
     factory="mirror_core.middleware.builtin.ratelimit:RateLimitMiddleware",
     settings_model=RateLimitSettings,
@@ -85,5 +85,5 @@ middleware = MiddlewareConfig(
 )
 
 
-def middleware_config() -> MiddlewareConfig:
+def middleware_config() -> MiddlewareManifest:
     return middleware

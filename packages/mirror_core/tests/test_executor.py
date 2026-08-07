@@ -5,10 +5,11 @@ from unittest.mock import AsyncMock
 import pytest
 from mirror_core.exceptions import ExecutionError
 from mirror_core.executor import Executor, RunOutcome, StepState
+from mirror_core.extensions.models import CapabilityManifest, ProviderManifest
+from mirror_core.extensions.registry import ExtensionRegistryManager
 from mirror_core.middleware import MiddlewareChain, MiddlewareInvocation
 from mirror_core.pipeline import Pipeline, Step
 from mirror_core.planner import Planner
-from mirror_core.registry import CapabilityConfig, ProviderConfig, Registry
 from pydantic import BaseModel
 
 
@@ -22,9 +23,9 @@ class MockResult(BaseModel):
 
 
 def make_plan(*steps: Step):
-    registry = Registry()
+    registry = ExtensionRegistryManager()
     registry.register_capability(
-        CapabilityConfig(
+        CapabilityManifest(
             name="fetch",
             api_version="1.2",
             request_model=MockRequest,
@@ -33,7 +34,7 @@ def make_plan(*steps: Step):
         )
     )
     registry.register_provider(
-        ProviderConfig(
+        ProviderManifest(
             name="httpx",
             capability="fetch",
             capability_api="~=1.0",
@@ -328,3 +329,71 @@ async def test_cancel_stops_a_running_task() -> None:
     assert cancelled.is_set()
     assert result.outcome is RunOutcome.CANCELLED
     assert result.states["a"] is StepState.CANCELLED
+
+
+@pytest.mark.asyncio
+async def test_abort_after_prior_success_is_partially_succeeded() -> None:
+    provider = AsyncMock()
+    provider.fetch = AsyncMock(
+        side_effect=[MockResult(content="ok"), ValueError("boom")]
+    )
+    plan = make_plan(
+        Step(
+            id="a",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+        ),
+        Step(
+            id="b",
+            capability="fetch",
+            input={"url": "a.content"},
+            outputs=["result"],
+            on_error="abort",
+        ),
+    )
+    executor = Executor({("fetch", "httpx"): provider})
+
+    result = await executor.execute_run(plan, inputs={"url": "x"}, runner=runner)
+
+    assert result.outcome is RunOutcome.PARTIALLY_SUCCEEDED
+    assert result.states["a"] is StepState.SUCCEEDED
+    assert result.states["b"] is StepState.FAILED
+
+
+@pytest.mark.asyncio
+async def test_resume_rejects_unknown_checkpoint_steps() -> None:
+    from mirror_core.workers import InMemoryCheckpointStore
+
+    plan = make_plan(
+        Step(
+            id="a",
+            capability="fetch",
+            input={"url": "$pipeline.url"},
+            outputs=["result"],
+        )
+    )
+    checkpoint = InMemoryCheckpointStore()
+    run_id = __import__("uuid").UUID("00000000-0000-0000-0000-000000000999")
+    checkpoint.save(
+        run_id,
+        "a",
+        {
+            "run_id": str(run_id),
+            "pipeline_id": plan.pipeline_id,
+            "step_id": "a",
+            "states": {"ghost": "running"},
+            "results": {},
+            "errors": {},
+            "retry_counts": {},
+            "failed_step_id": None,
+            "cancelled": False,
+            "inputs": {"url": "x"},
+        },
+    )
+    executor = Executor({("fetch", "httpx"): AsyncMock()}, checkpoint_store=checkpoint)
+
+    with pytest.raises(ExecutionError, match="unknown step ids"):
+        await executor.resume_from_checkpoint(
+            plan, run_id=run_id, inputs={"url": "x"}, runner=runner
+        )

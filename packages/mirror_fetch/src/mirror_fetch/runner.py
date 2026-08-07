@@ -16,6 +16,7 @@ async def fetch_step(
     signal_bus: Any | None = None,
     step_id: str | None = None,
 ) -> FetchResult:
+    """Adapt a Fetch provider to the capability runner contract."""
     del settings, signal_bus, step_id
     try:
         return await provider.fetch(request)

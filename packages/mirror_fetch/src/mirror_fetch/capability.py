@@ -1,12 +1,12 @@
 """Capability descriptor for Fetch."""
 
-from mirror_core.registry import CapabilityConfig
+from mirror_core.extensions.models import CapabilityManifest
 
 from mirror_fetch.models import FetchRequest, FetchResult
 from mirror_fetch.protocol import Fetch
 from mirror_fetch.settings import FetchSettings
 
-capability = CapabilityConfig(
+capability = CapabilityManifest(
     name="fetch",
     api_version="1.0",
     protocol=Fetch,

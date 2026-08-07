@@ -13,6 +13,8 @@ from mirror_analyze.protocol import Analyze
 
 
 class AnalyzeContract(BaseContract):
+    """Reusable contract tests for Analyze providers."""
+
     __test__ = False
     provider_class: type[Analyze] | None = None
 

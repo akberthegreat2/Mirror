@@ -28,8 +28,8 @@ Mirror core must provide:
 - a pipeline compiler that produces an execution plan;
 - an execution engine that runs plans only;
 - `ExecutionRun` as per-run state, not shared executor state;
-- cancellation, retry, timeout, and fallback semantics;
-- pipeline, capability, and step middleware scopes;
+- cancellation, retry, and timeout semantics; fallback provider resolution is now part of the runtime;
+- global and capability middleware scopes;
 - signals for lifecycle and execution events;
 - worker contracts for execution, checkpoints, leases, and artifacts;
 - deterministic configuration precedence.

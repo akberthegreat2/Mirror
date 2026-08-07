@@ -8,47 +8,27 @@ Signals announce facts about runtime progress. They are for observability, not c
 - Signal handlers should be side-effect safe.
 - Signal failures should be treated as observability failures, not as a reason to rewrite the pipeline outcome.
 
-## Common signal names
+## Current core signal names
 
-### Core (`mirror_core`)
+These names are emitted by the current runtime:
 
 - `application.started`
 - `application.shutting_down`
 - `application.shutdown`
 - `pipeline.started`
 - `pipeline.finished`
+- `pipeline.failed`
 - `step.started`
 - `step.succeeded`
 - `step.failed`
 - `step.skipped`
-- `worker.started`
-- `worker.stopped`
-- `worker.heartbeat`
-- `resource.created`
+- `step.retrying`
 
-### Capability-level signals
+## Current scope
 
-Capability packages define their own signal names, under the same rules as
-core signals (observe only, typed payloads, non-critical by default). These
-are just as stable a promise as the core list above — a name changing here
-is a breaking change like any other.
+The repository snapshot does **not** currently ship capability-specific signal modules such as `crawl.started` or `archive.started`. Capability-level signal families remain a future extension and should be added through an ADR before they become part of the public contract.
 
-`mirror_crawl` (`mirror_crawl.signals`):
-
-- `crawl.started`
-- `crawl.page.discovered`
-- `crawl.page.stored`
-- `crawl.finished`
-
-`mirror_archive` (`mirror_archive.signals`):
-
-- `archive.started`
-- `archive.succeeded`
-- `archive.failed`
-
-A test in each capability package (`test_signal_contract_names_match_docs`)
-asserts these string values match this file, so this section cannot drift
-from the code silently.
+The snapshot also does **not** include automatic tests that keep capability-level signal names synchronized with this document. If those signal families are added later, the first commit that introduces them should also add matching contract tests.
 
 ## Receiver guidance
 
@@ -58,9 +38,3 @@ Receivers should not be the only place where a runtime guarantee exists.
 ## Event payloads
 
 Payloads should be typed, stable, and documented alongside the signal names they belong to.
-
-
-## Rule
-
-Signals observe the system. Signals MUST NOT change execution flow. Middleware
-controls flow; signals report what happened.

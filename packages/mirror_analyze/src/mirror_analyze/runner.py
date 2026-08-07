@@ -8,6 +8,7 @@ from .protocol import Analyze
 
 
 async def analyze_step(provider: Analyze, request: AnalyzeRequest) -> AnalyzeResult:
+    """Adapt an Analyze provider to the capability runner contract."""
     try:
         return await provider.analyze(request)
     except AnalyzeError:

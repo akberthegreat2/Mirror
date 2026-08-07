@@ -1,6 +1,6 @@
 # Storage reference
 
-Mirror separates metadata storage from blob storage.
+Mirror separates metadata storage from blob storage. Metadata contracts live in `mirror_core.metadata`; blob storage lives in `mirror_core.storage`.
 
 ## Metadata storage
 

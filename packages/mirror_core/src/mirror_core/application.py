@@ -10,15 +10,17 @@ from typing import Any, cast
 
 from typing_extensions import Self
 
+from mirror_core.compiler import PipelineCompiler
 from mirror_core.components import ComponentManager
 from mirror_core.discovery import DiscoveryResult, DiscoverySource, discover
 from mirror_core.exceptions import ApplicationError
 from mirror_core.executor import ExecutionResult, Executor
+from mirror_core.extensions.models import MiddlewareManifest
+from mirror_core.extensions.registry import ExtensionRegistryManager
+from mirror_core.imports import import_symbol, resolve_model
 from mirror_core.lifecycle import AsyncLifecycle
 from mirror_core.middleware import Middleware, MiddlewareChain
 from mirror_core.pipeline import Pipeline
-from mirror_core.planner import Planner
-from mirror_core.registry import MiddlewareConfig, Registry
 from mirror_core.resource import ResourceEnvelope
 from mirror_core.settings import MirrorSettings
 from mirror_core.signals import SignalBus
@@ -37,7 +39,7 @@ class Application:
         self.settings = settings or MirrorSettings()
         self._discovery_source = discovery_source
         self._discovery_result: DiscoveryResult | None = None
-        self._registry = Registry()
+        self._registry = ExtensionRegistryManager()
         self._signal_bus = SignalBus()
         self._executor: Executor | None = None
         self._component_manager = ComponentManager(self._registry, self.settings)
@@ -122,7 +124,10 @@ class Application:
             for capability, config in self.settings.components.items()
             if "provider" in config
         }
-        plan = Planner(self._registry, default_providers=defaults).plan(pipeline)
+        plan = PipelineCompiler(
+            self._registry,
+            default_providers=defaults,
+        ).compile(pipeline)
         if self._lifecycle_stack is None:
             raise ApplicationError("Application lifecycle stack is unavailable")
         for compiled in plan.steps.values():
@@ -153,13 +158,13 @@ class Application:
         if result is None:
             raise ApplicationError("Discovery result is unavailable")
         for capability in result.capabilities:
-            self._registry.register_capability(capability)
+            self._registry.register(capability)
         for provider in result.providers:
-            self._registry.register_provider(provider)
+            self._registry.register(provider)
         for middleware in result.middleware:
-            self._registry.register_middleware(middleware)
+            self._registry.register(middleware)
         for interface in result.interfaces:
-            self._registry.register_interface(interface)
+            self._registry.register(interface)
 
     async def _build_middleware_chains(
         self, stack: AsyncExitStack
@@ -178,10 +183,8 @@ class Application:
         instances: dict[str, Middleware] = {}
         for name in self._order_middleware(list(configs.values())):
             config = configs[name.name]
-            factory = ComponentManager.import_symbol(config.factory)
-            settings_model = ComponentManager.resolve_settings_model(
-                config.settings_model
-            )
+            factory = import_symbol(config.factory)
+            settings_model = resolve_model(config.settings_model)
             raw_settings = self.settings.middleware_settings.get(config.name, {})
             instance = factory(settings_model.model_validate(raw_settings))
             if isinstance(instance, AsyncLifecycle):
@@ -214,7 +217,9 @@ class Application:
         return middleware_chains
 
     @staticmethod
-    def _order_middleware(configs: list[MiddlewareConfig]) -> list[MiddlewareConfig]:
+    def _order_middleware(
+        configs: list[MiddlewareManifest],
+    ) -> list[MiddlewareManifest]:
         """Topologically order middleware, using priority as a stable tie-breaker."""
         by_name = {config.name: config for config in configs}
         dependencies: dict[str, set[str]] = {config.name: set() for config in configs}
@@ -225,7 +230,7 @@ class Application:
             for target in config.before:
                 if target in by_name:
                     dependencies[target].add(config.name)
-        ordered: list[MiddlewareConfig] = []
+        ordered: list[MiddlewareManifest] = []
         remaining = set(by_name)
         while remaining:
             ready = [
@@ -244,7 +249,7 @@ class Application:
         return ordered
 
     def _reset_runtime_state(self) -> None:
-        self._registry = Registry()
+        self._registry = ExtensionRegistryManager()
         self._signal_bus = SignalBus()
         self._executor = None
         self._component_manager = ComponentManager(self._registry, self.settings)
@@ -260,7 +265,7 @@ class Application:
         return self._component_manager
 
     @property
-    def registry(self) -> Registry:
+    def registry(self) -> ExtensionRegistryManager:
         return self._registry
 
     @property

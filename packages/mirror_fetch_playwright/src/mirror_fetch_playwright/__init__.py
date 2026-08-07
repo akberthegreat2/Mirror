@@ -1,11 +1,11 @@
 """Playwright-style provider for Mirror Fetch."""
 
-from mirror_core.registry import ProviderConfig
+from mirror_core.extensions.models import ProviderManifest
 
 from mirror_fetch_playwright.provider import PlaywrightProvider
 from mirror_fetch_playwright.settings import PlaywrightSettings
 
-provider = ProviderConfig(
+provider = ProviderManifest(
     name="playwright",
     capability="fetch",
     capability_api="~=1.0",

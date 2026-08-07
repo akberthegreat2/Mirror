@@ -11,7 +11,7 @@ other Mirror package.
 - `Planner`, `ExecutionPlan`
 - `Executor`, `ExecutionRun`, `ExecutionResult`, `RunOutcome`, `StepState`
 - `SignalBus`
-- `Invocation`, `Middleware`, `MiddlewareChain`
+- `MiddlewareInvocation`, `MiddlewareContext`, `Middleware`, `MiddlewareChain`
 - `ResourceEnvelope`, `ProducerRef`, `BlobReference`
 - worker contracts and in-memory stores
 

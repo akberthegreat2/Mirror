@@ -15,5 +15,6 @@ async def crawl_site(
     metadata_store: object | None = None,
     blob_store: object | None = None,
 ) -> CrawlResult:
+    """Adapt a Crawl provider to the capability runner contract."""
     del settings, signal_bus, step_id, metadata_store, blob_store
     return await provider.crawl(request)

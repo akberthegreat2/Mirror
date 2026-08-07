@@ -55,15 +55,16 @@ class FakeDiscoverySource:
 
 def create_capability_manifest(
     extension_id: str = "test-capability",
-    name: str = "Test Capability",
+    name: str | None = None,
     version: str = "1.0.0",
     protocol: str = "module:Protocol",  # default to avoid validation errors
     runner: str = "module:Runner",  # default to avoid validation errors
     **kwargs,
 ) -> CapabilityManifest:
+    resolved_name = name or extension_id
     return CapabilityManifest(
         extension_id=extension_id,
-        name=name,
+        name=resolved_name,
         version=version,
         kind=ExtensionKind.CAPABILITY,
         protocol=protocol,
@@ -74,18 +75,21 @@ def create_capability_manifest(
 
 def create_provider_manifest(
     extension_id: str = "test-provider",
-    name: str = "Test Provider",
+    name: str | None = None,
     version: str = "1.0.0",
     capability: str = "test-capability",
+    capability_api: str = "~=1.0",
     factory: str = "module:Factory",
     **kwargs,
 ) -> ProviderManifest:
+    resolved_name = name or extension_id.split("-")[-1]
     return ProviderManifest(
         extension_id=extension_id,
-        name=name,
+        name=resolved_name,
         version=version,
         kind=ExtensionKind.PROVIDER,
         capability=capability,
+        capability_api=capability_api,
         factory=factory,
         **kwargs,
     )
@@ -98,20 +102,19 @@ def create_provider_manifest(
 
 def test_manifest_required_fields() -> None:
     """Ensure required fields are enforced by Pydantic."""
-    with pytest.raises(PydanticValidationError):
-        # missing extension_id
-        CapabilityManifest(  # type: ignore
-            name="Test",
-            version="1.0",
-            kind=ExtensionKind.CAPABILITY,
-        )
+    manifest = CapabilityManifest(  # type: ignore
+        name="Test",
+        version="1.0",
+        kind=ExtensionKind.CAPABILITY,
+        protocol="module:Protocol",
+    )
+    assert manifest.extension_id == "Test:1.0"
 
     with pytest.raises(PydanticValidationError):
-        # missing version
         CapabilityManifest(  # type: ignore
             extension_id="test",
-            name="Test",
             kind=ExtensionKind.CAPABILITY,
+            protocol="module:Protocol",
         )
 
 
@@ -172,9 +175,7 @@ def test_discover_fake_manifests(monkeypatch: pytest.MonkeyPatch) -> None:
             "mirror.capabilities": [
                 (
                     "fetch",
-                    create_capability_manifest(
-                        extension_id="fetch", name="Fetch Capability"
-                    ),
+                    create_capability_manifest(extension_id="fetch"),
                 ),
             ],
             "mirror.providers": [
@@ -193,7 +194,8 @@ def test_discover_fake_manifests(monkeypatch: pytest.MonkeyPatch) -> None:
                         name="CLI Interface",
                         version="1.0",
                         kind=ExtensionKind.INTERFACE,
-                        entry_point="mirror_cli.main:app",
+                        interface_type="cli",
+                        factory="mirror_cli.main:app",
                     ),
                 ),
             ],
@@ -307,7 +309,7 @@ def test_validate_missing_capability_for_provider() -> None:
 
 def test_validate_provider_with_valid_capability() -> None:
     """Provider referencing an existing capability should be valid."""
-    capability = create_capability_manifest(extension_id="fetch")
+    capability = create_capability_manifest(extension_id="fetch", name="fetch")
     provider = create_provider_manifest(capability="fetch")
     valid, errors = validate_manifests([capability, provider])
     assert len(valid) == 2
@@ -348,7 +350,8 @@ def test_registry_manager_register_and_list() -> None:
         name="CLI",
         version="1.0",
         kind=ExtensionKind.INTERFACE,
-        entry_point="module:app",
+        interface_type="cli",
+        factory="module:app",
     )
     mw = MiddlewareManifest(
         extension_id="retry",
@@ -379,7 +382,7 @@ def test_registry_manager_register_and_list() -> None:
     assert len(manager.list_storage()) == 1
 
     assert manager.get_capability("fetch").extension_id == "fetch"
-    assert manager.get_provider("fetch-httpx").extension_id == "fetch-httpx"
+    assert manager.get_provider("fetch", "httpx").extension_id == "fetch-httpx"
 
     # Test get_extension across all registries
     assert manager.get_extension("fetch").extension_id == "fetch"
@@ -430,7 +433,8 @@ def test_full_flow(monkeypatch: pytest.MonkeyPatch) -> None:
         name="CLI",
         version="1.0",
         kind=ExtensionKind.INTERFACE,
-        entry_point="module:app",
+        interface_type="cli",
+        factory="module:app",
     )
 
     # Mock entry points
@@ -472,5 +476,5 @@ def test_full_flow(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Check
     assert manager.get_capability("fetch").extension_id == "fetch"
-    assert manager.get_provider("fetch-httpx").extension_id == "fetch-httpx"
+    assert manager.get_provider("fetch", "httpx").extension_id == "fetch-httpx"
     assert manager.get_interface("cli").extension_id == "cli"

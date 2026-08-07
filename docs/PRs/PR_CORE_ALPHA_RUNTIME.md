@@ -14,9 +14,9 @@ The workspace had a healthy package split, but a few runtime and packaging edges
 
 ### Core runtime
 
-- Added a typed Invocation model to mirror_core.middleware.
+- Added a typed MiddlewareInvocation model to mirror_core.middleware.
 - Updated the middleware protocol and chain executor to consume typed invocations.
-- Updated the executor to pass Invocation objects instead of dictionaries.
+- Updated the executor to pass MiddlewareInvocation objects instead of dictionaries.
 - Added a safe AST-based condition evaluator; it no longer uses eval().
 - Kept ExecutionRun isolated per execution and preserved concurrent run safety.
 
@@ -46,5 +46,4 @@ The workspace had a healthy package split, but a few runtime and packaging edges
 
 ## Follow-ups
 
-- Compile per-capability middleware chains from configuration once the settings model is finalized.
 - Continue improving contract coverage around middleware construction.

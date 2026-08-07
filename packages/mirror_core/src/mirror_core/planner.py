@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import hashlib
 from collections import deque
+from collections.abc import Mapping
+from types import MappingProxyType
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from mirror_core.exceptions import PlannerError
+from mirror_core.execution import ExecutionPolicy
+from mirror_core.extensions.models import CapabilityManifest, ProviderManifest
+from mirror_core.extensions.registry import ExtensionRegistryManager
+from mirror_core.imports import resolve_type
 from mirror_core.pipeline import Pipeline, Step
-from mirror_core.registry import CapabilityConfig, ProviderConfig, Registry
 
 
 class CompiledStep(BaseModel):
@@ -19,9 +24,11 @@ class CompiledStep(BaseModel):
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     definition: Step
-    capability: CapabilityConfig
-    provider: ProviderConfig
+    capability: CapabilityManifest
+    provider: ProviderManifest
     dependencies: frozenset[str] = Field(default_factory=frozenset)
+    fallback_providers: tuple[ProviderManifest, ...] = Field(default_factory=tuple)
+    policy: ExecutionPolicy = Field(default_factory=ExecutionPolicy)
 
     @property
     def id(self) -> str:
@@ -34,11 +41,15 @@ class ExecutionPlan(BaseModel):
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     pipeline_id: str
-    steps: dict[str, CompiledStep]
+    steps: Mapping[str, CompiledStep]
     order: tuple[str, ...]
     parallel_groups: tuple[tuple[str, ...], ...]
     config_fingerprint: str
     input_names: frozenset[str] = Field(default_factory=frozenset)
+
+    def model_post_init(self, __context: Any) -> None:
+        """Freeze the compiled steps mapping after validation."""
+        object.__setattr__(self, "steps", MappingProxyType(dict(self.steps)))
 
     def get_step(self, step_id: str) -> CompiledStep:
         try:
@@ -51,8 +62,13 @@ class ExecutionPlan(BaseModel):
         return list(self.order)
 
     @property
-    def dependencies(self) -> dict[str, set[str]]:
-        return {step_id: set(step.dependencies) for step_id, step in self.steps.items()}
+    def dependencies(self) -> Mapping[str, frozenset[str]]:
+        return MappingProxyType(
+            {
+                step_id: frozenset(step.dependencies)
+                for step_id, step in self.steps.items()
+            }
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -63,7 +79,11 @@ class ExecutionPlan(BaseModel):
                     "capability": compiled.capability.name,
                     "capability_version": compiled.capability.api_version,
                     "provider": compiled.provider.name,
+                    "fallback_providers": [
+                        provider.name for provider in compiled.fallback_providers
+                    ],
                     "dependencies": sorted(compiled.dependencies),
+                    "policy": compiled.policy.model_dump(mode="json"),
                 }
                 for step_id, compiled in self.steps.items()
             },
@@ -78,7 +98,9 @@ class Planner:
     """Validate a pipeline and resolve all runtime identities exactly once."""
 
     def __init__(
-        self, registry: Registry, default_providers: dict[str, str] | None = None
+        self,
+        registry: ExtensionRegistryManager,
+        default_providers: dict[str, str] | None = None,
     ) -> None:
         self._registry = registry
         self._default_providers = default_providers or {}
@@ -88,6 +110,9 @@ class Planner:
         capabilities = self._resolve_capabilities(pipeline)
         self._validate_required_capabilities(capabilities)
         providers = self._resolve_providers(pipeline, capabilities)
+        fallback_providers = self._resolve_fallback_providers(
+            pipeline, capabilities, providers
+        )
         dependencies, reverse_dependencies = self._build_dependency_graph(pipeline)
         order = self._topological_sort(pipeline, dependencies, reverse_dependencies)
         self._validate_bindings(pipeline, capabilities)
@@ -100,6 +125,8 @@ class Planner:
                 capability=capabilities[step.id],
                 provider=providers[step.id],
                 dependencies=frozenset(dependencies[step.id]),
+                fallback_providers=tuple(fallback_providers[step.id]),
+                policy=ExecutionPolicy.from_step(step),
             )
             for step in pipeline.steps
         }
@@ -122,8 +149,10 @@ class Planner:
         if duplicates:
             raise PlannerError(f"Duplicate pipeline step IDs: {', '.join(duplicates)}")
 
-    def _resolve_capabilities(self, pipeline: Pipeline) -> dict[str, CapabilityConfig]:
-        resolved: dict[str, CapabilityConfig] = {}
+    def _resolve_capabilities(
+        self, pipeline: Pipeline
+    ) -> dict[str, CapabilityManifest]:
+        resolved: dict[str, CapabilityManifest] = {}
         for step in pipeline.steps:
             try:
                 resolved[step.id] = self._registry.resolve_capability(step.capability)
@@ -135,11 +164,11 @@ class Planner:
         return resolved
 
     def _validate_required_capabilities(
-        self, capabilities: dict[str, CapabilityConfig]
+        self, capabilities: dict[str, CapabilityManifest]
     ) -> None:
         required = sorted(
             {
-                (dependency.name, dependency.version)
+                (dependency.target, dependency.version_constraint)
                 for capability in capabilities.values()
                 for dependency in capability.dependencies
             }
@@ -161,9 +190,9 @@ class Planner:
     def _resolve_providers(
         self,
         pipeline: Pipeline,
-        capabilities: dict[str, CapabilityConfig],
-    ) -> dict[str, ProviderConfig]:
-        resolved: dict[str, ProviderConfig] = {}
+        capabilities: dict[str, CapabilityManifest],
+    ) -> dict[str, ProviderManifest]:
+        resolved: dict[str, ProviderManifest] = {}
         for step in pipeline.steps:
             requested = step.provider or self._default_providers.get(step.capability)
             try:
@@ -178,17 +207,49 @@ class Planner:
                 ) from exc
         return resolved
 
+    def _resolve_fallback_providers(
+        self,
+        pipeline: Pipeline,
+        capabilities: dict[str, CapabilityManifest],
+        primary: dict[str, ProviderManifest],
+    ) -> dict[str, list[ProviderManifest]]:
+        resolved: dict[str, list[ProviderManifest]] = {}
+        for step in pipeline.steps:
+            fallback = step.fallback.providers if step.fallback is not None else ()
+            providers: list[ProviderManifest] = []
+            seen: set[str] = set()
+            for provider_name in fallback:
+                if provider_name in seen or provider_name == primary[step.id].name:
+                    continue
+                try:
+                    provider = self._registry.resolve_provider(
+                        capabilities[step.id], provider_name
+                    )
+                except Exception as exc:
+                    raise PlannerError(
+                        f"Unable to resolve fallback provider {provider_name!r} "
+                        f"for step {step.id!r}",
+                        cause=exc,
+                    ) from exc
+                providers.append(provider)
+                seen.add(provider.name)
+            resolved[step.id] = providers
+        return resolved
+
     def _validate_bindings(
         self,
         pipeline: Pipeline,
-        capabilities: dict[str, CapabilityConfig],
+        capabilities: dict[str, CapabilityManifest],
     ) -> None:
         steps_by_id = {step.id: step for step in pipeline.steps}
         for step in pipeline.steps:
             capability = capabilities[step.id]
             available_outputs = set(capability.output_ports)
-            if capability.result_model is not None:
-                available_outputs.update(capability.result_model.model_fields)
+            result_model = resolve_type(capability.result_model)
+            if result_model is not None:
+                available_outputs.update(
+                    getattr(result_model, "model_fields", {}).keys()
+                )
                 available_outputs.add("result")
             unknown_outputs = sorted(set(step.outputs).difference(available_outputs))
             if unknown_outputs:
@@ -196,8 +257,9 @@ class Planner:
                     f"Step {step.id!r} declares unknown outputs: {', '.join(unknown_outputs)}"
                 )
             declared_inputs = set(capability.input_ports)
-            if not declared_inputs and capability.request_model is not None:
-                declared_inputs = set(capability.request_model.model_fields)
+            request_model = resolve_type(capability.request_model)
+            if not declared_inputs and request_model is not None:
+                declared_inputs = set(getattr(request_model, "model_fields", {}).keys())
 
             for target, source in step.input.items():
                 if declared_inputs and target not in declared_inputs:
@@ -218,8 +280,11 @@ class Planner:
                     )
                 source_capability = capabilities[source_step]
                 source_ports = set(source_capability.output_ports)
-                if source_capability.result_model is not None:
-                    source_ports.update(source_capability.result_model.model_fields)
+                source_result_model = resolve_type(source_capability.result_model)
+                if source_result_model is not None:
+                    source_ports.update(
+                        getattr(source_result_model, "model_fields", {}).keys()
+                    )
                 if not source_ports:
                     source_ports = set(steps_by_id[source_step].outputs)
                 if source_output not in source_ports:
@@ -248,18 +313,20 @@ class Planner:
     def _validate_port_compatibility(
         source_step: str,
         source_output: str,
-        source_capability: CapabilityConfig,
+        source_capability: CapabilityManifest,
         target_step: str,
         target_input: str,
-        target_capability: CapabilityConfig,
+        target_capability: CapabilityManifest,
     ) -> None:
         source_type: Any = source_capability.output_ports.get(source_output)
-        if source_type is None and source_capability.result_model is not None:
-            field = source_capability.result_model.model_fields.get(source_output)
+        source_result_model = resolve_type(source_capability.result_model)
+        if source_type is None and source_result_model is not None:
+            field = getattr(source_result_model, "model_fields", {}).get(source_output)
             source_type = field.annotation if field is not None else None
         target_type: Any = target_capability.input_ports.get(target_input)
-        if target_type is None and target_capability.request_model is not None:
-            field = target_capability.request_model.model_fields.get(target_input)
+        target_request_model = resolve_type(target_capability.request_model)
+        if target_type is None and target_request_model is not None:
+            field = getattr(target_request_model, "model_fields", {}).get(target_input)
             target_type = field.annotation if field is not None else None
         if source_type is None or target_type is None or source_type == target_type:
             return

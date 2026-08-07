@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from mirror_core.registry import ProviderConfig
+from mirror_core.extensions.models import ProviderManifest
 from mirror_monitor.models import MonitorRequest, MonitorResult
 from mirror_monitor.protocol import Monitor
 
@@ -18,7 +18,7 @@ class MemoryMonitorProvider(Monitor):
         return MonitorResult(snapshot=snapshot)
 
 
-provider = ProviderConfig(
+provider = ProviderManifest(
     name="memory",
     capability="monitor",
     capability_api="~=1.0",

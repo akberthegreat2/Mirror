@@ -97,8 +97,7 @@ Provider instances are keyed by `(capability, provider)`, allowing future pipeli
 This PR does not claim to complete:
 
 - namespace-based discovery groups;
-- per-capability middleware compilation;
-- retry/fallback/compensation semantics;
+- retry semantics in the executor;
 - durable execution stores and checkpoints;
 - schema registry and distributed resource deserialization;
 - distributed execution backends;

@@ -8,6 +8,7 @@ from .protocol import Diff
 
 
 async def diff_step(provider: Diff, request: DiffRequest) -> DiffResult:
+    """Adapt a Diff provider to the capability runner contract."""
     try:
         return await provider.diff(request)
     except DiffError:

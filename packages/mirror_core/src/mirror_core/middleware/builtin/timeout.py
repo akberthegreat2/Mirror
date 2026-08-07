@@ -7,9 +7,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from mirror_core.extensions.models import MiddlewareManifest
 from mirror_core.middleware.contracts import NextMiddleware
 from mirror_core.middleware.invocation import MiddlewareInvocation
-from mirror_core.registry import MiddlewareConfig
 
 
 class TimeoutSettings(BaseModel):
@@ -45,7 +45,7 @@ class TimeoutMiddleware:
             ) from None
 
 
-middleware = MiddlewareConfig(
+middleware = MiddlewareManifest(
     name="timeout",
     factory="mirror_core.middleware.builtin.timeout:TimeoutMiddleware",
     settings_model=TimeoutSettings,
@@ -58,5 +58,5 @@ middleware = MiddlewareConfig(
 )
 
 
-def middleware_config() -> MiddlewareConfig:
+def middleware_config() -> MiddlewareManifest:
     return middleware

@@ -9,4 +9,6 @@ from .models import ScrapeRequest, ScrapeResult
 
 @runtime_checkable
 class Scrape(Protocol):
+    """Protocol for scrape providers."""
+
     async def scrape(self, request: ScrapeRequest) -> ScrapeResult: ...

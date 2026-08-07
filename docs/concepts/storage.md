@@ -1,6 +1,6 @@
 # Storage
 
-Mirror separates metadata from blobs.
+Mirror separates metadata from blobs. Metadata lives in `mirror_core.metadata`; blob storage lives in `mirror_core.storage`.
 
 - Metadata is the small, queryable information stored in a database.
 - Blobs are the large payloads stored in a blob store or filesystem backend.

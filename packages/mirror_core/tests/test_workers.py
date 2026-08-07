@@ -6,10 +6,12 @@ from uuid import UUID
 
 import pytest
 from mirror_core.workers import (
+    DeadLetterRecord,
     ExecutionRecord,
     InlineWorker,
     InMemoryArtifactStore,
     InMemoryCheckpointStore,
+    InMemoryDeadLetterQueue,
     InMemoryExecutionStore,
     InMemoryLeaseManager,
     JobState,
@@ -72,3 +74,19 @@ def test_in_memory_lease_manager_round_trip() -> None:
     renewed = manager.renew(lease)
     assert renewed.job_id == lease.job_id
     manager.release(renewed)
+
+
+def test_in_memory_dead_letter_queue_round_trip() -> None:
+    """The dead-letter queue should preserve terminal failures in memory."""
+    queue = InMemoryDeadLetterQueue()
+    run_id = UUID("00000000-0000-0000-0000-000000000004")
+    record = DeadLetterRecord(
+        run_id=run_id,
+        pipeline_id="demo",
+        step_id="step-1",
+        reason="boom",
+        terminal_status="failed",
+    )
+    queue.record(record)
+    assert queue.get(run_id) == record
+    assert queue.list() == [record]

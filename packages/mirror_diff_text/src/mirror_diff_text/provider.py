@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from mirror_core.registry import ProviderConfig
+from mirror_core.extensions.models import ProviderManifest
 from mirror_diff.models import DiffRequest, DiffResult
 from mirror_diff.protocol import Diff
 
@@ -14,7 +14,7 @@ class TextDiffProvider(Diff):
         return DiffResult(summary=DiffEngine().compare(request.before, request.after))
 
 
-provider = ProviderConfig(
+provider = ProviderManifest(
     name="text",
     capability="diff",
     capability_api="~=1.0",

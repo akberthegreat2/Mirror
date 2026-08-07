@@ -24,7 +24,7 @@ classifiers = [
 test = ["pytest>=7.0", "pytest-asyncio>=0.21"]
 dev = ["ruff", "mypy"]
 
-[project.entry-points."mirror"]
+[project.entry-points."mirror.interfaces"]
 cli = "mirror_cli:interface"
 
 [tool.setuptools.packages.find]

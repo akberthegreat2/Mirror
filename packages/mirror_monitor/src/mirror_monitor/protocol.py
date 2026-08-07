@@ -9,4 +9,6 @@ from .models import MonitorRequest, MonitorResult
 
 @runtime_checkable
 class Monitor(Protocol):
+    """Protocol for monitor providers."""
+
     async def check(self, request: MonitorRequest) -> MonitorResult: ...

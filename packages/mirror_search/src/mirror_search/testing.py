@@ -13,6 +13,8 @@ from mirror_search.protocol import Search
 
 
 class SearchContract(BaseContract):
+    """Reusable contract tests for Search providers."""
+
     __test__ = False
     provider_class: type[Search] | None = None
 

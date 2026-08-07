@@ -13,6 +13,8 @@ from mirror_monitor.protocol import Monitor
 
 
 class MonitorContract(BaseContract):
+    """Reusable contract tests for Monitor providers."""
+
     __test__ = False
     provider_class: type[Monitor] | None = None
 

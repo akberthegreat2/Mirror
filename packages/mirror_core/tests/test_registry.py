@@ -2,19 +2,22 @@
 
 import pytest
 from mirror_core.exceptions import RegistryError
-from mirror_core.registry import CapabilityConfig, ProviderConfig, Registry
+from mirror_core.extensions.models import CapabilityManifest, ProviderManifest
+from mirror_core.extensions.registry import ExtensionRegistryManager
 
 
 def test_register_capability():
-    r = Registry()
-    cap = CapabilityConfig(name="fetch", api_version="1.0")
+    r = ExtensionRegistryManager()
+    cap = CapabilityManifest(
+        name="fetch", api_version="1.0", protocol="module:Protocol"
+    )
     r.register_capability(cap)
     assert r.get_capability("fetch", "1.0") is cap
 
 
 def test_register_provider():
-    r = Registry()
-    prov = ProviderConfig(
+    r = ExtensionRegistryManager()
+    prov = ProviderManifest(
         name="httpx", capability="fetch", capability_api="~=1.0", factory="a:b"
     )
     r.register_provider(prov)
@@ -22,22 +25,28 @@ def test_register_provider():
 
 
 def test_duplicate_capability():
-    r = Registry()
-    r.register_capability(CapabilityConfig(name="fetch", api_version="1.0"))
+    r = ExtensionRegistryManager()
+    r.register_capability(
+        CapabilityManifest(name="fetch", api_version="1.0", protocol="module:Protocol")
+    )
     with pytest.raises(RegistryError):
-        r.register_capability(CapabilityConfig(name="fetch", api_version="1.0"))
+        r.register_capability(
+            CapabilityManifest(
+                name="fetch", api_version="1.0", protocol="module:Protocol"
+            )
+        )
 
 
 def test_duplicate_provider():
-    r = Registry()
+    r = ExtensionRegistryManager()
     r.register_provider(
-        ProviderConfig(
+        ProviderManifest(
             name="httpx", capability="fetch", capability_api="~=1.0", factory="a:b"
         )
     )
     with pytest.raises(RegistryError):
         r.register_provider(
-            ProviderConfig(
+            ProviderManifest(
                 name="httpx", capability="fetch", capability_api="~=1.0", factory="a:b"
             )
         )

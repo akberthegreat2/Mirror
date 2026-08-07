@@ -8,6 +8,7 @@ from .protocol import Monitor
 
 
 async def monitor_step(provider: Monitor, request: MonitorRequest) -> MonitorResult:
+    """Adapt a Monitor provider to the capability runner contract."""
     try:
         return await provider.check(request)
     except MonitorError:

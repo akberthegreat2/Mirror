@@ -1,107 +1,167 @@
-
 # Mirror Architecture Specification
 
-**Version:** 1.1
+**Version:** 1.2
 **Status:** Approved
-**Date:** 2026-08-06
+**Date:** 2026-08-07
 
-This document is a contributor contract. It states the rules that Mirror code,
-tests, and docs must follow. If code and this document disagree, the code must
-change or the feature must be marked experimental.
+This document is the constitutional contract for Mirror. It is normative. If code, tests, or other documentation disagree with this file, the code or the other document must change, or the feature must be marked experimental.
 
-## 1. Philosophy
+## 1. Scope
 
-Mirror is a framework for building web products. It is a chassis for
-pipelines, workers, middleware, and storage adapters. Mirror Core MUST stay
-capability-agnostic.
+This document defines ownership, boundaries, dependency rules, and change control for Mirror.
 
-Mirror is not a monolithic crawler. It is not a scraper. It is not a dashboard
-framework. It is the execution layer that web products run on.
+It does not describe every package in the repository.
+It does not serve as a roadmap.
+It does not act as a tutorial.
+It does not enumerate every current or future capability family.
 
-## 2. Non-negotiable principles
+Detailed package catalogs, examples, and future capability lists belong in reference docs, ecosystem docs, ADRs, and roadmaps.
 
-| Principle | Meaning |
-| --- | --- |
-| Core knows nothing | `mirror_core` imports no capability-specific package. |
-| Discovery, not hardcoding | Extensions are loaded from entry points. |
-| Installed ≠ activated | Settings decide what is active. |
-| Typed boundaries | Boundaries use typed models. No raw dictionaries across subsystems. |
-| Capability owns provider | Capabilities define contracts; providers implement them. |
-| DAG, not list | Pipelines are directed acyclic graphs. |
-| Deterministic configuration | Defaults → file → environment → runtime. |
-| Transactional lifecycle | Startup rolls back on failure; shutdown reverses startup. |
-| Observability first-class | Signals, middleware, and logs are built in. |
+## 2. Normative language
 
-## 3. Current package topology
+The words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are used as requirements in the RFC sense.
 
-```
-packages/
-├── mirror_core/            # Chassis and runtime kernel
-├── mirror_fetch/           # Fetch capability contract
-├── mirror_fetch_httpx/     # HTTPX fetch provider
-├── mirror_fetch_playwright/ # Playwright fetch provider
-├── mirror_archive/         # Archive capability contract
-├── mirror_archive_warc/    # WARC archive provider
-├── mirror_crawl/           # Crawl capability contract
-├── mirror_crawl_local/     # Local crawl provider
-├── mirror_search/          # Search capability contract
-├── mirror_search_memory/   # First-party search provider
-├── mirror_analyze/         # Analyze capability contract
-├── mirror_analyze_basic/   # First-party analyze provider
-├── mirror_scrape/          # Scrape capability contract
-├── mirror_scrape_basic/    # First-party scrape provider
-├── mirror_diff/            # Diff capability contract
-├── mirror_diff_text/       # First-party diff provider
-├── mirror_monitor/         # Monitor capability contract
-├── mirror_monitor_memory/  # First-party monitor provider
-├── mirror_cli/             # CLI interface and scaffolding
-├── mirror_control_django/  # Django control-plane bridge
-└── mirror_testing/         # Contract-testing utilities
-```
+## 3. Architecture principles
 
-## 4. Current core subsystems
+Mirror is a capability kernel.
 
-| Subsystem | Responsibility |
-| --- | --- |
-| Application | Composition root. Owns registry, settings, signals, middleware, execution engine, lifecycle. |
-| Registry | Stores discovered descriptors. |
-| Discovery | Loads entry points and classifies descriptors. |
-| Settings | Deterministic precedence and redaction rules. |
-| Lifecycle | Transactional startup and reverse-order shutdown. |
-| Signals | Observable lifecycle and execution events. |
-| Middleware | Middleware chain owned by `mirror_core`. |
-| Pipeline | DAG model for work. |
-| Planner | Validates graph and produces execution plans. |
-| Executor | Runs plans with isolated execution state. |
-| Resource | Immutable provenance-bearing resource envelopes. |
-| Worker contracts | Protocols for local and distributed execution. |
-| Storage contracts | `MetadataStore`/`BlobStore` protocols plus in-memory, SQLite, and filesystem implementations. |
-| Scheduler contract | `SchedulerBackend` protocol plus in-memory and SQLite implementations. |
+The kernel MUST remain capability-agnostic.
+The kernel MUST own orchestration, execution, lifecycle, discovery, scheduling, signals, registries, storage abstractions, and middleware semantics.
+Capabilities MUST own domain contracts only.
+Providers MUST implement capability contracts only.
+Services and workflows MAY compose multiple capabilities through published contracts.
+Interfaces MAY expose the kernel through CLI, API, admin, or dashboard surfaces, but they MUST NOT bypass the kernel.
+
+Mirror is open-source-first.
+Core MUST NOT depend on proprietary vendor services.
+Vendor-specific providers MAY exist as optional external plugins, but they MUST remain replaceable and non-essential.
+
+## 4. Ownership rules
+
+### Core
+
+Core owns:
+- execution
+- planning
+- compilation
+- lifecycle
+- discovery
+- extension registration
+- settings precedence
+- registries
+- middleware semantics
+- signal dispatch
+- worker abstraction
+- scheduler abstraction
+- metadata abstraction
+- storage abstraction
+- execution state
+
+### Capability packages
+
+A capability package owns:
+- one domain contract;
+- its request/result models;
+- its error taxonomy;
+- its typed protocol;
+- its descriptor metadata;
+- its runner adapter, if needed.
+
+A capability package MUST NOT:
+- own framework infrastructure;
+- own execution semantics;
+- own discovery logic;
+- own scheduling logic;
+- own registry logic;
+- own middleware semantics;
+- own signal dispatch logic;
+- instantiate unrelated providers.
+
+### Provider packages
+
+A provider package owns:
+- one concrete implementation of a capability contract;
+- its backend-specific configuration;
+- backend-specific translation logic.
+
+A provider package MUST NOT:
+- create its own framework runtime;
+- own orchestration;
+- select unrelated providers;
+- register itself outside the published extension mechanism;
+- import another provider as a hidden implementation detail.
+
+### Services and workflows
+
+A service or workflow package MAY orchestrate capabilities.
+It MUST do so through published contracts and core-owned orchestration.
+It MUST NOT become a second framework.
+
+### Interfaces
+
+Interfaces such as CLI, API, admin, dashboards, or SDKs MAY expose Mirror functionality.
+They MUST remain thin entry layers.
+They MUST NOT replace or duplicate core orchestration.
 
 ## 5. Dependency rules
 
-```
-capability -> mirror_core
-provider -> capability
-provider -> mirror_core
-interface -> mirror_core
-interface -> capability (optional for generation)
+The dependency direction is strict:
 
-Compatibility shims may exist temporarily, but the executable middleware implementation lives only in `mirror_core`.
-```
+- Core MUST NOT import capability or provider implementation packages.
+- Capability packages MAY import Core and their own direct contract dependencies.
+- Provider packages MAY import Core and the capability contract they implement.
+- Capability packages MUST NOT import provider packages.
+- Provider packages MUST NOT import other provider packages.
+- Interface packages MUST NOT depend on private implementation details.
+- Cross-capability collaboration MUST occur through public contracts, not through direct package coupling.
 
-No cycles. No capability package may import a provider package.
+Cycles are prohibited.
 
-## 6. Deferred to beta
+## 6. Runtime responsibilities
 
-- distributed workers
-- dashboard / Django control plane
-- REST and GraphQL interfaces
-- SaaS multi-tenancy
-- billing
-- cluster orchestration
+Core is the only authority for:
+- compiled plans;
+- execution runs;
+- runtime context;
+- retry, timeout, and cancellation policy;
+- middleware invocation;
+- signal emission;
+- worker leasing;
+- scheduling decisions;
+- metadata persistence;
+- resource envelopes and lineage.
 
-## 7. Documentation rule
+Capabilities and providers may observe those runtime facts, but they MUST NOT redefine them.
 
-If a behavior is promised, it must appear in code, tests, and docs. If any one
-is missing, the promise is incomplete.
+## 7. Extension model
+
+Mirror uses a published extension model.
+Extensions are discovered, validated, activated, deactivated, and unloaded according to core-owned rules.
+
+Any transition from one extension API to another MUST preserve compatibility until a documented deprecation path exists.
+
+Legacy compatibility layers MAY exist, but they MUST be treated as transitional and must not override the canonical extension model.
+
+## 8. Prohibited patterns
+
+The following patterns are prohibited:
+
+- a capability package implementing its own executor or planner;
+- a provider package implementing a second runtime;
+- a package creating a hidden plugin registry;
+- a capability package hardcoding provider selection;
+- a package bypassing published contracts for convenience;
+- a package importing proprietary vendor services as required dependencies of Core;
+- a package reintroducing framework infrastructure after it has been centralized in Core.
+
+## 9. Change control
+
+Architectural changes require an ADR.
+
+A change that affects ownership, dependency direction, runtime guarantees, or extension rules MUST be documented before it lands.
+
+## 10. Documentation rule
+
+This document is intentionally general.
+
+Examples, current package inventories, future capability catalogs, and implementation-specific notes MUST live elsewhere.

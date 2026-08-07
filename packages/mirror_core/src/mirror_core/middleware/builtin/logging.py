@@ -8,9 +8,9 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from mirror_core.extensions.models import MiddlewareManifest
 from mirror_core.middleware.contracts import NextMiddleware
 from mirror_core.middleware.invocation import MiddlewareInvocation
-from mirror_core.registry import MiddlewareConfig
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,7 @@ class LoggingMiddleware:
             raise
 
 
-middleware = MiddlewareConfig(
+middleware = MiddlewareManifest(
     name="logging",
     factory="mirror_core.middleware.builtin.logging:LoggingMiddleware",
     settings_model=LoggingSettings,
@@ -97,5 +97,5 @@ middleware = MiddlewareConfig(
 )
 
 
-def middleware_config() -> MiddlewareConfig:
+def middleware_config() -> MiddlewareManifest:
     return middleware

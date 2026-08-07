@@ -1,15 +1,17 @@
 """Tests for pipeline compilation."""
 
+from types import MappingProxyType
+
 import pytest
 from mirror_core.exceptions import PlannerError
+from mirror_core.extensions.models import (
+    CapabilityManifest,
+    Dependency,
+    ProviderManifest,
+)
+from mirror_core.extensions.registry import ExtensionRegistryManager
 from mirror_core.pipeline import Pipeline, Step
 from mirror_core.planner import Planner
-from mirror_core.registry import (
-    CapabilityConfig,
-    ProviderConfig,
-    Registry,
-    RequiredCapability,
-)
 from pydantic import BaseModel
 
 
@@ -21,10 +23,10 @@ class TextOutput(BaseModel):
     result: str
 
 
-def registry() -> Registry:
-    result = Registry()
+def registry() -> ExtensionRegistryManager:
+    result = ExtensionRegistryManager()
     result.register_capability(
-        CapabilityConfig(
+        CapabilityManifest(
             name="fetch",
             api_version="1.10",
             request_model=TextInput,
@@ -33,9 +35,9 @@ def registry() -> Registry:
             output_ports={"result": TextOutput},
         )
     )
-    result.register_capability(CapabilityConfig(name="fetch", api_version="1.9"))
+    result.register_capability(CapabilityManifest(name="fetch", api_version="1.9"))
     result.register_provider(
-        ProviderConfig(
+        ProviderManifest(
             name="httpx",
             capability="fetch",
             capability_api="~=1.0",
@@ -109,19 +111,19 @@ def test_planner_rejects_undeclared_pipeline_input() -> None:
 
 
 def test_planner_validates_required_capabilities() -> None:
-    registry = Registry()
+    registry = ExtensionRegistryManager()
     registry.register_capability(
-        CapabilityConfig(
+        CapabilityManifest(
             name="crawl",
             api_version="1.0",
             request_model=TextInput,
             result_model=TextOutput,
             output_ports={"result": TextOutput},
-            dependencies=[RequiredCapability(name="fetch", version="~=1.0")],
+            dependencies=[Dependency(name="fetch", version="~=1.0")],
         )
     )
     registry.register_provider(
-        ProviderConfig(
+        ProviderManifest(
             name="crawl", capability="crawl", capability_api="~=1.0", factory="x:y"
         )
     )
@@ -152,9 +154,9 @@ def test_port_assignability_is_directional() -> None:
     class TargetResult(BaseModel):
         ok: bool
 
-    registry = Registry()
+    registry = ExtensionRegistryManager()
     registry.register_capability(
-        CapabilityConfig(
+        CapabilityManifest(
             name="source",
             api_version="1.0",
             request_model=SourceRequest,
@@ -163,7 +165,7 @@ def test_port_assignability_is_directional() -> None:
         )
     )
     registry.register_capability(
-        CapabilityConfig(
+        CapabilityManifest(
             name="target",
             api_version="1.0",
             request_model=TargetRequest,
@@ -172,12 +174,12 @@ def test_port_assignability_is_directional() -> None:
         )
     )
     registry.register_provider(
-        ProviderConfig(
+        ProviderManifest(
             name="source", capability="source", capability_api="~=1.0", factory="x:y"
         )
     )
     registry.register_provider(
-        ProviderConfig(
+        ProviderManifest(
             name="target", capability="target", capability_api="~=1.0", factory="x:y"
         )
     )
@@ -192,3 +194,31 @@ def test_port_assignability_is_directional() -> None:
 
     with pytest.raises(PlannerError, match="Incompatible binding"):
         Planner(registry).plan(pipeline)
+
+
+def test_execution_plan_steps_are_deeply_immutable() -> None:
+    """Compiled execution plans should expose read-only mappings."""
+
+    pipeline = Pipeline(
+        id="test",
+        steps=[
+            Step(
+                id="a",
+                capability="fetch",
+                input={"value": "$pipeline.url"},
+                outputs=["result"],
+            )
+        ],
+        inputs={"url": "str"},
+    )
+
+    plan = Planner(registry(), default_providers={"fetch": "httpx"}).plan(pipeline)
+
+    assert isinstance(plan.steps, MappingProxyType)
+    assert isinstance(plan.dependencies, MappingProxyType)
+
+    with pytest.raises(TypeError):
+        plan.steps["b"] = plan.get_step("a")  # type: ignore[index]
+
+    with pytest.raises(TypeError):
+        plan.dependencies["a"] = frozenset({"b"})  # type: ignore[index]

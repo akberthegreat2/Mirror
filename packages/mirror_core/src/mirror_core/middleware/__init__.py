@@ -5,6 +5,7 @@ and the built-in chain behavior, while third-party packages may still
 provide compatible middleware implementations via entry points.
 """
 
+from mirror_core.execution import CapabilityContext, ExecutionContext, ExecutionPolicy
 from mirror_core.middleware.builtin import (
     LoggingMiddleware,
     LoggingSettings,
@@ -24,6 +25,9 @@ from mirror_core.middleware.contracts import Middleware, NextMiddleware
 from mirror_core.middleware.invocation import MiddlewareInvocation
 
 __all__ = [
+    "CapabilityContext",
+    "ExecutionContext",
+    "ExecutionPolicy",
     "LoggingMiddleware",
     "LoggingSettings",
     "Middleware",

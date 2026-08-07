@@ -26,8 +26,10 @@ def test_sqlite_scheduler_round_trip(tmp_path: Path) -> None:
     scheduler.schedule(record)
     assert scheduler.list() == [record]
     assert scheduler.due() == [record]
-    scheduler.pause(record.schedule_id)
+    paused = scheduler.pause(record.schedule_id)
+    assert paused.state.name == "PAUSED"
     assert scheduler.due() == []
-    scheduler.resume(record.schedule_id)
+    resumed = scheduler.resume(record.schedule_id)
+    assert resumed.state.name == "SCHEDULED"
     assert scheduler.due() == [record]
     scheduler.close()

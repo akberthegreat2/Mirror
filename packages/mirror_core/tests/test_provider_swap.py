@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 from mirror_core.application import Application
+from mirror_core.extensions.models import MiddlewareManifest, ProviderManifest
 from mirror_core.pipeline import Pipeline, Step
-from mirror_core.registry import MiddlewareConfig, ProviderConfig
 from mirror_core.settings import MirrorSettings
 from mirror_fetch.capability import capability as fetch_capability
 from mirror_fetch.models import FetchRequest, FetchResult
@@ -16,42 +16,32 @@ from mirror_fetch_playwright.provider import PlaywrightProvider
 class ProviderSwapDiscoverySource:
     """Discovery source exposing one capability and two providers."""
 
-    def iter_entry_points(self, group: str):
-        assert group == "mirror"
+    def discover(self):
         return [
-            ("fetch", lambda: fetch_capability),
-            (
-                "fetch-httpx",
-                lambda: ProviderConfig(
-                    name="httpx",
-                    capability="fetch",
-                    capability_api="~=1.0",
-                    factory="mirror_fetch_httpx.provider:HTTPXProvider",
-                    settings_model="mirror_fetch_httpx.settings:HTTPXSettings",
-                    metadata={"version": "1.0.0"},
-                ),
+            fetch_capability,
+            ProviderManifest(
+                name="httpx",
+                capability="fetch",
+                capability_api="~=1.0",
+                factory="mirror_fetch_httpx.provider:HTTPXProvider",
+                settings_model="mirror_fetch_httpx.settings:HTTPXSettings",
+                metadata={"version": "1.0.0"},
             ),
-            (
-                "fetch-playwright",
-                lambda: ProviderConfig(
-                    name="playwright",
-                    capability="fetch",
-                    capability_api="~=1.0",
-                    factory="mirror_fetch_playwright.provider:PlaywrightProvider",
-                    settings_model="mirror_fetch_playwright.settings:PlaywrightSettings",
-                    metadata={"version": "1.0.0"},
-                ),
+            ProviderManifest(
+                name="playwright",
+                capability="fetch",
+                capability_api="~=1.0",
+                factory="mirror_fetch_playwright.provider:PlaywrightProvider",
+                settings_model="mirror_fetch_playwright.settings:PlaywrightSettings",
+                metadata={"version": "1.0.0"},
             ),
-            (
-                "retry",
-                lambda: MiddlewareConfig(
-                    name="retry",
-                    factory="mirror_core.middleware.builtin.retry:RetryMiddleware",
-                    settings_model="mirror_core.middleware.builtin.retry:RetrySettings",
-                    before=["timeout", "ratelimit"],
-                ),
+            MiddlewareManifest(
+                name="retry",
+                factory="mirror_core.middleware.builtin.retry:RetryMiddleware",
+                settings_model="mirror_core.middleware.builtin.retry:RetrySettings",
+                before=["timeout", "ratelimit"],
             ),
-        ]
+        ], []
 
 
 @pytest.mark.asyncio

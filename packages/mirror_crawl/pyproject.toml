@@ -15,7 +15,7 @@ dependencies = [
     "mirror-fetch>=0.1.0",
 ]
 
-[project.entry-points."mirror"]
+[project.entry-points."mirror.capabilities"]
 crawl = "mirror_crawl:capability"
 
 [tool.setuptools.packages.find]

@@ -1,11 +1,11 @@
 """WARC provider for Mirror Archive capability."""
 
-from mirror_core.registry import ProviderConfig
+from mirror_core.extensions.models import ProviderManifest
 
 from mirror_archive_warc.provider import WARCProvider
 from mirror_archive_warc.settings import WARCSettings
 
-provider = ProviderConfig(
+provider = ProviderManifest(
     name="warc",
     capability="archive",
     capability_api="~=1.0",

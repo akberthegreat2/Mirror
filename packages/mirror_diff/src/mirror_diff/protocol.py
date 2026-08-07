@@ -9,4 +9,6 @@ from .models import DiffRequest, DiffResult
 
 @runtime_checkable
 class Diff(Protocol):
+    """Protocol for diff providers."""
+
     async def diff(self, request: DiffRequest) -> DiffResult: ...

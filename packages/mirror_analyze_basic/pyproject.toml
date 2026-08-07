@@ -15,7 +15,7 @@ dependencies = [
     "mirror-analyze>=0.1.0",
 ]
 
-[project.entry-points."mirror"]
+[project.entry-points."mirror.providers"]
 basic = "mirror_analyze_basic:provider"
 
 [tool.setuptools.packages.find]

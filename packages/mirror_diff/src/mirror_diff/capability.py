@@ -1,12 +1,12 @@
 """Capability descriptors for the diff capability."""
 
-from mirror_core.registry import CapabilityConfig
+from mirror_core.extensions.models import CapabilityManifest
 
 from .models import DiffRequest, DiffResult
 from .protocol import Diff
 from .settings import DiffSettings
 
-capability = CapabilityConfig(
+capability = CapabilityManifest(
     name="diff",
     api_version="1.0.0",
     protocol=Diff,

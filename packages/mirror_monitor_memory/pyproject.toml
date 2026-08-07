@@ -16,7 +16,7 @@ dependencies = [
     "httpx>=0.24",
 ]
 
-[project.entry-points."mirror"]
+[project.entry-points."mirror.providers"]
 memory = "mirror_monitor_memory:provider"
 
 [tool.setuptools.packages.find]

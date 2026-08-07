@@ -7,7 +7,7 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 
 import pytest
-from mirror_core.registry import ProviderConfig
+from mirror_core.extensions.models import ProviderManifest
 from mirror_crawl.capability import capability as crawl_capability
 from mirror_crawl.models import CrawlRequest, CrawlSettings
 from mirror_crawl.runner import crawl_site
@@ -91,7 +91,7 @@ class _DiscoverySource:
             ("crawl", lambda: crawl_capability),
             (
                 "fetch-httpx",
-                lambda: ProviderConfig(
+                lambda: ProviderManifest(
                     name="httpx",
                     capability="fetch",
                     capability_api="~=1.0",
@@ -102,7 +102,7 @@ class _DiscoverySource:
             ),
             (
                 "crawl-local",
-                lambda: ProviderConfig(
+                lambda: ProviderManifest(
                     name="local",
                     capability="crawl",
                     capability_api="~=1.0",

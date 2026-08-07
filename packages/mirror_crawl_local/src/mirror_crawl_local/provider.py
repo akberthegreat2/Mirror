@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from mirror_core.registry import ProviderConfig
+from mirror_core.extensions.models import ProviderManifest
 from mirror_crawl.models import CrawlRequest, CrawlResult, CrawlSettings
 from mirror_crawl.protocol import Crawl
 from mirror_fetch.protocol import Fetch
@@ -21,7 +21,7 @@ class LocalCrawlProvider(Crawl):
         return await self._service.crawl(request)
 
 
-provider = ProviderConfig(
+provider = ProviderManifest(
     name="local",
     capability="crawl",
     capability_api="~=1.0",

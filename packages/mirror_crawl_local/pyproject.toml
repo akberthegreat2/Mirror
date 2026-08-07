@@ -16,7 +16,7 @@ dependencies = [
     "mirror-crawl>=0.1.0",
 ]
 
-[project.entry-points."mirror"]
+[project.entry-points."mirror.providers"]
 crawl-local = "mirror_crawl_local:provider"
 
 [tool.setuptools.packages.find]

@@ -110,21 +110,18 @@ def validate_manifests(
         valid.append(manifest)
 
     # 3. Verify provider capability references (only for valid manifests)
-    capability_ids = {
-        m.extension_id for m in valid if isinstance(m, CapabilityManifest)
-    }
+    capability_names = {m.name for m in valid if isinstance(m, CapabilityManifest)}
     for manifest in valid:
         if (
             isinstance(manifest, ProviderManifest)
-            and manifest.capability not in capability_ids
+            and manifest.capability not in capability_names
         ):
             errors.append(
                 (
                     manifest.extension_id,
-                    f"Provider's capability '{manifest.capability}' is not a valid capability extension (or was invalid).",
+                    f"Provider's capability '{manifest.capability}' is not a valid capability name (or was invalid).",
                 )
             )
-            # Remove from valid list
             valid = [m for m in valid if m.extension_id != manifest.extension_id]
 
     return valid, errors

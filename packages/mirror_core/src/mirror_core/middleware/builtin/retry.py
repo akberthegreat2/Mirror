@@ -9,9 +9,9 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from mirror_core.extensions.models import MiddlewareManifest
 from mirror_core.middleware.contracts import Middleware, NextMiddleware
 from mirror_core.middleware.invocation import MiddlewareInvocation
-from mirror_core.registry import MiddlewareConfig
 
 
 class RetrySettings(BaseModel):
@@ -98,7 +98,7 @@ class RetryMiddleware:
         return tuple(resolved) if resolved else None
 
 
-middleware = MiddlewareConfig(
+middleware = MiddlewareManifest(
     name="retry",
     factory="mirror_core.middleware.builtin.retry:RetryMiddleware",
     settings_model=RetrySettings,
@@ -110,5 +110,5 @@ middleware = MiddlewareConfig(
 )
 
 
-def middleware_config() -> MiddlewareConfig:
+def middleware_config() -> MiddlewareManifest:
     return middleware

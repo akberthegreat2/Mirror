@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from mirror_core.registry import ProviderConfig
+from mirror_core.extensions.models import ProviderManifest
 from mirror_search.models import SearchRequest, SearchResult
 from mirror_search.protocol import Search
 from mirror_search.settings import SearchSettings
@@ -26,7 +26,7 @@ class SearchMemoryProvider(Search):
         )
 
 
-provider = ProviderConfig(
+provider = ProviderManifest(
     name="memory",
     capability="search",
     capability_api="~=1.0",

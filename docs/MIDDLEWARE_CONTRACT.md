@@ -4,16 +4,16 @@ Middleware is a core contract. It wraps execution and may observe, transform, sh
 
 ## Scopes
 
-- application middleware
-- pipeline middleware
+- application or global middleware
 - capability middleware
-- step middleware
 
 ## Construction contract
 
 Middleware is instantiated from a validated settings model, the same way providers are.
 The application bootstrap resolves the descriptor, validates settings, and creates
-one middleware instance per named middleware.
+one middleware instance per named middleware. Middleware invocations now carry
+ExecutionContext and CapabilityContext objects so cross-cutting concerns can
+observe the same runtime snapshot as the executor.
 
 ## What middleware may do
 
@@ -36,6 +36,7 @@ one middleware instance per named middleware.
 
 Ordering must be explicit and deterministic.
 The compiled chain should honor declared ordering constraints and applicability rules.
+Middleware order is part of the runtime contract: declarations execute in sequence, and the final handler sees the same invocation snapshot that upstream middleware observed.
 
 ## Short-circuiting
 
@@ -44,9 +45,8 @@ That is a supported control-flow decision, not an error.
 
 ## Policy ownership
 
-Retry, timeout, fallback, and cancellation are execution policies.
-Middleware may enforce them, but the policy definition belongs to the core runtime contract.
-
+Retry, timeout, and cancellation are execution policies.
+Middleware may enforce them, but the policy definition belongs to the core runtime contract. Fallback is reserved for later policy work.
 
 ## Construction rule
 

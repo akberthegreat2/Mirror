@@ -1,12 +1,12 @@
 """HTTPX provider for Mirror Fetch capability."""
 
-from mirror_core.registry import ProviderConfig
+from mirror_core.extensions.models import ProviderManifest
 
 from mirror_fetch_httpx.provider import HTTPXProvider
 from mirror_fetch_httpx.settings import HTTPXSettings
 
 # Provider descriptor for discovery
-provider = ProviderConfig(
+provider = ProviderManifest(
     name="httpx",
     capability="fetch",
     capability_api="~=1.0",

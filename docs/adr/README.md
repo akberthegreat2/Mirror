@@ -4,6 +4,8 @@ These architecture decision records explain why the framework looks the way it
 looks. New contributors should read the relevant ADR before changing runtime
 contracts.
 
+## Accepted ADRs
+
 - ADR-0001 package boundaries
 - ADR-0002 discovery and entry points
 - ADR-0003 pipeline compiler
@@ -23,9 +25,25 @@ contracts.
 - ADR-0017 django control plane
 - ADR-0018 celery and redis workers
 - ADR-0019 metadata store
-
 - ADR-0020 django control-plane contract
 - ADR-0021 control-plane metadata models
 - ADR-0022 admin visibility and roles
 - ADR-0023 optional Django dependency
 - ADR-0024 capability package boundaries
+- ADR-0025 execution semantics and runtime policies
+- ADR-0026 knowledge infrastructure capability model
+- ADR-0027 trusted execution pipeline
+- ADR-0028 extension model and plugin lifecycle
+- ADR-0029 distributed execution and Celery worker integration
+
+## Future drafts
+
+Proposed ADR drafts preserved for later implementation work live in `docs/adr/future/`:
+
+- ADR-0030 — Metadata Store Architecture
+- ADR-0031 — Scheduler Backend Architecture
+- ADR-0032 — Distributed Worker Architecture
+- ADR-0033 — Enterprise Execution Pipeline & Runtime Semantics
+- ADR-0034 — Capability Expansion and Vertical Ecosystem Model
+- ADR-0035 — Certification, Smoke Tests, and Lab Validation Strategy
+- ADR-0036 — Operational Development Stack and Deployment Baseline

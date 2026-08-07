@@ -13,7 +13,7 @@ Mirror beta must provide:
 - a Django control plane for users, auth, and admin operations;
 - docs, ADRs, tests, and PR notes for every user-facing promise.
 
-Scheduler support, metadata storage, and blob storage have already graduated into the stable core package (`mirror_core.scheduler` and `mirror_core.storage`).
+Scheduler support has already graduated into the stable core package (`mirror_core.scheduler`). Metadata storage now lives in `mirror_core.metadata` and is re-exported from `mirror_core.storage` for compatibility; blob storage remains in `mirror_core.storage`.
 
 ## Beta runtime guarantees
 
@@ -21,7 +21,7 @@ Scheduler support, metadata storage, and blob storage have already graduated int
 - Workers MUST be able to resume work from persisted state.
 - Scheduler jobs MUST be repeatable and observable.
 - Metadata and blob storage MUST use the stable core backends documented in
-  `mirror_core.storage`.
+  `mirror_core.metadata` and `mirror_core.storage`.
 - Redis MAY be used for cache, queue, and lease coordination.
 - Django admin MUST be able to read and manage stored metadata.
 

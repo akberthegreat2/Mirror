@@ -1,4 +1,4 @@
-"""Mirror Extension System – manifests, discovery, registries, validation.
+"""Mirror Extension System – manifests, discovery, registries, validation, and lifecycle.
 
 This module provides the foundation for all pluggable components in Mirror.
 """
@@ -9,6 +9,11 @@ from mirror_core.extensions.errors import (
     ExtensionError,
     RegistryError,
     ValidationError,
+)
+from mirror_core.extensions.lifecycle import (
+    ExtensionLifecycleManager,
+    ExtensionLifecycleRecord,
+    ExtensionLifecycleState,
 )
 from mirror_core.extensions.models import (
     CapabilityManifest,
@@ -38,6 +43,9 @@ __all__ = [
     "DiscoveryError",
     "ExtensionError",
     "ExtensionKind",
+    "ExtensionLifecycleManager",
+    "ExtensionLifecycleRecord",
+    "ExtensionLifecycleState",
     "ExtensionManifest",
     "ExtensionRegistryManager",
     "InterfaceManifest",

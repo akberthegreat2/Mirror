@@ -1,12 +1,12 @@
 """Capability descriptors for the scrape capability."""
 
-from mirror_core.registry import CapabilityConfig
+from mirror_core.extensions.models import CapabilityManifest
 
 from .models import ScrapeRequest, ScrapeResult
 from .protocol import Scrape
 from .settings import ScrapeSettings
 
-capability = CapabilityConfig(
+capability = CapabilityManifest(
     name="scrape",
     api_version="1.0.0",
     protocol=Scrape,

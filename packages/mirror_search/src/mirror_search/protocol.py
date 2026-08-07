@@ -9,4 +9,6 @@ from .models import SearchRequest, SearchResult
 
 @runtime_checkable
 class Search(Protocol):
+    """Protocol for search providers."""
+
     async def search(self, request: SearchRequest) -> SearchResult: ...

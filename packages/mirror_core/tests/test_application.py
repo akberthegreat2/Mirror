@@ -6,7 +6,7 @@ from typing import ClassVar, Protocol, runtime_checkable
 import pytest
 from mirror_core.application import Application
 from mirror_core.discovery import DiscoverySource
-from mirror_core.registry import CapabilityConfig, ProviderConfig
+from mirror_core.extensions.models import CapabilityManifest, ProviderManifest
 from mirror_core.settings import MirrorSettings
 from pydantic import BaseModel
 
@@ -45,27 +45,21 @@ sys.modules["mirror_test_provider"] = sys.modules[__name__]
 
 
 class FakeSource(DiscoverySource):
-    def iter_entry_points(self, group: str):
+    def discover(self):
         return [
-            (
-                "capability",
-                lambda: CapabilityConfig(
-                    name="example",
-                    api_version="1.0",
-                    protocol=CapabilityProtocol,
-                ),
+            CapabilityManifest(
+                name="example",
+                api_version="1.0",
+                protocol=CapabilityProtocol,
             ),
-            (
-                "provider",
-                lambda: ProviderConfig(
-                    name="default",
-                    capability="example",
-                    capability_api="~=1.0",
-                    factory="mirror_test_provider:Provider",
-                    settings_model=ProviderSettings,
-                ),
+            ProviderManifest(
+                name="default",
+                capability="example",
+                capability_api="~=1.0",
+                factory="mirror_test_provider:Provider",
+                settings_model=ProviderSettings,
             ),
-        ]
+        ], []
 
 
 @pytest.mark.asyncio

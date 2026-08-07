@@ -5,11 +5,13 @@ of the old beta staging area and into stable core modules.
 
 ## What changed
 
-- `mirror_core.storage` now defines the stable storage contracts:
-  `MetadataRecord`, `MetadataStore`, and `BlobStore`.
-- `mirror_core.storage` also provides the supported backends:
-  `InMemoryMetadataStore`, `InMemoryBlobStore`, `SQLiteMetadataStore`, and
-  `FileSystemBlobStore`.
+- `mirror_core.metadata` now defines the stable metadata contracts:
+  `MetadataNamespaces`, `MetadataRecord`, `MetadataStore`, `InMemoryMetadataStore`, and `SQLiteMetadataStore`.
+- `mirror_core.storage` now defines the stable blob-storage contract:
+  `BlobStore`.
+- `mirror_core.storage` also provides the supported blob backends:
+  `InMemoryBlobStore` and `FileSystemBlobStore`.
+- `mirror_core.storage` re-exports the metadata contracts for compatibility.
 - `mirror_core.scheduler` now presents the stable scheduling contract and
   backends: `ScheduleRecord`, `ScheduleState`, `SchedulerBackend`,
   `InMemoryScheduler`, and `SQLiteScheduler`.

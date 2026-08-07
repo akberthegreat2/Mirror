@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import inspect
 from contextlib import AsyncExitStack
 from typing import Any, get_args, get_origin, get_type_hints
@@ -10,19 +9,19 @@ from typing import Any, get_args, get_origin, get_type_hints
 from pydantic import BaseModel
 
 from mirror_core.exceptions import ApplicationError
+from mirror_core.extensions.models import CapabilityManifest
+from mirror_core.extensions.registry import ExtensionRegistryManager
+from mirror_core.imports import import_symbol, resolve_model, resolve_type
 from mirror_core.lifecycle import AsyncLifecycle
-from mirror_core.registry import Registry
 from mirror_core.settings import MirrorSettings
-
-
-class EmptySettings(BaseModel):
-    """Settings model used when a provider declares no configuration."""
 
 
 class ComponentManager:
     """Own provider instances selected for one Application runtime."""
 
-    def __init__(self, registry: Registry, settings: MirrorSettings) -> None:
+    def __init__(
+        self, registry: ExtensionRegistryManager, settings: MirrorSettings
+    ) -> None:
         self._registry = registry
         self._settings = settings
         self._instances: dict[tuple[str, str], Any] = {}
@@ -78,12 +77,12 @@ class ComponentManager:
             dependency_instances: dict[str, Any] = {}
             for dependency in capability.dependencies:
                 dependency_instance = await self.ensure_capability(
-                    dependency.name, stack
+                    dependency.target, stack
                 )
-                dependency_instances[dependency.name] = dependency_instance
+                dependency_instances[dependency.target] = dependency_instance
 
-            factory = self.import_symbol(provider.factory)
-            settings_model = self.resolve_settings_model(provider.settings_model)
+            factory = import_symbol(provider.factory)
+            settings_model = resolve_model(provider.settings_model)
             raw_settings = self._settings.component_settings.get(
                 capability_name, {}
             ).get(provider.name, {})
@@ -92,9 +91,8 @@ class ComponentManager:
                 factory, settings_instance, dependency_instances
             )
 
-            if capability.protocol is not None and not isinstance(
-                instance, capability.protocol
-            ):
+            protocol = resolve_type(capability.protocol)
+            if protocol is not None and not isinstance(instance, protocol):
                 raise ApplicationError(
                     f"Provider {provider.name!r} does not implement capability "
                     f"protocol {capability.name!r}"
@@ -182,7 +180,9 @@ class ComponentManager:
                     return resolved
         return None
 
-    def _select_provider_name(self, capability_name: str, capability: Any) -> str:
+    def _select_provider_name(
+        self, capability_name: str, capability: CapabilityManifest
+    ) -> str:
         configured = self._settings.components.get(capability_name, {}).get("provider")
         provider_name = (
             configured if isinstance(configured, str) and configured else None
@@ -204,26 +204,3 @@ class ComponentManager:
         self._instances.clear()
         self._selected_providers.clear()
         self._initializing.clear()
-
-    @staticmethod
-    def import_symbol(path: str) -> Any:
-        """Import a descriptor symbol from a ``module:symbol`` path."""
-        module_name, separator, symbol_name = path.rpartition(":")
-        if not separator:
-            raise ApplicationError(f"Invalid import path: {path!r}")
-        try:
-            return getattr(importlib.import_module(module_name), symbol_name)
-        except (ImportError, AttributeError) as exc:
-            raise ApplicationError(f"Unable to import {path!r}", cause=exc) from exc
-
-    @classmethod
-    def resolve_settings_model(
-        cls, value: type[BaseModel] | str | None
-    ) -> type[BaseModel]:
-        """Resolve and validate an optional Pydantic settings model."""
-        if value is None:
-            return EmptySettings
-        resolved = cls.import_symbol(value) if isinstance(value, str) else value
-        if not isinstance(resolved, type) or not issubclass(resolved, BaseModel):
-            raise ApplicationError("Component settings model must be a Pydantic model")
-        return resolved

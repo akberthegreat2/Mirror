@@ -1,19 +1,28 @@
 """Tests for discovery."""
 
 from mirror_core.discovery import DiscoverySource, discover
-from mirror_core.registry import CapabilityConfig
+from mirror_core.extensions.models import CapabilityManifest
 
 
 class FakeSource(DiscoverySource):
     def __init__(self, entries):
         self._entries = entries
 
-    def iter_entry_points(self, group: str):
-        return [(name, lambda obj=obj: obj) for name, obj in self._entries]
+    def discover(self):
+        return [obj for _, obj in self._entries], []
 
 
 def test_discovery_capability():
-    fake = FakeSource([("fetch", CapabilityConfig(name="fetch", api_version="1.0"))])
+    fake = FakeSource(
+        [
+            (
+                "fetch",
+                CapabilityManifest(
+                    name="fetch", api_version="1.0", protocol="module:Protocol"
+                ),
+            )
+        ]
+    )
     result = discover(source=fake)
     assert len(result.capabilities) == 1
     assert result.capabilities[0].name == "fetch"
@@ -29,8 +38,18 @@ def test_discovery_unknown_type():
 def test_discovery_duplicates():
     fake = FakeSource(
         [
-            ("fetch1", CapabilityConfig(name="fetch", api_version="1.0")),
-            ("fetch2", CapabilityConfig(name="fetch", api_version="1.0")),
+            (
+                "fetch1",
+                CapabilityManifest(
+                    name="fetch", api_version="1.0", protocol="module:Protocol"
+                ),
+            ),
+            (
+                "fetch2",
+                CapabilityManifest(
+                    name="fetch", api_version="1.0", protocol="module:Protocol"
+                ),
+            ),
         ]
     )
     result = discover(source=fake)

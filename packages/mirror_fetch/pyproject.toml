@@ -25,7 +25,7 @@ classifiers = [
 test = ["pytest>=7.0", "pytest-asyncio>=0.21", "pytest-cov>=4.0"]
 dev = ["ruff", "mypy"]
 
-[project.entry-points."mirror"]
+[project.entry-points."mirror.capabilities"]
 fetch = "mirror_fetch:capability"
 
 [tool.setuptools.packages.find]

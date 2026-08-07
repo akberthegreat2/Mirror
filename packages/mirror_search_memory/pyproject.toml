@@ -15,7 +15,7 @@ dependencies = [
     "mirror-search>=0.1.0",
 ]
 
-[project.entry-points."mirror"]
+[project.entry-points."mirror.providers"]
 memory = "mirror_search_memory:provider"
 
 [tool.setuptools.packages.find]

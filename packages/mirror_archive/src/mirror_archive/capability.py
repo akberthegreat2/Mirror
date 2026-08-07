@@ -1,12 +1,12 @@
 """Capability descriptor for Archive."""
 
-from mirror_core.registry import CapabilityConfig
+from mirror_core.extensions.models import CapabilityManifest
 
 from mirror_archive.models import ArchiveRequest, ArchiveResult
 from mirror_archive.protocol import Archive
 from mirror_archive.settings import ArchiveSettings
 
-capability = CapabilityConfig(
+capability = CapabilityManifest(
     name="archive",
     api_version="1.0",
     protocol=Archive,

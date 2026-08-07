@@ -8,6 +8,7 @@ from .protocol import Search
 
 
 async def search_step(provider: Search, request: SearchRequest) -> SearchResult:
+    """Adapt a Search provider to the capability runner contract."""
     try:
         return await provider.search(request)
     except SearchError:

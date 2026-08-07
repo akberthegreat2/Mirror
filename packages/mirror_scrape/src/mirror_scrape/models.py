@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 
 @dataclass(slots=True, frozen=True)
 class ScrapedDocument:
+    """Structured document extracted from HTML."""
+
     url: str | None
     title: str | None
     text: str
@@ -20,9 +22,13 @@ class ScrapedDocument:
 
 
 class ScrapeRequest(BaseModel):
+    """Input for an HTML scraping operation."""
+
     html: str = Field(min_length=1)
     url: str | None = None
 
 
 class ScrapeResult(BaseModel):
+    """Output of an HTML scraping operation."""
+
     document: ScrapedDocument

@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from mirror_core.execution import CapabilityContext, ExecutionContext
 from mirror_core.middleware.context import MiddlewareContext
 from mirror_core.pipeline import Step
 
@@ -18,5 +19,7 @@ class MiddlewareInvocation(BaseModel):
     step: Step
     request: BaseModel
     provider: Any
+    execution_context: ExecutionContext
+    capability_context: CapabilityContext
     context: dict[str, Any] = Field(default_factory=dict)
-    middleware_context: MiddlewareContext = Field(default_factory=MiddlewareContext)
+    middleware_context: MiddlewareContext | None = None

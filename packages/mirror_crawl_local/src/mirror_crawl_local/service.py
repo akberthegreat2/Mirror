@@ -8,7 +8,8 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 from mirror_core.exceptions import ExecutionError
-from mirror_core.storage import BlobStore, MetadataRecord, MetadataStore
+from mirror_core.metadata import MetadataRecord, MetadataStore
+from mirror_core.storage import BlobStore
 from mirror_crawl.models import CrawlRecord, CrawlRequest, CrawlResult
 from mirror_fetch.models import FetchRequest, FetchResult
 from mirror_fetch.protocol import Fetch

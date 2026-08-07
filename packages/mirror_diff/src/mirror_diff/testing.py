@@ -13,6 +13,8 @@ from mirror_diff.protocol import Diff
 
 
 class DiffContract(BaseContract):
+    """Reusable contract tests for Diff providers."""
+
     __test__ = False
     provider_class: type[Diff] | None = None
 

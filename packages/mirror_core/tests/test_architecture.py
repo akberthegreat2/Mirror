@@ -26,6 +26,11 @@ CAPABILITY_PACKAGES = (
     "mirror_scrape",
     "mirror_diff",
     "mirror_monitor",
+    "mirror_normalize",
+    "mirror_chunk",
+    "mirror_embedding",
+    "mirror_vectorstore",
+    "mirror_retrieval",
 )
 FORBIDDEN_FRAMEWORK_FILES = {
     "runtime.py",
@@ -215,3 +220,85 @@ def test_capability_packages_do_not_define_framework_files() -> None:
             ):
                 violations.append(str(file_path.relative_to(ROOT)))
     assert not violations, f"Capability packages define framework files: {violations}"
+
+
+DOCUMENTED_CAPABILITY_MODULES = (
+    "mirror_fetch.runner",
+    "mirror_fetch.testing",
+    "mirror_archive.runner",
+    "mirror_archive.testing",
+    "mirror_crawl.runner",
+    "mirror_search.models",
+    "mirror_search.protocol",
+    "mirror_search.runner",
+    "mirror_search.testing",
+    "mirror_analyze.models",
+    "mirror_analyze.protocol",
+    "mirror_analyze.runner",
+    "mirror_analyze.testing",
+    "mirror_scrape.models",
+    "mirror_scrape.protocol",
+    "mirror_scrape.runner",
+    "mirror_scrape.testing",
+    "mirror_diff.models",
+    "mirror_diff.protocol",
+    "mirror_diff.runner",
+    "mirror_diff.testing",
+    "mirror_monitor.models",
+    "mirror_monitor.protocol",
+    "mirror_monitor.runner",
+    "mirror_monitor.testing",
+    "mirror_normalize.models",
+    "mirror_normalize.protocol",
+    "mirror_normalize.runner",
+    "mirror_normalize.settings",
+    "mirror_chunk.models",
+    "mirror_chunk.protocol",
+    "mirror_chunk.runner",
+    "mirror_chunk.settings",
+    "mirror_embedding.models",
+    "mirror_embedding.protocol",
+    "mirror_embedding.runner",
+    "mirror_embedding.settings",
+    "mirror_vectorstore.models",
+    "mirror_vectorstore.protocol",
+    "mirror_vectorstore.runner",
+    "mirror_vectorstore.settings",
+    "mirror_retrieval.models",
+    "mirror_retrieval.protocol",
+    "mirror_retrieval.runner",
+    "mirror_retrieval.settings",
+)
+
+
+def test_capability_public_surface_is_documented() -> None:
+    """Ensure public capability entrypoints have docstrings.
+
+    The split capability packages expose runners, contracts, and data models
+    directly. This test keeps their public surface documented at the module-
+    level so the capability packages stay consistent with Fetch and Archive.
+    """
+
+    import importlib
+    import inspect
+
+    for module_name in DOCUMENTED_CAPABILITY_MODULES:
+        module = importlib.import_module(module_name)
+        public = [
+            (name, member)
+            for name, member in inspect.getmembers(module)
+            if not name.startswith("_")
+            and (inspect.isfunction(member) or inspect.isclass(member))
+            and getattr(member, "__module__", None) == module.__name__
+        ]
+        assert public, f"No public callables found in {module_name}"
+        missing = [name for name, member in public if not inspect.getdoc(member)]
+        assert not missing, f"Missing docstrings in {module_name}: {missing}"
+
+
+def test_core_exports_execution_contexts_and_policies() -> None:
+    from mirror_core import CapabilityContext, ExecutionContext, ExecutionPolicy
+
+    assert CapabilityContext.__name__ == "CapabilityContext"
+    assert ExecutionContext.__name__ == "ExecutionContext"
+    assert ExecutionPolicy.__name__ == "ExecutionPolicy"

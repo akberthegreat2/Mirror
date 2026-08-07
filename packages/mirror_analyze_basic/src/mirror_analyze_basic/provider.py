@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from mirror_analyze.models import AnalyzeRequest, AnalyzeResult
 from mirror_analyze.protocol import Analyze
-from mirror_core.registry import ProviderConfig
+from mirror_core.extensions.models import ProviderManifest
 
 from .analyzer import Analyzer
 
@@ -14,7 +14,7 @@ class BasicAnalyzeProvider(Analyze):
         return AnalyzeResult(analysis=Analyzer().analyze(request.text))
 
 
-provider = ProviderConfig(
+provider = ProviderManifest(
     name="basic",
     capability="analyze",
     capability_api="~=1.0",

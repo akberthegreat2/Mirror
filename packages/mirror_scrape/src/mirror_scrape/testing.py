@@ -13,6 +13,8 @@ from mirror_scrape.protocol import Scrape
 
 
 class ScrapeContract(BaseContract):
+    """Reusable contract tests for Scrape providers."""
+
     __test__ = False
     provider_class: type[Scrape] | None = None
 
