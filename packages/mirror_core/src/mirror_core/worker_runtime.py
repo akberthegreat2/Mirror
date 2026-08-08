@@ -60,12 +60,8 @@ class SQLiteExecutionStore:
                 json.dumps(_encode_metadata_value(record.payload), sort_keys=True),
                 record.worker_id,
                 record.created_at.isoformat(),
-                record.started_at.isoformat()
-                if record.started_at is not None
-                else None,
-                record.completed_at.isoformat()
-                if record.completed_at is not None
-                else None,
+                record.started_at.isoformat() if record.started_at is not None else None,
+                record.completed_at.isoformat() if record.completed_at is not None else None,
                 json.dumps(_encode_metadata_value(record.metadata), sort_keys=True),
             ),
         )
@@ -73,16 +69,12 @@ class SQLiteExecutionStore:
 
     def get(self, run_id: UUID) -> ExecutionRecord | None:
         """Return one execution record if present."""
-        row = self._conn.execute(
-            "SELECT * FROM execution_runs WHERE run_id = ?", (str(run_id),)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM execution_runs WHERE run_id = ?", (str(run_id),)).fetchone()
         return None if row is None else self._row_to_record(row)
 
     def list(self) -> list[ExecutionRecord]:
         """Return all stored execution records."""
-        rows = self._conn.execute(
-            "SELECT * FROM execution_runs ORDER BY created_at, run_id"
-        ).fetchall()
+        rows = self._conn.execute("SELECT * FROM execution_runs ORDER BY created_at, run_id").fetchall()
         return [self._row_to_record(row) for row in rows]
 
     def close(self) -> None:
@@ -114,12 +106,8 @@ class SQLiteExecutionStore:
             payload=_decode_metadata_value(json.loads(row["payload"])),
             worker_id=row["worker_id"],
             created_at=_parse_datetime(row["created_at"]),
-            started_at=_parse_datetime(row["started_at"])
-            if row["started_at"]
-            else None,
-            completed_at=_parse_datetime(row["completed_at"])
-            if row["completed_at"]
-            else None,
+            started_at=_parse_datetime(row["started_at"]) if row["started_at"] else None,
+            completed_at=_parse_datetime(row["completed_at"]) if row["completed_at"] else None,
             metadata=_decode_metadata_value(json.loads(row["metadata"])),
         )
 
@@ -134,9 +122,7 @@ class SQLiteLeaseManager:
         self._conn.row_factory = sqlite3.Row
         self._ensure_schema()
 
-    def acquire(
-        self, job_id: UUID, worker_id: str, ttl_seconds: int = 60
-    ) -> WorkerLease:
+    def acquire(self, job_id: UUID, worker_id: str, ttl_seconds: int = 60) -> WorkerLease:
         """Acquire or replace a lease for a job."""
         lease = WorkerLease(
             job_id=job_id,
@@ -158,9 +144,7 @@ class SQLiteLeaseManager:
 
     def renew(self, lease: WorkerLease, ttl_seconds: int = 60) -> WorkerLease:
         """Renew an existing lease."""
-        updated = lease.model_copy(
-            update={"expires_at": _utcnow() + timedelta(seconds=ttl_seconds)}
-        )
+        updated = lease.model_copy(update={"expires_at": _utcnow() + timedelta(seconds=ttl_seconds)})
         self._conn.execute(
             """
             INSERT INTO leases(job_id, worker_id, expires_at)
@@ -195,9 +179,7 @@ class SQLiteLeaseManager:
 
     def list(self) -> list[WorkerLease]:
         """Return all active leases."""
-        rows = self._conn.execute(
-            "SELECT job_id, worker_id, expires_at FROM leases ORDER BY expires_at, job_id"
-        ).fetchall()
+        rows = self._conn.execute("SELECT job_id, worker_id, expires_at FROM leases ORDER BY expires_at, job_id").fetchall()
         return [
             WorkerLease(
                 job_id=UUID(row["job_id"]),
@@ -270,9 +252,7 @@ class WorkerRuntime:
         )
         return stored
 
-    async def claim(
-        self, worker_id: str, execution_class: str = "default"
-    ) -> WorkerJob | None:
+    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
         """Claim the next queued job for a worker in one execution class."""
         job = await self.backend.claim(worker_id, execution_class)
         if job is None:
@@ -325,11 +305,7 @@ class WorkerRuntime:
         """Mark a worker as alive and refresh the lease if possible."""
         await self.backend.heartbeat(worker_id, job_id)
         if job_id is not None and self.lease_manager is not None:
-            lease = (
-                self.lease_manager.get(job_id)
-                if hasattr(self.lease_manager, "get")
-                else None
-            )
+            lease = self.lease_manager.get(job_id) if hasattr(self.lease_manager, "get") else None
             if lease is not None:
                 renewed = self.lease_manager.renew(lease)
                 self._record(
@@ -357,9 +333,7 @@ class WorkerRuntime:
         self._record_execution(job, outcome="succeeded")
         return job
 
-    async def fail(
-        self, job_id: UUID, error: str, *, terminal: bool = True
-    ) -> WorkerJob:
+    async def fail(self, job_id: UUID, error: str, *, terminal: bool = True) -> WorkerJob:
         """Mark a job as failed and optionally route it to the DLQ."""
         job = await self.backend.fail(job_id, error)
         self._release_lease(job)
@@ -437,17 +411,11 @@ class WorkerRuntime:
     def _release_lease(self, job: WorkerJob) -> None:
         if self.lease_manager is None:
             return
-        lease = (
-            self.lease_manager.get(job.job_id)
-            if hasattr(self.lease_manager, "get")
-            else None
-        )
+        lease = self.lease_manager.get(job.job_id) if hasattr(self.lease_manager, "get") else None
         if lease is not None:
             self.lease_manager.release(lease)
 
-    def _record_execution(
-        self, job: WorkerJob, *, outcome: str, error: str | None = None
-    ) -> None:
+    def _record_execution(self, job: WorkerJob, *, outcome: str, error: str | None = None) -> None:
         if self.execution_store is not None:
             self.execution_store.record(
                 ExecutionRecord(

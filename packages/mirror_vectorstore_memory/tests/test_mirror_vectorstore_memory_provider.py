@@ -46,7 +46,4 @@ def test_provider_descriptor() -> None:
 
     assert provider.name == "memory"
     assert provider.capability == "vectorstore"
-    assert (
-        provider.factory
-        == "mirror_vectorstore_memory.provider:MemoryVectorStoreProvider"
-    )
+    assert provider.factory == "mirror_vectorstore_memory.provider:MemoryVectorStoreProvider"

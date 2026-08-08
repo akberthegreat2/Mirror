@@ -43,10 +43,7 @@ class MirrorSettings(BaseSettings):
         if value is None:
             return {}
         if isinstance(value, dict):
-            return {
-                key: secret if isinstance(secret, SecretStr) else SecretStr(str(secret))
-                for key, secret in value.items()
-            }
+            return {key: secret if isinstance(secret, SecretStr) else SecretStr(str(secret)) for key, secret in value.items()}
         raise ValueError("secrets must be a mapping")
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
@@ -73,9 +70,7 @@ class MirrorSettings(BaseSettings):
                 try:
                     import yaml
                 except ImportError as exc:
-                    raise ConfigurationError(
-                        "YAML configuration requires the 'yaml' extra"
-                    ) from exc
+                    raise ConfigurationError("YAML configuration requires the 'yaml' extra") from exc
                 with path.open("r", encoding="utf-8") as stream:
                     data = yaml.safe_load(stream) or {}
             elif path.suffix == ".toml":
@@ -85,13 +80,9 @@ class MirrorSettings(BaseSettings):
                 with path.open("r", encoding="utf-8") as stream:
                     data = json.load(stream)
             else:
-                raise ConfigurationError(
-                    f"Unsupported configuration format: {path.suffix}"
-                )
+                raise ConfigurationError(f"Unsupported configuration format: {path.suffix}")
         except OSError as exc:
-            raise ConfigurationError(
-                f"Unable to read configuration file: {path}"
-            ) from exc
+            raise ConfigurationError(f"Unable to read configuration file: {path}") from exc
         return cls.model_validate(data)
 
     @classmethod

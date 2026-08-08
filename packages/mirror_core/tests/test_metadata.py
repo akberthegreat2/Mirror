@@ -69,9 +69,7 @@ def test_sqlite_metadata_store_round_trip_preserves_common_types(
 
     assert loaded == record
     assert isinstance(loaded.payload["seen_at"], datetime)
-    assert isinstance(
-        loaded.payload["resource_id"], type(record.payload["resource_id"])
-    )
+    assert isinstance(loaded.payload["resource_id"], type(record.payload["resource_id"]))
     assert isinstance(loaded.payload["path"], Path)
     assert store.list(namespace=record.namespace) == [record]
     store.close()

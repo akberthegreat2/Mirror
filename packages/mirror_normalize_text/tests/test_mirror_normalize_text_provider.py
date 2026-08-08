@@ -34,6 +34,4 @@ def test_provider_descriptor() -> None:
 
     assert provider.name == "text"
     assert provider.capability == "normalize"
-    assert (
-        provider.factory == "mirror_normalize_text.provider:TextNormalizationProvider"
-    )
+    assert provider.factory == "mirror_normalize_text.provider:TextNormalizationProvider"

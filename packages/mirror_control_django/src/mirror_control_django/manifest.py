@@ -157,9 +157,7 @@ interface = InterfaceManifest(
     interface_type="dashboard",
     factory="mirror_control_django.views:DashboardView",
     requires_capabilities=[],
-    metadata={
-        "description": "Django admin/control-plane interface for Mirror metadata and pipeline operations."
-    },
+    metadata={"description": "Django admin/control-plane interface for Mirror metadata and pipeline operations."},
 )
 
 __all__ = [

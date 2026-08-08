@@ -23,18 +23,14 @@ class TracingSettings(BaseModel):
 class TracingMiddleware:
     """Propagate basic run and step context through the invocation chain."""
 
-    def __init__(
-        self, settings: TracingSettings | None = None, /, **overrides: Any
-    ) -> None:
+    def __init__(self, settings: TracingSettings | None = None, /, **overrides: Any) -> None:
         if settings is None:
             settings = TracingSettings.model_validate(overrides)
         elif overrides:
             settings = settings.model_copy(update=overrides)
         self.settings = settings
 
-    async def __call__(
-        self, invocation: MiddlewareInvocation, next_middleware: NextMiddleware
-    ) -> Any:
+    async def __call__(self, invocation: MiddlewareInvocation, next_middleware: NextMiddleware) -> Any:
         trace = invocation.context.setdefault("trace", {})
         trace.setdefault("service_name", self.settings.service_name)
         trace.setdefault("step_id", invocation.step.id)

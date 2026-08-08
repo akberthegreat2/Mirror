@@ -70,19 +70,12 @@ class CheckpointCoordinator:
     ) -> None:
         snapshot_run_id = snapshot.get("run_id")
         if snapshot_run_id is not None and str(snapshot_run_id) != str(run_id):
-            raise ExecutionError(
-                f"Checkpoint run_id mismatch for run {run_id} step {step_id!r}"
-            )
+            raise ExecutionError(f"Checkpoint run_id mismatch for run {run_id} step {step_id!r}")
         if snapshot.get("pipeline_id") not in {None, run.plan.pipeline_id}:
-            raise ExecutionError(
-                f"Checkpoint pipeline mismatch for run {run_id} step {step_id!r}"
-            )
+            raise ExecutionError(f"Checkpoint pipeline mismatch for run {run_id} step {step_id!r}")
         run.restore(
             states={name: value for name, value in snapshot.get("states", {}).items()},
-            results={
-                name: self._restore_envelope(value)
-                for name, value in snapshot.get("results", {}).items()
-            },
+            results={name: self._restore_envelope(value) for name, value in snapshot.get("results", {}).items()},
             errors=snapshot.get("errors", {}),
             retry_counts=snapshot.get("retry_counts", {}),
             failed_step_id=snapshot.get("failed_step_id"),
@@ -104,10 +97,7 @@ class CheckpointCoordinator:
             "failed_step_id": run.failed_step_id,
             "cancelled": run.cancelled,
             "inputs": dict(run.inputs),
-            "results": {
-                step_id: self._serialize_envelope(envelope)
-                for step_id, envelope in run.results.items()
-            },
+            "results": {step_id: self._serialize_envelope(envelope) for step_id, envelope in run.results.items()},
             "metadata": {"config_fingerprint": run.plan.config_fingerprint},
         }
         self.checkpoint_store.save(run.run_id, step.id, payload)
@@ -133,14 +123,8 @@ class DeadLetterRecorder:
             step_id=run.failed_step_id,
             reason=next(iter(result.errors.values()), "execution failed"),
             original_inputs=dict(run.inputs),
-            policy_state={
-                step_id: compiled.policy.model_dump(mode="json")
-                for step_id, compiled in run.plan.steps.items()
-            },
-            provenance={
-                step_id: envelope.resource_id
-                for step_id, envelope in run.results.items()
-            },
+            policy_state={step_id: compiled.policy.model_dump(mode="json") for step_id, compiled in run.plan.steps.items()},
+            provenance={step_id: envelope.resource_id for step_id, envelope in run.results.items()},
             retry_count=sum(run.retry_counts.values()),
             terminal_status=result.outcome.value,
         )
@@ -167,9 +151,7 @@ class CompensationInvoker:
                     "step_id": compiled.id,
                     "capability": compiled.capability.name,
                     "provider": compiled.provider.name,
-                    "policy": compiled.policy.compensation.model_dump(mode="json")
-                    if compiled.policy.compensation is not None
-                    else {},
+                    "policy": compiled.policy.compensation.model_dump(mode="json") if compiled.policy.compensation is not None else {},
                     "error": str(error),
                 },
             )
@@ -221,9 +203,7 @@ class PolicyInvoker:
         for index, provider_config in enumerate(provider_configs):
             provider = self._get_provider(compiled, provider_config)
             try:
-                payload = await self.invoke_with_policies(
-                    compiled, provider, provider_config, request, runner, run
-                )
+                payload = await self.invoke_with_policies(compiled, provider, provider_config, request, runner, run)
                 if index > 0:
                     await self._emit(
                         "step.fallback.succeeded",
@@ -263,9 +243,7 @@ class PolicyInvoker:
         last_error: Exception | None = None
         for attempt in range(1, attempts + 1):
             try:
-                invocation = self._invoke(
-                    compiled, provider, provider_config, request, runner, run
-                )
+                invocation = self._invoke(compiled, provider, provider_config, request, runner, run)
                 if policy.timeout is not None:
                     return await asyncio.wait_for(invocation, timeout=policy.timeout)
                 return await invocation
@@ -295,11 +273,7 @@ class PolicyInvoker:
                     error=exc,
                     policy=policy.model_dump(mode="json"),
                 )
-                delay = (
-                    policy.retry.delay_for_attempt(attempt + 1)
-                    if policy.retry is not None
-                    else 0.0
-                )
+                delay = policy.retry.delay_for_attempt(attempt + 1) if policy.retry is not None else 0.0
                 if delay:
                     await asyncio.sleep(delay)
         raise ExecutionError("Retry policy exhausted", cause=last_error)

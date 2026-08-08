@@ -23,26 +23,18 @@ class TimeoutSettings(BaseModel):
 class TimeoutMiddleware:
     """Enforce a timeout on capability invocation."""
 
-    def __init__(
-        self, settings: TimeoutSettings | None = None, /, **overrides: Any
-    ) -> None:
+    def __init__(self, settings: TimeoutSettings | None = None, /, **overrides: Any) -> None:
         if settings is None:
             settings = TimeoutSettings.model_validate(overrides)
         elif overrides:
             settings = settings.model_copy(update=overrides)
         self.settings = settings
 
-    async def __call__(
-        self, invocation: MiddlewareInvocation, next_middleware: NextMiddleware
-    ) -> Any:
+    async def __call__(self, invocation: MiddlewareInvocation, next_middleware: NextMiddleware) -> Any:
         try:
-            return await asyncio.wait_for(
-                next_middleware(invocation), timeout=self.settings.timeout
-            )
+            return await asyncio.wait_for(next_middleware(invocation), timeout=self.settings.timeout)
         except asyncio.TimeoutError:
-            raise TimeoutError(
-                f"Invocation timed out after {self.settings.timeout} seconds"
-            ) from None
+            raise TimeoutError(f"Invocation timed out after {self.settings.timeout} seconds") from None
 
 
 middleware = MiddlewareManifest(

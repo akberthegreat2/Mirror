@@ -94,9 +94,7 @@ def test_extension_lifecycle_manager_full_flow(
 
     manager.deactivate(valid)
     assert manager.get_record("fetch").state == ExtensionLifecycleState.DEACTIVATED
-    assert (
-        manager.get_record("fetch-httpx").state == ExtensionLifecycleState.DEACTIVATED
-    )
+    assert manager.get_record("fetch-httpx").state == ExtensionLifecycleState.DEACTIVATED
 
     manager.unload(valid)
     assert manager.get_record("fetch").state == ExtensionLifecycleState.UNLOADED

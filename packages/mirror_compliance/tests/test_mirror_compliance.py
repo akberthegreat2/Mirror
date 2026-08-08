@@ -22,13 +22,7 @@ async def test_compliance_step_success() -> None:
     """The runner should delegate to the provider."""
 
     provider = AsyncMock()
-    request = ComplianceRequest(
-        documents=[
-            ComplianceDocument(
-                document_id="doc-1", text="Mirror", metadata={"source": "test"}
-            )
-        ]
-    )
+    request = ComplianceRequest(documents=[ComplianceDocument(document_id="doc-1", text="Mirror", metadata={"source": "test"})])
     expected = ComplianceResult(
         assessments=[
             ComplianceAssessment(
@@ -55,13 +49,7 @@ async def test_compliance_step_wraps_unknown_error() -> None:
 
     provider = AsyncMock()
     provider.check.side_effect = ValueError("boom")
-    request = ComplianceRequest(
-        documents=[
-            ComplianceDocument(
-                document_id="doc-1", text="Mirror", metadata={"source": "test"}
-            )
-        ]
-    )
+    request = ComplianceRequest(documents=[ComplianceDocument(document_id="doc-1", text="Mirror", metadata={"source": "test"})])
 
     with pytest.raises(ComplianceError) as excinfo:
         await compliance_step(provider, request)

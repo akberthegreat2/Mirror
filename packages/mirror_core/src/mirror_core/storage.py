@@ -79,11 +79,7 @@ def _normalize_blob_key(key: str) -> str:
 
 def _resolve_blob_path(base_path: Path, key: str) -> Path:
     candidate = Path(key)
-    if (
-        candidate.is_absolute()
-        or any(part in {"..", "."} for part in candidate.parts)
-        or not candidate.parts
-    ):
+    if candidate.is_absolute() or any(part in {"..", "."} for part in candidate.parts) or not candidate.parts:
         raise ValueError("Blob key must be a relative path without traversal segments")
     return base_path.joinpath(*candidate.parts)
 

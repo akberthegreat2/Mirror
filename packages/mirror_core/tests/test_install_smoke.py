@@ -45,9 +45,7 @@ def test_local_install_and_import_smoke(tmp_path: Path) -> None:
     target = tmp_path / "site-packages"
     target.mkdir()
 
-    copied_paths = [
-        _copy_package_tree(path, tmp_path / path.name) for path in PACKAGE_PATHS
-    ]
+    copied_paths = [_copy_package_tree(path, tmp_path / path.name) for path in PACKAGE_PATHS]
 
     install = [
         sys.executable,
@@ -81,9 +79,7 @@ def test_local_install_and_import_smoke(tmp_path: Path) -> None:
         text=True,
         env={
             **os.environ,
-            "PYTHONPATH": os.pathsep.join(
-                [str(target), "/opt/pyvenv/lib/python3.13/site-packages"]
-            ),
+            "PYTHONPATH": os.pathsep.join([str(target), "/opt/pyvenv/lib/python3.13/site-packages"]),
         },
     )
 
@@ -139,9 +135,7 @@ async def test_real_world_fetch_pipeline_uses_actual_packages(
             timestamp="2026-08-03T00:00:00+00:00",
         )
 
-    async def playwright_fetch(
-        self: PlaywrightProvider, request: FetchRequest
-    ) -> FetchResult:
+    async def playwright_fetch(self: PlaywrightProvider, request: FetchRequest) -> FetchResult:
         return FetchResult(
             url=str(request.url),
             status_code=200,
@@ -190,9 +184,7 @@ async def test_real_world_fetch_pipeline_uses_actual_packages(
         )
         await app.start()
         try:
-            result = await app.run_pipeline_detailed(
-                pipeline, inputs={"url": "https://example.com"}
-            )
+            result = await app.run_pipeline_detailed(pipeline, inputs={"url": "https://example.com"})
         finally:
             await app.shutdown()
         assert result.outcome.value == "succeeded"

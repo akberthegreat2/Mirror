@@ -15,8 +15,6 @@ def test_scraper_extracts_text() -> None:
 
 @pytest.mark.asyncio
 async def test_basic_scrape_provider_works() -> None:
-    result = await BasicScrapeProvider().scrape(
-        ScrapeRequest(html="<html><body>Hello</body></html>")
-    )
+    result = await BasicScrapeProvider().scrape(ScrapeRequest(html="<html><body>Hello</body></html>"))
     assert isinstance(result, ScrapeResult)
     assert result.document.text

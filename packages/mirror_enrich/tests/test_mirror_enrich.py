@@ -23,9 +23,7 @@ async def test_enrich_step_success() -> None:
     """The runner should delegate to the provider."""
 
     provider = AsyncMock()
-    request = EnrichmentRequest(
-        documents=[EnrichmentDocument(document_id="doc-1", text="Hello Mirror.")]
-    )
+    request = EnrichmentRequest(documents=[EnrichmentDocument(document_id="doc-1", text="Hello Mirror.")])
     expected = EnrichmentResult(
         documents=[
             EnrichedDocument(
@@ -61,9 +59,7 @@ async def test_enrich_step_wraps_unknown_error() -> None:
 
     provider = AsyncMock()
     provider.enrich.side_effect = ValueError("boom")
-    request = EnrichmentRequest(
-        documents=[EnrichmentDocument(document_id="doc-1", text="Hello Mirror.")]
-    )
+    request = EnrichmentRequest(documents=[EnrichmentDocument(document_id="doc-1", text="Hello Mirror.")])
 
     with pytest.raises(EnrichmentError) as excinfo:
         await enrich_step(provider, request)

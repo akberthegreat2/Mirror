@@ -27,15 +27,11 @@ def test_analyzer_extracts_keywords() -> None:
 
 @pytest.mark.asyncio
 async def test_analyze_step() -> None:
-    result = await analyze_step(
-        FakeAnalyzeProvider(), AnalyzeRequest(text="Hello world from Mirror")
-    )
+    result = await analyze_step(FakeAnalyzeProvider(), AnalyzeRequest(text="Hello world from Mirror"))
     assert result.analysis.keywords
 
 
 @pytest.mark.asyncio
 async def test_basic_analyze_provider() -> None:
-    result = await BasicAnalyzeProvider().analyze(
-        AnalyzeRequest(text="Hello world from Mirror")
-    )
+    result = await BasicAnalyzeProvider().analyze(AnalyzeRequest(text="Hello world from Mirror"))
     assert result.analysis.keywords

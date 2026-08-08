@@ -70,10 +70,7 @@ async def test_worker_runtime_records_execution_and_metadata() -> None:
             "pipeline_id": submitted.pipeline_id,
         },
     )
-    assert (
-        metadata_store.get(MetadataNamespaces.EXECUTION_RUNS, str(submitted.job_id))
-        is not None
-    )
+    assert metadata_store.get(MetadataNamespaces.EXECUTION_RUNS, str(submitted.job_id)) is not None
     assert lease_manager.get(submitted.job_id) is None
 
     await backend.stop()
@@ -87,9 +84,7 @@ async def test_worker_runtime_routes_failures_to_dlq() -> None:
     dead_letter_queue = InMemoryDeadLetterQueue()
     runtime = WorkerRuntime(backend, dead_letter_queue=dead_letter_queue)
 
-    submitted = await runtime.submit(
-        WorkerJob(kind="crawl", payload={"url": "https://example.com"})
-    )
+    submitted = await runtime.submit(WorkerJob(kind="crawl", payload={"url": "https://example.com"}))
     assert submitted.run_id == submitted.job_id
     assert submitted.pipeline_id == "crawl"
     claimed = await runtime.claim("worker-1")
@@ -116,9 +111,7 @@ async def test_worker_runtime_routes_failures_to_dlq() -> None:
         lease_id=str(submitted.job_id),
     )
     assert record is not None
-    assert record.model_dump(exclude={"created_at"}) == expected.model_dump(
-        exclude={"created_at"}
-    )
+    assert record.model_dump(exclude={"created_at"}) == expected.model_dump(exclude={"created_at"})
 
     await backend.stop()
 
@@ -153,9 +146,7 @@ async def test_worker_runtime_requeues_expired_jobs(tmp_path: Path) -> None:
     backend = SQLiteWorkerBackend(tmp_path / "runtime.sqlite3")
     await backend.start()
     runtime = WorkerRuntime(backend)
-    submitted = await runtime.submit(
-        WorkerJob(kind="crawl", payload={"url": "https://example.com"})
-    )
+    submitted = await runtime.submit(WorkerJob(kind="crawl", payload={"url": "https://example.com"}))
     assert submitted.run_id == submitted.job_id
     assert submitted.pipeline_id == "crawl"
     claimed = await runtime.claim("worker-1")

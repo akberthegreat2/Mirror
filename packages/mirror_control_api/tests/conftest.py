@@ -37,17 +37,13 @@ def _configure() -> None:
             "django.contrib.auth.middleware.AuthenticationMiddleware",
             "django.contrib.messages.middleware.MessageMiddleware",
         ],
-        DATABASES={
-            "default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}
-        },
+        DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
         TEMPLATES=[
             {
                 "BACKEND": "django.template.backends.django.DjangoTemplates",
                 "DIRS": [str(base_dir / "src")],
                 "APP_DIRS": True,
-                "OPTIONS": {
-                    "context_processors": ["django.template.context_processors.request"]
-                },
+                "OPTIONS": {"context_processors": ["django.template.context_processors.request"]},
             }
         ],
         ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"],

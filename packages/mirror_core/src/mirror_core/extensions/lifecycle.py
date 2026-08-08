@@ -84,18 +84,14 @@ class ExtensionLifecycleManager:
         """Return lifecycle records ordered by extension id for diagnostics."""
         return tuple(self._records[key] for key in sorted(self._records))
 
-    def discover(
-        self, groups: list[str] | None = None
-    ) -> tuple[list[ExtensionManifest], list[tuple[str, str]]]:
+    def discover(self, groups: list[str] | None = None) -> tuple[list[ExtensionManifest], list[tuple[str, str]]]:
         """Discover extension manifests and record them as discovered."""
         manifests, errors = discover_extensions(groups=groups)
         for manifest in manifests:
             self._set_state(manifest, ExtensionLifecycleState.DISCOVERED)
         return manifests, errors
 
-    def validate(
-        self, manifests: list[ExtensionManifest]
-    ) -> tuple[list[ExtensionManifest], list[tuple[str, str]]]:
+    def validate(self, manifests: list[ExtensionManifest]) -> tuple[list[ExtensionManifest], list[tuple[str, str]]]:
         """Validate manifests and record valid ones as validated."""
         valid, errors = validate_manifests(manifests)
         for manifest in valid:
@@ -110,16 +106,12 @@ class ExtensionLifecycleManager:
         """Record extension configuration without changing ownership boundaries."""
         configuration = configuration or {}
         for manifest in manifests:
-            self._ensure_transition_allowed(
-                manifest, ExtensionLifecycleState.CONFIGURED
-            )
+            self._ensure_transition_allowed(manifest, ExtensionLifecycleState.CONFIGURED)
             record = self._get_or_create_record(manifest)
             self._records[manifest.extension_id] = replace(
                 record,
                 state=ExtensionLifecycleState.CONFIGURED,
-                configuration=MappingProxyType(
-                    dict(configuration.get(manifest.extension_id, {}))
-                ),
+                configuration=MappingProxyType(dict(configuration.get(manifest.extension_id, {}))),
             )
 
     def activate(self, manifests: list[ExtensionManifest]) -> None:
@@ -138,9 +130,7 @@ class ExtensionLifecycleManager:
     def deactivate(self, manifests: list[ExtensionManifest]) -> None:
         """Mark activated manifests as deactivated."""
         for manifest in manifests:
-            self._ensure_transition_allowed(
-                manifest, ExtensionLifecycleState.DEACTIVATED
-            )
+            self._ensure_transition_allowed(manifest, ExtensionLifecycleState.DEACTIVATED)
             record = self._get_or_create_record(manifest)
             self._records[manifest.extension_id] = replace(
                 record,
@@ -162,9 +152,7 @@ class ExtensionLifecycleManager:
         try:
             return self._records[extension_id]
         except KeyError as exc:
-            raise LifecycleError(
-                f"Extension lifecycle record not found: {extension_id}"
-            ) from exc
+            raise LifecycleError(f"Extension lifecycle record not found: {extension_id}") from exc
 
     def _set_state(
         self,
@@ -175,10 +163,7 @@ class ExtensionLifecycleManager:
         current_order = self._STATE_ORDER[record.state]
         next_order = self._STATE_ORDER[state]
         if next_order < current_order:
-            raise LifecycleError(
-                f"Invalid lifecycle transition for {manifest.extension_id!r}: "
-                f"{record.state.value} -> {state.value}"
-            )
+            raise LifecycleError(f"Invalid lifecycle transition for {manifest.extension_id!r}: {record.state.value} -> {state.value}")
         if next_order == current_order:
             return
         self._records[manifest.extension_id] = replace(record, state=state)
@@ -191,18 +176,12 @@ class ExtensionLifecycleManager:
         record = self._records.get(manifest.extension_id)
         if record is None:
             if next_state != ExtensionLifecycleState.DISCOVERED:
-                raise LifecycleError(
-                    f"Extension {manifest.extension_id!r} must be discovered before "
-                    f"it can transition to {next_state.value}"
-                )
+                raise LifecycleError(f"Extension {manifest.extension_id!r} must be discovered before it can transition to {next_state.value}")
             return
         current_order = self._STATE_ORDER[record.state]
         next_order = self._STATE_ORDER[next_state]
         if next_order < current_order:
-            raise LifecycleError(
-                f"Invalid lifecycle transition for {manifest.extension_id!r}: "
-                f"{record.state.value} -> {next_state.value}"
-            )
+            raise LifecycleError(f"Invalid lifecycle transition for {manifest.extension_id!r}: {record.state.value} -> {next_state.value}")
         if record.state == next_state:
             return
         if next_state == ExtensionLifecycleState.CONFIGURED:
@@ -210,34 +189,17 @@ class ExtensionLifecycleManager:
                 ExtensionLifecycleState.DISCOVERED,
                 ExtensionLifecycleState.VALIDATED,
             }:
-                raise LifecycleError(
-                    f"Extension {manifest.extension_id!r} cannot be configured "
-                    f"from {record.state.value}"
-                )
+                raise LifecycleError(f"Extension {manifest.extension_id!r} cannot be configured from {record.state.value}")
         elif next_state == ExtensionLifecycleState.ACTIVATED:
             if record.state != ExtensionLifecycleState.CONFIGURED:
-                raise LifecycleError(
-                    f"Extension {manifest.extension_id!r} cannot be activated "
-                    f"from {record.state.value}"
-                )
+                raise LifecycleError(f"Extension {manifest.extension_id!r} cannot be activated from {record.state.value}")
         elif next_state == ExtensionLifecycleState.DEACTIVATED:
             if record.state != ExtensionLifecycleState.ACTIVATED:
-                raise LifecycleError(
-                    f"Extension {manifest.extension_id!r} cannot be deactivated "
-                    f"from {record.state.value}"
-                )
-        elif (
-            next_state == ExtensionLifecycleState.UNLOADED
-            and record.state != ExtensionLifecycleState.DEACTIVATED
-        ):
-            raise LifecycleError(
-                f"Extension {manifest.extension_id!r} cannot be unloaded "
-                f"from {record.state.value}"
-            )
+                raise LifecycleError(f"Extension {manifest.extension_id!r} cannot be deactivated from {record.state.value}")
+        elif next_state == ExtensionLifecycleState.UNLOADED and record.state != ExtensionLifecycleState.DEACTIVATED:
+            raise LifecycleError(f"Extension {manifest.extension_id!r} cannot be unloaded from {record.state.value}")
 
-    def _get_or_create_record(
-        self, manifest: ExtensionManifest
-    ) -> ExtensionLifecycleRecord:
+    def _get_or_create_record(self, manifest: ExtensionManifest) -> ExtensionLifecycleRecord:
         record = self._records.get(manifest.extension_id)
         if record is None:
             record = ExtensionLifecycleRecord(
@@ -246,10 +208,6 @@ class ExtensionLifecycleManager:
                 configuration={},
             )
             self._records[manifest.extension_id] = record
-        elif record.manifest.model_dump(mode="python") != manifest.model_dump(
-            mode="python"
-        ):
-            raise LifecycleError(
-                f"Conflicting manifest for extension {manifest.extension_id!r}"
-            )
+        elif record.manifest.model_dump(mode="python") != manifest.model_dump(mode="python"):
+            raise LifecycleError(f"Conflicting manifest for extension {manifest.extension_id!r}")
         return record

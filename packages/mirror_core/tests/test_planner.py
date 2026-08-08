@@ -122,19 +122,13 @@ def test_planner_validates_required_capabilities() -> None:
             dependencies=[Dependency(name="fetch", version="~=1.0")],
         )
     )
-    registry.register_provider(
-        ProviderManifest(
-            name="crawl", capability="crawl", capability_api="~=1.0", factory="x:y"
-        )
-    )
+    registry.register_provider(ProviderManifest(name="crawl", capability="crawl", capability_api="~=1.0", factory="x:y"))
     pipeline = Pipeline(
         id="deps",
         steps=[Step(id="crawl", capability="crawl", outputs=["result"])],
     )
 
-    with pytest.raises(
-        PlannerError, match=r"Required capability 'fetch' \(~=1.0\) is not available"
-    ):
+    with pytest.raises(PlannerError, match=r"Required capability 'fetch' \(~=1.0\) is not available"):
         Planner(registry).plan(pipeline)
 
 
@@ -173,16 +167,8 @@ def test_port_assignability_is_directional() -> None:
             input_ports={"animal": Dog},
         )
     )
-    registry.register_provider(
-        ProviderManifest(
-            name="source", capability="source", capability_api="~=1.0", factory="x:y"
-        )
-    )
-    registry.register_provider(
-        ProviderManifest(
-            name="target", capability="target", capability_api="~=1.0", factory="x:y"
-        )
-    )
+    registry.register_provider(ProviderManifest(name="source", capability="source", capability_api="~=1.0", factory="x:y"))
+    registry.register_provider(ProviderManifest(name="target", capability="target", capability_api="~=1.0", factory="x:y"))
     pipeline = Pipeline(
         id="unsafe",
         inputs={"value": "str"},

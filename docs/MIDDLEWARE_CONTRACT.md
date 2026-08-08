@@ -46,7 +46,7 @@ That is a supported control-flow decision, not an error.
 ## Policy ownership
 
 Retry, timeout, and cancellation are execution policies.
-Middleware may enforce them, but the policy definition belongs to the core runtime contract. Fallback is reserved for later policy work.
+Middleware may enforce them, but the policy definition belongs to the core runtime contract. Fallback: supported. A pipeline may configure fallback behavior for step failures; the runtime applies it according to the pipeline's execution policy.
 
 ## Construction rule
 

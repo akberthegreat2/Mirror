@@ -34,9 +34,7 @@ async def test_scheduler_coordinator_dispatches_due_jobs() -> None:
             name="crawl",
             due_at=due_at,
             payload={"url": "https://example.com"},
-            trigger=ScheduleTrigger(
-                kind=ScheduleTriggerKind.INTERVAL, every_seconds=60
-            ),
+            trigger=ScheduleTrigger(kind=ScheduleTriggerKind.INTERVAL, every_seconds=60),
             queue_name="default",
         )
     )
@@ -50,9 +48,7 @@ async def test_scheduler_coordinator_dispatches_due_jobs() -> None:
     assert jobs[0].payload["schedule_id"] == str(record.schedule_id)
     assert scheduler.due(now=due_at) == []
 
-    stored = metadata_store.get(
-        MetadataNamespaces.SCHEDULER_STATE, str(record.schedule_id)
-    )
+    stored = metadata_store.get(MetadataNamespaces.SCHEDULER_STATE, str(record.schedule_id))
     assert stored is not None
     assert stored.payload["state"] == "scheduled"
     assert stored.payload["next_run_at"] is not None

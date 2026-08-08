@@ -197,12 +197,7 @@ def test_no_packaging_artifacts_are_checked_in() -> None:
     bad_paths: list[str] = []
     for path in ROOT.rglob("*"):
         parts = set(path.parts)
-        if (
-            path.suffix == ".egg-info"
-            or path.name.endswith(".egg-info")
-            or "build" in parts
-            or "dist" in parts
-        ):
+        if path.suffix == ".egg-info" or path.name.endswith(".egg-info") or "build" in parts or "dist" in parts:
             bad_paths.append(str(path.relative_to(ROOT)))
     assert not bad_paths, f"Checked-in packaging artifacts found: {bad_paths}"
 
@@ -214,10 +209,7 @@ def test_capability_packages_do_not_define_framework_files() -> None:
         if not source_root.exists():
             continue
         for file_path in source_root.rglob("*.py"):
-            if (
-                file_path.name in FORBIDDEN_FRAMEWORK_FILES
-                or file_path.name in FORBIDDEN_CAPABILITY_HELPERS
-            ):
+            if file_path.name in FORBIDDEN_FRAMEWORK_FILES or file_path.name in FORBIDDEN_CAPABILITY_HELPERS:
                 violations.append(str(file_path.relative_to(ROOT)))
     assert not violations, f"Capability packages define framework files: {violations}"
 
@@ -284,13 +276,7 @@ def test_capability_public_surface_is_documented() -> None:
 
     for module_name in DOCUMENTED_CAPABILITY_MODULES:
         module = importlib.import_module(module_name)
-        public = [
-            (name, member)
-            for name, member in inspect.getmembers(module)
-            if not name.startswith("_")
-            and (inspect.isfunction(member) or inspect.isclass(member))
-            and getattr(member, "__module__", None) == module.__name__
-        ]
+        public = [(name, member) for name, member in inspect.getmembers(module) if not name.startswith("_") and (inspect.isfunction(member) or inspect.isclass(member)) and getattr(member, "__module__", None) == module.__name__]
         assert public, f"No public callables found in {module_name}"
         missing = [name for name, member in public if not inspect.getdoc(member)]
         assert not missing, f"Missing docstrings in {module_name}: {missing}"

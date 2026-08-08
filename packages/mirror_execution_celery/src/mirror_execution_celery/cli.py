@@ -46,9 +46,7 @@ def submit_main() -> None:
 
     parser = argparse.ArgumentParser(description="Submit a Mirror pipeline to Celery")
     parser.add_argument("pipeline", help="JSON file containing a Mirror pipeline")
-    parser.add_argument(
-        "--inputs", default="{}", help="JSON object containing pipeline inputs"
-    )
+    parser.add_argument("--inputs", default="{}", help="JSON object containing pipeline inputs")
     parser.add_argument("--execution-class", default="default")
     args = parser.parse_args()
 
@@ -73,10 +71,7 @@ def submit_main() -> None:
         try:
             pipeline_model = Pipeline.model_validate(pipeline_data)
             plan = mirror_app.compile_pipeline(pipeline_model)
-            provider_selections = {
-                step_id: compiled.provider.name
-                for step_id, compiled in plan.steps.items()
-            }
+            provider_selections = {step_id: compiled.provider.name for step_id, compiled in plan.steps.items()}
         finally:
             await mirror_app.shutdown()
         await backend.start()

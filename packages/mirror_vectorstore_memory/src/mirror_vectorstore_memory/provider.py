@@ -31,9 +31,7 @@ class MemoryVectorStoreProvider(VectorStore):
         for record in request.records:
             self._validate_record(record)
             bucket[record.record_id] = record
-        return VectorUpsertResult(
-            namespace=request.namespace, upserted=len(request.records)
-        )
+        return VectorUpsertResult(namespace=request.namespace, upserted=len(request.records))
 
     async def query(self, request: VectorQueryRequest) -> VectorQueryResult:
         """Return the nearest records for a query vector."""
@@ -52,26 +50,20 @@ class MemoryVectorStoreProvider(VectorStore):
             if self._matches_filters(record, request.filters)
         ]
         matches.sort(key=lambda match: (-match.score, match.record.record_id))
-        return VectorQueryResult(
-            namespace=request.namespace, matches=matches[: request.top_k]
-        )
+        return VectorQueryResult(namespace=request.namespace, matches=matches[: request.top_k])
 
     def _validate_record(self, record: VectorRecord) -> None:
         if not record.vector:
             raise ValueError(f"record '{record.record_id}' must include a vector")
 
-    def _matches_filters(
-        self, record: VectorRecord, filters: dict[str, object]
-    ) -> bool:
+    def _matches_filters(self, record: VectorRecord, filters: dict[str, object]) -> bool:
         for key, expected in filters.items():
             actual = record.metadata.get(key)
             if actual != expected:
                 return False
         return True
 
-    def _cosine_similarity(
-        self, left: tuple[float, ...], right: tuple[float, ...]
-    ) -> float:
+    def _cosine_similarity(self, left: tuple[float, ...], right: tuple[float, ...]) -> float:
         if not left or not right:
             return 0.0
         length = min(len(left), len(right))

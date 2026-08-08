@@ -11,8 +11,6 @@ def test_diff_engine_detects_change() -> None:
 
 @pytest.mark.asyncio
 async def test_text_diff_provider_works() -> None:
-    result = await TextDiffProvider().diff(
-        DiffRequest(before="hello", after="hello world")
-    )
+    result = await TextDiffProvider().diff(DiffRequest(before="hello", after="hello world"))
     assert isinstance(result, DiffResult)
     assert result.summary.changed is True

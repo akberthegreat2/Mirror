@@ -17,9 +17,7 @@ def test_discovery_capability():
         [
             (
                 "fetch",
-                CapabilityManifest(
-                    name="fetch", api_version="1.0", protocol="module:Protocol"
-                ),
+                CapabilityManifest(name="fetch", api_version="1.0", protocol="module:Protocol"),
             )
         ]
     )
@@ -40,15 +38,11 @@ def test_discovery_duplicates():
         [
             (
                 "fetch1",
-                CapabilityManifest(
-                    name="fetch", api_version="1.0", protocol="module:Protocol"
-                ),
+                CapabilityManifest(name="fetch", api_version="1.0", protocol="module:Protocol"),
             ),
             (
                 "fetch2",
-                CapabilityManifest(
-                    name="fetch", api_version="1.0", protocol="module:Protocol"
-                ),
+                CapabilityManifest(name="fetch", api_version="1.0", protocol="module:Protocol"),
             ),
         ]
     )

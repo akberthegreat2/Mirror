@@ -27,10 +27,7 @@ def _validate_name(value: str, label: str) -> None:
     if not value:
         raise ValueError(f"{label} cannot be empty")
     if not _IDENTIFIER_RE.fullmatch(value):
-        raise ValueError(
-            f"{label} must start with a letter or underscore and contain only "
-            "letters, digits, underscores, or hyphens"
-        )
+        raise ValueError(f"{label} must start with a letter or underscore and contain only letters, digits, underscores, or hyphens")
 
 
 def _render(template: str, **replacements: str) -> str:
@@ -126,9 +123,7 @@ _PROJECT_FILES: dict[str, str] = {
         "urlpatterns: list[str] = []",
     ),
     "apps/__init__.py": _text('"""Application packages for the Mirror project."""'),
-    "apps/core/__init__.py": _text(
-        '"""Default application package created by `mirror startproject`."""'
-    ),
+    "apps/core/__init__.py": _text('"""Default application package created by `mirror startproject`."""'),
     "apps/core/config.py": _text(
         '"""Application configuration for the default Mirror app."""',
         "",
@@ -343,9 +338,7 @@ def create_app(name: str, *, root: Path | None = None) -> Path:
     base = Path.cwd() if root is None else root
     apps_root = base / "apps"
     if not apps_root.exists():
-        raise FileNotFoundError(
-            f"Unable to find apps/ under {base}. Run `mirror startproject` first."
-        )
+        raise FileNotFoundError(f"Unable to find apps/ under {base}. Run `mirror startproject` first.")
     app_root = apps_root / name
     if app_root.exists():
         raise FileExistsError(f"Application already exists: {app_root}")

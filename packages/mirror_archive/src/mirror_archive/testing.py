@@ -63,9 +63,7 @@ class ArchiveContract(BaseContract):
         assert result.checksum is not None
 
     @pytest.mark.asyncio
-    async def test_invalid_request_is_translated(
-        self, started_provider: Archive
-    ) -> None:
+    async def test_invalid_request_is_translated(self, started_provider: Archive) -> None:
         """Verify that providers reject malformed payloads through their contract."""
         invalid = ArchiveRequest.model_construct(resource_id=uuid4(), payload=cast(ArchivePayload, None))
         with pytest.raises(ArchiveError):

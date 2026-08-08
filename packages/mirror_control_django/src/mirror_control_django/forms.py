@@ -43,9 +43,7 @@ class PipelineVersionForm(forms.ModelForm):
             if payload is not None:
                 self.fields["definition_text"].initial = payload.decode("utf-8")
         else:
-            self.fields["definition_text"].initial = CorePipeline(
-                id="pipeline", steps=[]
-            ).model_dump_json(indent=2)
+            self.fields["definition_text"].initial = CorePipeline(id="pipeline", steps=[]).model_dump_json(indent=2)
         if self.instance.pk and getattr(self.instance.pipeline, "is_read_only", False):
             self.fields["definition_text"].disabled = True
 

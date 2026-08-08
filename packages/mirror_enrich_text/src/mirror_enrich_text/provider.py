@@ -43,19 +43,9 @@ class TextEnrichmentProvider(Enricher):
             text = text.strip()
 
         tokens = [token.casefold() for token in TOKEN_RE.findall(text)]
-        filtered = [
-            token
-            for token in tokens
-            if len(token) >= self._settings.min_keyword_length
-            and token not in self._settings.stopwords
-        ]
+        filtered = [token for token in tokens if len(token) >= self._settings.min_keyword_length and token not in self._settings.stopwords]
         counts = Counter(filtered)
-        keywords = tuple(
-            token
-            for token, _ in sorted(
-                counts.items(), key=lambda item: (-item[1], item[0])
-            )[: self._settings.max_keywords]
-        )
+        keywords = tuple(token for token, _ in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[: self._settings.max_keywords])
         urls = tuple(dict.fromkeys(URL_RE.findall(document.text)))
         summary_words = text.split()[: self._settings.summary_word_limit]
         summary = " ".join(summary_words)

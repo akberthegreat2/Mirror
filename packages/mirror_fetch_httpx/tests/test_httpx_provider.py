@@ -36,11 +36,7 @@ async def test_fetch_auto_setup():
     request = FetchRequest(url="https://example.com")
 
     mock_client = AsyncMock()
-    mock_client.request = AsyncMock(
-        return_value=httpx.Response(
-            200, content=b"ok", request=httpx.Request("GET", "https://example.com")
-        )
-    )
+    mock_client.request = AsyncMock(return_value=httpx.Response(200, content=b"ok", request=httpx.Request("GET", "https://example.com")))
 
     async def mock_setup():
         provider._client = mock_client

@@ -31,15 +31,11 @@ def test_scraper_extracts_text() -> None:
 
 @pytest.mark.asyncio
 async def test_scrape_step() -> None:
-    result = await scrape_step(
-        FakeScrapeProvider(), ScrapeRequest(html="<html><body>Hello</body></html>")
-    )
+    result = await scrape_step(FakeScrapeProvider(), ScrapeRequest(html="<html><body>Hello</body></html>"))
     assert result.document.text
 
 
 @pytest.mark.asyncio
 async def test_basic_scrape_provider() -> None:
-    result = await BasicScrapeProvider().scrape(
-        ScrapeRequest(html="<html><body>Hello</body></html>")
-    )
+    result = await BasicScrapeProvider().scrape(ScrapeRequest(html="<html><body>Hello</body></html>"))
     assert result.document.text

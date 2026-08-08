@@ -30,9 +30,7 @@ async def test_provenance_step_success() -> None:
     """The runner should delegate to the provider."""
 
     provider = AsyncMock()
-    producer = ProducerRef(
-        capability="demo", capability_version="1.0", provider="memory"
-    )
+    producer = ProducerRef(capability="demo", capability_version="1.0", provider="memory")
     request = ProvenanceRequest(
         envelopes=[
             ProvenanceInput(
@@ -60,9 +58,7 @@ async def test_provenance_step_wraps_unknown_error() -> None:
 
     provider = AsyncMock()
     provider.provenance.side_effect = ValueError("boom")
-    producer = ProducerRef(
-        capability="demo", capability_version="1.0", provider="memory"
-    )
+    producer = ProducerRef(capability="demo", capability_version="1.0", provider="memory")
     request = ProvenanceRequest(
         envelopes=[
             ProvenanceInput(
@@ -93,9 +89,7 @@ def test_capability_descriptor() -> None:
 def test_resource_envelope_creation() -> None:
     """The core resource envelope should remain immutable and fingerprinted."""
 
-    producer = ProducerRef(
-        capability="demo", capability_version="1.0", provider="memory"
-    )
+    producer = ProducerRef(capability="demo", capability_version="1.0", provider="memory")
     envelope = ResourceEnvelope.create(
         resource_type="Payload",
         schema_version="1.0",

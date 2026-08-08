@@ -64,12 +64,7 @@ class ExecutionPlan(BaseModel):
 
     @property
     def dependencies(self) -> Mapping[str, frozenset[str]]:
-        return MappingProxyType(
-            {
-                step_id: frozenset(step.dependencies)
-                for step_id, step in self.steps.items()
-            }
-        )
+        return MappingProxyType({step_id: frozenset(step.dependencies) for step_id, step in self.steps.items()})
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -80,9 +75,7 @@ class ExecutionPlan(BaseModel):
                     "capability": compiled.capability.name,
                     "capability_version": compiled.capability.api_version,
                     "provider": compiled.provider.name,
-                    "fallback_providers": [
-                        provider.name for provider in compiled.fallback_providers
-                    ],
+                    "fallback_providers": [provider.name for provider in compiled.fallback_providers],
                     "dependencies": sorted(compiled.dependencies),
                     "policy": compiled.policy.model_dump(mode="json"),
                 }
@@ -111,9 +104,7 @@ class Planner:
         capabilities = self._resolve_capabilities(pipeline)
         self._validate_required_capabilities(capabilities)
         providers = self._resolve_providers(pipeline, capabilities)
-        fallback_providers = self._resolve_fallback_providers(
-            pipeline, capabilities, providers
-        )
+        fallback_providers = self._resolve_fallback_providers(pipeline, capabilities, providers)
         dependencies, reverse_dependencies = self._build_dependency_graph(pipeline)
         order = self._topological_sort(pipeline, dependencies, reverse_dependencies)
         self._validate_bindings(pipeline, capabilities)
@@ -141,11 +132,7 @@ class Planner:
             }
             for step_id, compiled in compiled_steps.items()
         }
-        fingerprint = hashlib.sha256(
-            json.dumps(
-                fingerprint_payload, sort_keys=True, separators=(",", ":")
-            ).encode()
-        ).hexdigest()
+        fingerprint = hashlib.sha256(json.dumps(fingerprint_payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         return ExecutionPlan(
             pipeline_id=pipeline.id,
             steps=compiled_steps,
@@ -158,15 +145,11 @@ class Planner:
     @staticmethod
     def _validate_unique_step_ids(pipeline: Pipeline) -> None:
         step_ids = [step.id for step in pipeline.steps]
-        duplicates = sorted(
-            {step_id for step_id in step_ids if step_ids.count(step_id) > 1}
-        )
+        duplicates = sorted({step_id for step_id in step_ids if step_ids.count(step_id) > 1})
         if duplicates:
             raise PlannerError(f"Duplicate pipeline step IDs: {', '.join(duplicates)}")
 
-    def _resolve_capabilities(
-        self, pipeline: Pipeline
-    ) -> dict[str, CapabilityManifest]:
+    def _resolve_capabilities(self, pipeline: Pipeline) -> dict[str, CapabilityManifest]:
         resolved: dict[str, CapabilityManifest] = {}
         for step in pipeline.steps:
             try:
@@ -178,25 +161,13 @@ class Planner:
                 ) from exc
         return resolved
 
-    def _validate_required_capabilities(
-        self, capabilities: dict[str, CapabilityManifest]
-    ) -> None:
-        required = sorted(
-            {
-                (dependency.target, dependency.version_constraint)
-                for capability in capabilities.values()
-                for dependency in capability.dependencies
-            }
-        )
+    def _validate_required_capabilities(self, capabilities: dict[str, CapabilityManifest]) -> None:
+        required = sorted({(dependency.target, dependency.version_constraint) for capability in capabilities.values() for dependency in capability.dependencies})
         for dependency_name, dependency_version in required:
             try:
                 self._registry.resolve_capability(dependency_name, dependency_version)
             except Exception as exc:
-                constraint = (
-                    dependency_version
-                    if dependency_version is not None
-                    else "any version"
-                )
+                constraint = dependency_version if dependency_version is not None else "any version"
                 raise PlannerError(
                     f"Required capability {dependency_name!r} ({constraint}) is not available",
                     cause=exc,
@@ -211,13 +182,10 @@ class Planner:
         for step in pipeline.steps:
             requested = step.provider or self._default_providers.get(step.capability)
             try:
-                resolved[step.id] = self._registry.resolve_provider(
-                    capabilities[step.id], requested
-                )
+                resolved[step.id] = self._registry.resolve_provider(capabilities[step.id], requested)
             except Exception as exc:
                 raise PlannerError(
-                    f"Unable to resolve provider for step {step.id!r} "
-                    f"({step.capability!r})",
+                    f"Unable to resolve provider for step {step.id!r} ({step.capability!r})",
                     cause=exc,
                 ) from exc
         return resolved
@@ -237,13 +205,10 @@ class Planner:
                 if provider_name in seen or provider_name == primary[step.id].name:
                     continue
                 try:
-                    provider = self._registry.resolve_provider(
-                        capabilities[step.id], provider_name
-                    )
+                    provider = self._registry.resolve_provider(capabilities[step.id], provider_name)
                 except Exception as exc:
                     raise PlannerError(
-                        f"Unable to resolve fallback provider {provider_name!r} "
-                        f"for step {step.id!r}",
+                        f"Unable to resolve fallback provider {provider_name!r} for step {step.id!r}",
                         cause=exc,
                     ) from exc
                 providers.append(provider)
@@ -262,15 +227,11 @@ class Planner:
             available_outputs = set(capability.output_ports)
             result_model = resolve_type(capability.result_model)
             if result_model is not None:
-                available_outputs.update(
-                    getattr(result_model, "model_fields", {}).keys()
-                )
+                available_outputs.update(getattr(result_model, "model_fields", {}).keys())
                 available_outputs.add("result")
             unknown_outputs = sorted(set(step.outputs).difference(available_outputs))
             if unknown_outputs:
-                raise PlannerError(
-                    f"Step {step.id!r} declares unknown outputs: {', '.join(unknown_outputs)}"
-                )
+                raise PlannerError(f"Step {step.id!r} declares unknown outputs: {', '.join(unknown_outputs)}")
             declared_inputs = set(capability.input_ports)
             request_model = resolve_type(capability.request_model)
             if not declared_inputs and request_model is not None:
@@ -278,35 +239,23 @@ class Planner:
 
             for target, source in step.input.items():
                 if declared_inputs and target not in declared_inputs:
-                    raise PlannerError(
-                        f"Step {step.id!r} binds undeclared input port {target!r}"
-                    )
+                    raise PlannerError(f"Step {step.id!r} binds undeclared input port {target!r}")
                 source_step, source_output = self._parse_binding(source, step.id)
                 if source_step == "$pipeline":
                     if source_output not in pipeline.inputs:
-                        raise PlannerError(
-                            f"Step {step.id!r} references undeclared pipeline input "
-                            f"{source_output!r}"
-                        )
+                        raise PlannerError(f"Step {step.id!r} references undeclared pipeline input {source_output!r}")
                     continue
                 if source_step not in steps_by_id:
-                    raise PlannerError(
-                        f"Step {step.id!r} references unknown step {source_step!r}"
-                    )
+                    raise PlannerError(f"Step {step.id!r} references unknown step {source_step!r}")
                 source_capability = capabilities[source_step]
                 source_ports = set(source_capability.output_ports)
                 source_result_model = resolve_type(source_capability.result_model)
                 if source_result_model is not None:
-                    source_ports.update(
-                        getattr(source_result_model, "model_fields", {}).keys()
-                    )
+                    source_ports.update(getattr(source_result_model, "model_fields", {}).keys())
                 if not source_ports:
                     source_ports = set(steps_by_id[source_step].outputs)
                 if source_output not in source_ports:
-                    raise PlannerError(
-                        f"Step {step.id!r} references unknown output {source_output!r} "
-                        f"from step {source_step!r}"
-                    )
+                    raise PlannerError(f"Step {step.id!r} references unknown output {source_output!r} from step {source_step!r}")
                 self._validate_port_compatibility(
                     source_step,
                     source_output,
@@ -319,9 +268,7 @@ class Planner:
     @staticmethod
     def _parse_binding(source: str, step_id: str) -> tuple[str, str]:
         if "." not in source:
-            raise PlannerError(
-                f"Step {step_id!r} has invalid binding {source!r}; expected '<step>.<output>'"
-            )
+            raise PlannerError(f"Step {step_id!r} has invalid binding {source!r}; expected '<step>.<output>'")
         return tuple(source.split(".", 1))  # type: ignore[return-value]
 
     @staticmethod
@@ -345,22 +292,13 @@ class Planner:
             target_type = field.annotation if field is not None else None
         if source_type is None or target_type is None or source_type == target_type:
             return
-        if (
-            isinstance(source_type, type)
-            and isinstance(target_type, type)
-            and issubclass(source_type, target_type)
-        ):
+        if isinstance(source_type, type) and isinstance(target_type, type) and issubclass(source_type, target_type):
             return
         source_name = getattr(source_type, "__name__", str(source_type))
         target_name = getattr(target_type, "__name__", str(target_type))
-        raise PlannerError(
-            f"Incompatible binding {source_step}.{source_output} ({source_name}) "
-            f"-> {target_step}.{target_input} ({target_name})"
-        )
+        raise PlannerError(f"Incompatible binding {source_step}.{source_output} ({source_name}) -> {target_step}.{target_input} ({target_name})")
 
-    def _build_dependency_graph(
-        self, pipeline: Pipeline
-    ) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+    def _build_dependency_graph(self, pipeline: Pipeline) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
         dependencies: dict[str, set[str]] = {step.id: set() for step in pipeline.steps}
         reverse: dict[str, set[str]] = {step.id: set() for step in pipeline.steps}
         for step in pipeline.steps:
@@ -393,16 +331,10 @@ class Planner:
         return order
 
     @staticmethod
-    def _compute_parallel_groups(
-        dependencies: dict[str, set[str]], order: list[str]
-    ) -> list[list[str]]:
+    def _compute_parallel_groups(dependencies: dict[str, set[str]], order: list[str]) -> list[list[str]]:
         level: dict[str, int] = {}
         for step_id in order:
-            level[step_id] = (
-                0
-                if not dependencies[step_id]
-                else 1 + max(level[dependency] for dependency in dependencies[step_id])
-            )
+            level[step_id] = 0 if not dependencies[step_id] else 1 + max(level[dependency] for dependency in dependencies[step_id])
         groups: dict[int, list[str]] = {}
         for step_id in order:
             groups.setdefault(level[step_id], []).append(step_id)

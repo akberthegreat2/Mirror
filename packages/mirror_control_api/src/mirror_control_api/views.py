@@ -45,9 +45,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
 
 class PipelineViewSet(viewsets.ModelViewSet):
-    queryset = models.Pipeline.objects.select_related("project").prefetch_related(
-        "versions"
-    )
+    queryset = models.Pipeline.objects.select_related("project").prefetch_related("versions")
     serializer_class = PipelineSerializer
 
     @action(detail=True, methods=["post"])
@@ -57,9 +55,7 @@ class PipelineViewSet(viewsets.ModelViewSet):
         if not definition_text:
             return Response({"detail": "definition_text is required"}, status=400)
         if pipeline.is_read_only:
-            return Response(
-                {"detail": "Code-defined pipelines are read-only"}, status=400
-            )
+            return Response({"detail": "Code-defined pipelines are read-only"}, status=400)
         from mirror_control_django.repository import ControlPlaneRepository
 
         repo = ControlPlaneRepository()
@@ -77,16 +73,12 @@ class PipelineViewSet(viewsets.ModelViewSet):
 
 
 class PipelineVersionViewSet(viewsets.ModelViewSet):
-    queryset = models.PipelineVersion.objects.select_related(
-        "pipeline", "pipeline__project"
-    )
+    queryset = models.PipelineVersion.objects.select_related("pipeline", "pipeline__project")
     serializer_class = PipelineVersionSerializer
 
     def update(self, request, *args, **kwargs):
         return Response(
-            {
-                "detail": "Pipeline versions are immutable; create a new version instead."
-            },
+            {"detail": "Pipeline versions are immutable; create a new version instead."},
             status=405,
         )
 
@@ -97,9 +89,7 @@ class PipelineVersionViewSet(viewsets.ModelViewSet):
 
 
 class ExecutionRunViewSet(viewsets.ModelViewSet):
-    queryset = models.ExecutionRun.objects.select_related(
-        "pipeline", "pipeline__project"
-    )
+    queryset = models.ExecutionRun.objects.select_related("pipeline", "pipeline__project")
     serializer_class = ExecutionRunSerializer
 
 

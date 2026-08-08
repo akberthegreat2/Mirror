@@ -65,28 +65,18 @@ class BaseRegistry:
 class CapabilityRegistry(BaseRegistry):
     """Registry for capability extensions."""
 
-    def _matches(
-        self, manifest: CapabilityManifest, name: str, api_version: str | None
-    ) -> bool:
-        return manifest.name == name and (
-            api_version is None or manifest.api_version == api_version
-        )
+    def _matches(self, manifest: CapabilityManifest, name: str, api_version: str | None) -> bool:
+        return manifest.name == name and (api_version is None or manifest.api_version == api_version)
 
-    def get_capability(
-        self, capability_name: str, api_version: str | None = None
-    ) -> CapabilityManifest:
+    def get_capability(self, capability_name: str, api_version: str | None = None) -> CapabilityManifest:
         candidates = self.list_capabilities()
         if api_version is not None:
             for manifest in candidates:
                 if self._matches(manifest, capability_name, api_version):
                     return manifest
-            raise RegistryError(
-                f"Capability not found: {capability_name!r} ({api_version!r})"
-            )
+            raise RegistryError(f"Capability not found: {capability_name!r} ({api_version!r})")
 
-        matching = [
-            manifest for manifest in candidates if manifest.name == capability_name
-        ]
+        matching = [manifest for manifest in candidates if manifest.name == capability_name]
         if not matching:
             raise RegistryError(f"Capability not found: {capability_name!r}")
         return max(matching, key=lambda manifest: Version(str(manifest.api_version)))
@@ -98,33 +88,22 @@ class CapabilityRegistry(BaseRegistry):
 class ProviderRegistry(BaseRegistry):
     """Registry for provider extensions."""
 
-    def get_provider(
-        self, capability_name: str, provider_name: str | None = None
-    ) -> ProviderManifest:
+    def get_provider(self, capability_name: str, provider_name: str | None = None) -> ProviderManifest:
         candidates = self.get_providers_for_capability(capability_name)
         if provider_name is not None:
             for manifest in candidates:
-                if (
-                    manifest.name == provider_name
-                    or manifest.extension_id == provider_name
-                ):
+                if manifest.name == provider_name or manifest.extension_id == provider_name:
                     return manifest
-            raise RegistryError(
-                f"Provider not found: {capability_name!r}/{provider_name!r}"
-            )
+            raise RegistryError(f"Provider not found: {capability_name!r}/{provider_name!r}")
 
         if not candidates:
-            raise RegistryError(
-                f"Provider not found for capability: {capability_name!r}"
-            )
+            raise RegistryError(f"Provider not found for capability: {capability_name!r}")
         return max(candidates, key=lambda manifest: (manifest.priority, manifest.name))
 
     def list_providers(self) -> list[ProviderManifest]:
         return cast(list[ProviderManifest], self.list())
 
-    def get_providers_for_capability(
-        self, capability_name: str
-    ) -> list[ProviderManifest]:
+    def get_providers_for_capability(self, capability_name: str) -> list[ProviderManifest]:
         """Return all providers that implement the given capability name."""
         with self._lock:
             return cast(
@@ -237,28 +216,16 @@ class ExtensionRegistryManager:
                 continue
         raise RegistryError(f"Extension not found: {extension_id}")
 
-    def resolve_capability(
-        self, capability_name: str, constraint: str | None = None
-    ) -> CapabilityManifest:
-        candidates = [
-            manifest
-            for manifest in self.capabilities.list_capabilities()
-            if manifest.name == capability_name
-        ]
+    def resolve_capability(self, capability_name: str, constraint: str | None = None) -> CapabilityManifest:
+        candidates = [manifest for manifest in self.capabilities.list_capabilities() if manifest.name == capability_name]
         if not candidates:
             raise RegistryError(f"Capability not found: {capability_name!r}")
         if constraint is not None:
             specifier = SpecifierSet(constraint)
-            candidates = [
-                manifest
-                for manifest in candidates
-                if Version(str(manifest.api_version)) in specifier
-            ]
+            candidates = [manifest for manifest in candidates if Version(str(manifest.api_version)) in specifier]
         if not candidates:
             constraint_text = constraint if constraint is not None else "any version"
-            raise RegistryError(
-                f"Capability {capability_name!r} does not satisfy {constraint_text!r}"
-            )
+            raise RegistryError(f"Capability {capability_name!r} does not satisfy {constraint_text!r}")
         return max(candidates, key=lambda manifest: Version(str(manifest.api_version)))
 
     def resolve_provider(
@@ -266,33 +233,16 @@ class ExtensionRegistryManager:
         capability: CapabilityManifest,
         provider_name: str | None = None,
     ) -> ProviderManifest:
-        candidates = [
-            provider
-            for provider in self.providers.list_providers()
-            if provider.capability == capability.name
-            and (
-                provider_name is None
-                or provider.name == provider_name
-                or provider.extension_id == provider_name
-            )
-            and Version(str(capability.api_version))
-            in SpecifierSet(provider.capability_api)
-        ]
+        candidates = [provider for provider in self.providers.list_providers() if provider.capability == capability.name and (provider_name is None or provider.name == provider_name or provider.extension_id == provider_name) and Version(str(capability.api_version)) in SpecifierSet(provider.capability_api)]
         if not candidates:
             requested = provider_name or "any provider"
-            raise RegistryError(
-                f"No compatible {requested} for capability {capability.name} {capability.api_version}"
-            )
+            raise RegistryError(f"No compatible {requested} for capability {capability.name} {capability.api_version}")
         return max(candidates, key=lambda provider: (provider.priority, provider.name))
 
-    def get_capability(
-        self, capability_name: str, api_version: str | None = None
-    ) -> CapabilityManifest:
+    def get_capability(self, capability_name: str, api_version: str | None = None) -> CapabilityManifest:
         return self.capabilities.get_capability(capability_name, api_version)
 
-    def get_provider(
-        self, capability_name: str, provider_name: str | None = None
-    ) -> ProviderManifest:
+    def get_provider(self, capability_name: str, provider_name: str | None = None) -> ProviderManifest:
         return self.providers.get_provider(capability_name, provider_name)
 
     def get_interface(self, extension_id: str) -> InterfaceManifest:
@@ -310,9 +260,7 @@ class ExtensionRegistryManager:
     def list_providers(self) -> list[ProviderManifest]:
         return self.providers.list_providers()
 
-    def list_providers_for_capability(
-        self, capability_name: str
-    ) -> list[ProviderManifest]:
+    def list_providers_for_capability(self, capability_name: str) -> list[ProviderManifest]:
         return self.providers.get_providers_for_capability(capability_name)
 
     def list_interfaces(self) -> list[InterfaceManifest]:

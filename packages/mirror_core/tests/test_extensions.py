@@ -181,9 +181,7 @@ def test_discover_fake_manifests(monkeypatch: pytest.MonkeyPatch) -> None:
             "mirror.providers": [
                 (
                     "httpx",
-                    create_provider_manifest(
-                        extension_id="fetch-httpx", capability="fetch"
-                    ),
+                    create_provider_manifest(extension_id="fetch-httpx", capability="fetch"),
                 ),
             ],
             "mirror.interfaces": [
@@ -237,17 +235,13 @@ def test_discover_fake_manifests(monkeypatch: pytest.MonkeyPatch) -> None:
     def mock_entry_points(group: str):
         if group not in fake_source.entries:
             return []
-        return [
-            FakeEntryPoint(name, value) for name, value in fake_source.entries[group]
-        ]
+        return [FakeEntryPoint(name, value) for name, value in fake_source.entries[group]]
 
     monkeypatch.setattr(importlib.metadata, "entry_points", mock_entry_points)
 
     manifests, errors = discover_extensions()
     assert errors == []
-    assert (
-        len(manifests) == 5
-    )  # 1 cap, 1 provider, 1 interface, 1 middleware, 1 storage
+    assert len(manifests) == 5  # 1 cap, 1 provider, 1 interface, 1 middleware, 1 storage
 
     # Check that each manifest has the expected kind
     kinds = [m.kind for m in manifests]

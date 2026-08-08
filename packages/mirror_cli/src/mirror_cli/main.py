@@ -270,10 +270,7 @@ def worker(
 @app.command("worker-check")
 def worker_check() -> None:
     """Report the availability of the shipped worker execution contracts."""
-    console.print(
-        "[green]Worker execution is available[/green] "
-        "(inline, SQLite, PostgreSQL, and Celery transports)."
-    )
+    console.print("[green]Worker execution is available[/green] (inline, SQLite, PostgreSQL, and Celery transports).")
 
 
 @app.command()

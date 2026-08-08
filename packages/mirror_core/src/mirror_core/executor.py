@@ -33,9 +33,7 @@ from mirror_core.resource import ProducerRef, ResourceEnvelope
 from mirror_core.workers import CheckpointStore, DeadLetterQueue
 
 Runner = Callable[..., Awaitable[BaseModel]]
-CompensationHandler = Callable[
-    ["ExecutionRun", CompiledStep, Exception], Awaitable[None]
-]
+CompensationHandler = Callable[["ExecutionRun", CompiledStep, Exception], Awaitable[None]]
 
 
 class StepState(str, Enum):
@@ -109,12 +107,8 @@ class ExecutionRun:
         """Restore the run state from a durable checkpoint snapshot."""
         unknown_states = sorted(set(states).difference(self.plan.step_ids))
         unknown_results = sorted(set(results).difference(self.plan.step_ids))
-        unknown_errors = sorted(
-            set((errors or {}).keys()).difference(self.plan.step_ids)
-        )
-        unknown_retries = sorted(
-            set((retry_counts or {}).keys()).difference(self.plan.step_ids)
-        )
+        unknown_errors = sorted(set((errors or {}).keys()).difference(self.plan.step_ids))
+        unknown_retries = sorted(set((retry_counts or {}).keys()).difference(self.plan.step_ids))
         if unknown_states or unknown_results or unknown_errors or unknown_retries:
             details = ", ".join(
                 part
@@ -128,9 +122,7 @@ class ExecutionRun:
             )
             raise ExecutionError(f"Checkpoint contains unknown step ids: {details}")
         if failed_step_id is not None and failed_step_id not in self.plan.step_ids:
-            raise ExecutionError(
-                f"Checkpoint references unknown failed step: {failed_step_id!r}"
-            )
+            raise ExecutionError(f"Checkpoint references unknown failed step: {failed_step_id!r}")
         self.states.update({name: StepState(value) for name, value in states.items()})
         self.results.update(dict(results))
         self.errors = dict(errors or {})
@@ -222,13 +214,9 @@ class Executor:
         runner: Runner | None = None,
         resume_from: tuple[UUID, str] | None = None,
     ) -> dict[str, ResourceEnvelope]:
-        result = await self.execute_run(
-            plan, inputs=inputs or {}, runner=runner, resume_from=resume_from
-        )
+        result = await self.execute_run(plan, inputs=inputs or {}, runner=runner, resume_from=resume_from)
         if result.outcome is RunOutcome.FAILED:
-            first_error = next(
-                iter(result.errors.values()), "Pipeline execution failed"
-            )
+            first_error = next(iter(result.errors.values()), "Pipeline execution failed")
             raise ExecutionError(first_error, details={"run_id": str(result.run_id)})
         return result.results
 
@@ -276,10 +264,7 @@ class Executor:
         self._record_metadata(
             MetadataRecord.policy_snapshot(
                 run.run_id,
-                payload={
-                    step_id: compiled.policy.model_dump(mode="json")
-                    for step_id, compiled in plan.steps.items()
-                },
+                payload={step_id: compiled.policy.model_dump(mode="json") for step_id, compiled in plan.steps.items()},
             )
         )
 
@@ -303,9 +288,7 @@ class Executor:
         self._skip_unrunnable_steps(run)
         return run.finish()
 
-    async def _record_run_finish(
-        self, run: ExecutionRun, result: ExecutionResult
-    ) -> None:
+    async def _record_run_finish(self, run: ExecutionRun, result: ExecutionResult) -> None:
         self._record_metadata(
             MetadataRecord.terminal_outcome(
                 run.run_id,
@@ -313,16 +296,12 @@ class Executor:
                     "pipeline_id": run.plan.pipeline_id,
                     "outcome": result.outcome.value,
                     "errors": dict(result.errors),
-                    "states": {
-                        step_id: state.value for step_id, state in result.states.items()
-                    },
+                    "states": {step_id: state.value for step_id, state in result.states.items()},
                 },
             )
         )
         await self._emit(
-            "pipeline.failed"
-            if result.outcome is RunOutcome.FAILED
-            else "pipeline.finished",
+            "pipeline.failed" if result.outcome is RunOutcome.FAILED else "pipeline.finished",
             run_id=run.run_id,
             result=result,
         )
@@ -331,19 +310,10 @@ class Executor:
 
     @staticmethod
     def _pending_steps(run: ExecutionRun) -> set[str]:
-        return {
-            step_id
-            for step_id in run.plan.step_ids
-            if run.states.get(step_id)
-            not in {StepState.SUCCEEDED, StepState.SKIPPED, StepState.CANCELLED}
-        }
+        return {step_id for step_id in run.plan.step_ids if run.states.get(step_id) not in {StepState.SUCCEEDED, StepState.SKIPPED, StepState.CANCELLED}}
 
     def _ready_steps(self, run: ExecutionRun, pending: set[str]) -> list[str]:
-        return [
-            step_id
-            for step_id in run.plan.order
-            if step_id in pending and self._can_run(run, step_id)
-        ]
+        return [step_id for step_id in run.plan.order if step_id in pending and self._can_run(run, step_id)]
 
     async def _schedule_ready_steps(
         self,
@@ -360,9 +330,7 @@ class Executor:
             pending.remove(step_id)
 
     async def _drain_completed_tasks(self, run: ExecutionRun) -> None:
-        done, _ = await asyncio.wait(
-            run.tasks.values(), return_when=asyncio.FIRST_COMPLETED
-        )
+        done, _ = await asyncio.wait(run.tasks.values(), return_when=asyncio.FIRST_COMPLETED)
         for task in done:
             try:
                 await task
@@ -399,9 +367,7 @@ class Executor:
         else:
             loaded_snapshot = self._checkpoint_coordinator.load(run_id, step_id)
             if loaded_snapshot is None:
-                raise ExecutionError(
-                    f"No checkpoint available for run {run_id} step {step_id!r}"
-                )
+                raise ExecutionError(f"No checkpoint available for run {run_id} step {step_id!r}")
             snapshot = loaded_snapshot
         self._record_metadata(
             MetadataRecord.replay_pointer(
@@ -452,9 +418,7 @@ class Executor:
         run_id, step_id = resume_from
         snapshot = self._checkpoint_coordinator.load(run_id, step_id)
         if snapshot is None:
-            raise ExecutionError(
-                f"No checkpoint available for run {run_id} step {step_id!r}"
-            )
+            raise ExecutionError(f"No checkpoint available for run {run_id} step {step_id!r}")
         self._checkpoint_coordinator.restore(
             run,
             snapshot,
@@ -512,9 +476,7 @@ class Executor:
         inputs: Mapping[str, Any],
     ) -> bool:
         condition_context = self._condition_context(run, compiled, inputs)
-        if step.condition and not self._condition_evaluator.evaluate(
-            step.condition, condition_context
-        ):
+        if step.condition and not self._condition_evaluator.evaluate(step.condition, condition_context):
             run.states[step.id] = StepState.SKIPPED
             await self._emit("step.skipped", run_id=run.run_id, step=step)
             return False
@@ -545,30 +507,18 @@ class Executor:
         try:
             request = self._build_request(compiled, inputs)
             selected_runner = runner_override or self._get_runner(compiled)
-            payload, provider_config = await self._invoke_with_fallbacks(
-                compiled, request, selected_runner, run
-            )
+            payload, provider_config = await self._invoke_with_fallbacks(compiled, request, selected_runner, run)
             if not isinstance(payload, BaseModel):
-                raise ExecutionError(
-                    f"Runner for step {step.id!r} returned {type(payload).__name__}; expected a Pydantic model"
-                )
+                raise ExecutionError(f"Runner for step {step.id!r} returned {type(payload).__name__}; expected a Pydantic model")
             expected = compiled.capability.result_model
             if expected is not None:
                 expected_type = resolve_model(expected)
                 if not isinstance(payload, expected_type):
-                    raise ExecutionError(
-                        f"Runner for step {step.id!r} returned "
-                        f"{type(payload).__name__}; expected "
-                        f"{expected_type.__name__}"
-                    )
-            envelope = self._build_result_envelope(
-                run, compiled, step, payload, provider_config
-            )
+                    raise ExecutionError(f"Runner for step {step.id!r} returned {type(payload).__name__}; expected {expected_type.__name__}")
+            envelope = self._build_result_envelope(run, compiled, step, payload, provider_config)
             self._record_step_success(run, compiled, step, envelope, provider_config)
             self._save_checkpoint(run, compiled, step)
-            await self._emit(
-                "step.succeeded", run_id=run.run_id, step=step, result=envelope
-            )
+            await self._emit("step.succeeded", run_id=run.run_id, step=step, result=envelope)
         except asyncio.CancelledError:
             run.states[step.id] = StepState.CANCELLED
             raise
@@ -579,9 +529,7 @@ class Executor:
     def _build_request(compiled: CompiledStep, inputs: Mapping[str, Any]) -> BaseModel:
         request_model = compiled.capability.request_model
         if request_model is None:
-            raise ExecutionError(
-                f"Capability {compiled.capability.name!r} has no request model"
-            )
+            raise ExecutionError(f"Capability {compiled.capability.name!r} has no request model")
         return resolve_model(request_model).model_validate(inputs)
 
     def _build_result_envelope(
@@ -600,17 +548,9 @@ class Executor:
             config_fingerprint=run.plan.config_fingerprint,
             step_id=step.id,
         )
-        parents = [
-            run.results[d].resource_id
-            for d in compiled.dependencies
-            if d in run.results
-        ]
+        parents = [run.results[d].resource_id for d in compiled.dependencies if d in run.results]
         result_model = compiled.capability.result_model
-        resource_type = (
-            resolve_model(result_model).__name__
-            if result_model is not None
-            else type(payload).__name__
-        )
+        resource_type = resolve_model(result_model).__name__ if result_model is not None else type(payload).__name__
         return ResourceEnvelope.create(
             resource_type=resource_type,
             schema_version=compiled.capability.api_version,
@@ -715,9 +655,7 @@ class Executor:
         if compiled.policy.compensation is not None:
             await self._invoke_compensation(run, compiled, exc)
         if compiled.policy.on_error == "abort":
-            run.abort_error = ExecutionError(
-                f"Step {step.id!r} failed: {exc}", cause=exc
-            )
+            run.abort_error = ExecutionError(f"Step {step.id!r} failed: {exc}", cause=exc)
             self._cancel_tasks(run, except_step=step.id)
 
     async def _invoke_with_fallbacks(
@@ -727,9 +665,7 @@ class Executor:
         runner: Runner,
         run: ExecutionRun,
     ) -> tuple[BaseModel, Any]:
-        return await self._policy_invoker.invoke_with_fallbacks(
-            compiled, request, runner, run
-        )
+        return await self._policy_invoker.invoke_with_fallbacks(compiled, request, runner, run)
 
     async def _invoke_with_policies(
         self,
@@ -740,9 +676,7 @@ class Executor:
         runner: Runner,
         run: ExecutionRun,
     ) -> BaseModel:
-        return await self._policy_invoker.invoke_with_policies(
-            compiled, provider, provider_config, request, runner, run
-        )
+        return await self._policy_invoker.invoke_with_policies(compiled, provider, provider_config, request, runner, run)
 
     async def _invoke(
         self,
@@ -754,9 +688,7 @@ class Executor:
         run: ExecutionRun,
     ) -> BaseModel:
         execution_context = self._build_execution_context(run, compiled)
-        capability_context = self._build_capability_context(
-            execution_context, compiled, provider_config
-        )
+        capability_context = self._build_capability_context(execution_context, compiled, provider_config)
         invocation = self._build_invocation(
             run,
             compiled,
@@ -772,17 +704,11 @@ class Executor:
             compiled.id,
             middleware_context=invocation.middleware_context,
         )
-        chain = self.middleware_chains.get(
-            compiled.capability.name, self.middleware_chain
-        )
-        return await self._run_middleware_chain(
-            chain, invocation, runner, runner_context
-        )
+        chain = self.middleware_chains.get(compiled.capability.name, self.middleware_chain)
+        return await self._run_middleware_chain(chain, invocation, runner, runner_context)
 
     @staticmethod
-    def _build_execution_context(
-        run: ExecutionRun, compiled: CompiledStep
-    ) -> ExecutionContext:
+    def _build_execution_context(run: ExecutionRun, compiled: CompiledStep) -> ExecutionContext:
         return ExecutionContext(
             run_id=run.run_id,
             pipeline_id=run.plan.pipeline_id,
@@ -853,9 +779,7 @@ class Executor:
                 capability=compiled.capability.name,
                 capability_version=compiled.capability.api_version,
                 provider=provider_config.name,
-                provider_version=cast(
-                    str | None, provider_config.metadata.get("version")
-                ),
+                provider_version=cast(str | None, provider_config.metadata.get("version")),
                 policy=compiled.policy,
                 metadata={"provider": provider_config.name},
             ),
@@ -875,18 +799,12 @@ class Executor:
                 runner_context=runner_context,
             )
 
-        return (
-            await final(invocation)
-            if chain is None
-            else cast(BaseModel, await chain.execute(invocation, final))
-        )
+        return await final(invocation) if chain is None else cast(BaseModel, await chain.execute(invocation, final))
 
     def _get_runner(self, compiled: CompiledStep) -> Runner:
         path = compiled.capability.runner
         if path is None:
-            raise ExecutionError(
-                f"No runner defined for capability {compiled.capability.name!r}"
-            )
+            raise ExecutionError(f"No runner defined for capability {compiled.capability.name!r}")
         module_path, separator, name = path.rpartition(":")
         if not separator:
             raise ExecutionError(f"Invalid runner import path: {path!r}")
@@ -898,13 +816,9 @@ class Executor:
             return self.components[exact_key]
         if compiled.capability.name in self.components:
             return self.components[compiled.capability.name]
-        raise ExecutionError(
-            f"Provider {provider_config.name!r} is not initialized for capability {compiled.capability.name!r}"
-        )
+        raise ExecutionError(f"Provider {provider_config.name!r} is not initialized for capability {compiled.capability.name!r}")
 
-    def _save_checkpoint(
-        self, run: ExecutionRun, compiled: CompiledStep, step: Any
-    ) -> None:
+    def _save_checkpoint(self, run: ExecutionRun, compiled: CompiledStep, step: Any) -> None:
         self._checkpoint_coordinator.save(run, step)
 
     def _record_metadata(self, record: MetadataRecord) -> None:
@@ -920,18 +834,14 @@ class Executor:
     ) -> None:
         await self._compensation_invoker.invoke(run, compiled, error)
 
-    async def _record_dead_letter(
-        self, run: ExecutionRun, result: ExecutionResult
-    ) -> None:
+    async def _record_dead_letter(self, run: ExecutionRun, result: ExecutionResult) -> None:
         self._dead_letter_recorder.record(run, result)
 
     @staticmethod
     def _serialize_envelope(envelope: ResourceEnvelope) -> dict[str, Any]:
         return {
             "envelope": envelope.model_dump(mode="json"),
-            "payload_type": (
-                f"{envelope.payload.__class__.__module__}:{envelope.payload.__class__.__qualname__}"
-            ),
+            "payload_type": (f"{envelope.payload.__class__.__module__}:{envelope.payload.__class__.__qualname__}"),
             "payload": envelope.payload.model_dump(mode="json"),
         }
 
@@ -945,9 +855,7 @@ class Executor:
                 continue
             envelope = run.results.get(source_step)
             if envelope is None:
-                raise ExecutionError(
-                    f"Missing dependency resource {source_step!r} for step {compiled.id!r}"
-                )
+                raise ExecutionError(f"Missing dependency resource {source_step!r} for step {compiled.id!r}")
             payload = envelope.payload
             if output == "result":
                 values[target] = payload
@@ -956,17 +864,12 @@ class Executor:
             elif isinstance(payload, Mapping) and output in payload:
                 values[target] = payload[output]
             else:
-                raise ExecutionError(
-                    f"Resource from step {source_step!r} has no output {output!r}"
-                )
+                raise ExecutionError(f"Resource from step {source_step!r} has no output {output!r}")
         return values
 
     @staticmethod
     def _can_run(run: ExecutionRun, step_id: str) -> bool:
-        return all(
-            run.states[d] is StepState.SUCCEEDED
-            for d in run.plan.get_step(step_id).dependencies
-        )
+        return all(run.states[d] is StepState.SUCCEEDED for d in run.plan.get_step(step_id).dependencies)
 
     @staticmethod
     def _cancel_pending(run: ExecutionRun) -> None:
@@ -978,14 +881,10 @@ class Executor:
     def _skip_unrunnable_steps(run: ExecutionRun) -> None:
         for step_id, state in run.states.items():
             if state in {StepState.PENDING, StepState.READY}:
-                run.states[step_id] = (
-                    StepState.CANCELLED if run.cancelled else StepState.SKIPPED
-                )
+                run.states[step_id] = StepState.CANCELLED if run.cancelled else StepState.SKIPPED
 
     @staticmethod
-    def _condition_context(
-        run: ExecutionRun, compiled: CompiledStep, inputs: Mapping[str, Any]
-    ) -> dict[str, Any]:
+    def _condition_context(run: ExecutionRun, compiled: CompiledStep, inputs: Mapping[str, Any]) -> dict[str, Any]:
         """Expose only bound inputs and direct dependency payloads to conditions."""
         context = dict(inputs)
         for dependency in compiled.dependencies:
@@ -1009,11 +908,7 @@ class Executor:
                 task.cancel()
 
     def cancel(self, run_id: UUID | None = None) -> None:
-        runs = (
-            [self._active_runs[run_id]]
-            if run_id is not None and run_id in self._active_runs
-            else list(self._active_runs.values())
-        )
+        runs = [self._active_runs[run_id]] if run_id is not None and run_id in self._active_runs else list(self._active_runs.values())
         for run in runs:
             run.cancelled = True
             self._cancel_tasks(run)

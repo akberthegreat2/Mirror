@@ -26,22 +26,14 @@ REAPER_QUEUE = "mirror.reaper"
 def queue_name(execution_class: str) -> str:
     """Map an execution class to an infrastructure queue name."""
     normalized = execution_class.strip().lower()
-    if not normalized or any(
-        char not in "abcdefghijklmnopqrstuvwxyz0123456789_-" for char in normalized
-    ):
-        raise ValueError(
-            "execution_class must contain only letters, numbers, '_' or '-'"
-        )
+    if not normalized or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789_-" for char in normalized):
+        raise ValueError("execution_class must contain only letters, numbers, '_' or '-'")
     return f"mirror.{normalized}"
 
 
-def create_celery_app(
-    *, broker_url: str | None = None, app_name: str = "mirror"
-) -> Celery:
+def create_celery_app(*, broker_url: str | None = None, app_name: str = "mirror") -> Celery:
     """Create the real Celery application used by Mirror workers."""
-    broker = broker_url or os.environ.get(
-        "MIRROR_CELERY_BROKER_URL", "redis://localhost:6379/0"
-    )
+    broker = broker_url or os.environ.get("MIRROR_CELERY_BROKER_URL", "redis://localhost:6379/0")
     app = Celery(app_name, broker=broker)
     app.conf.update(
         task_ignore_result=True,
@@ -89,9 +81,7 @@ def configure_worker_task(
     lease_seconds: int = 60,
 ) -> None:
     """Register the generic Mirror execution task on a Celery app."""
-    worker_name = (
-        worker_id or os.environ.get("MIRROR_WORKER_ID") or _default_worker_id()
-    )
+    worker_name = worker_id or os.environ.get("MIRROR_WORKER_ID") or _default_worker_id()
 
     @app.task(name="mirror.execute_job", bind=False, acks_late=True)
     def execute_job(job_id: str) -> None:
@@ -168,9 +158,7 @@ async def _execute_job(
         if job is None:
             logger.info("Job %s was already claimed or completed", job_id)
             return
-        heartbeat_task = __import__("asyncio").create_task(
-            _heartbeat_loop(runtime, worker_id, job.job_id, lease_seconds)
-        )
+        heartbeat_task = __import__("asyncio").create_task(_heartbeat_loop(runtime, worker_id, job.job_id, lease_seconds))
         try:
             app = Application(
                 settings=settings,
@@ -201,9 +189,7 @@ async def _execute_job(
         leases.close()
 
 
-async def _heartbeat_loop(
-    runtime: WorkerRuntime, worker_id: str, job_id: UUID, lease_seconds: int
-) -> None:
+async def _heartbeat_loop(runtime: WorkerRuntime, worker_id: str, job_id: UUID, lease_seconds: int) -> None:
     import asyncio
 
     interval = max(1.0, lease_seconds / 3)

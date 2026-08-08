@@ -346,9 +346,7 @@ class SQLiteMetadataStore:
 
     def list(self, namespace: str | None = None) -> list[MetadataRecord]:
         if namespace is None:
-            rows = self._conn.execute(
-                "SELECT namespace, key, payload, created_at FROM metadata ORDER BY namespace, key"
-            ).fetchall()
+            rows = self._conn.execute("SELECT namespace, key, payload, created_at FROM metadata ORDER BY namespace, key").fetchall()
         else:
             rows = self._conn.execute(
                 """

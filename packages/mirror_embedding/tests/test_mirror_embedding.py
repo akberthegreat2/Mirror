@@ -30,12 +30,8 @@ async def test_embed_step_success() -> None:
     """The runner should delegate to the provider."""
 
     provider = AsyncMock()
-    request = EmbeddingRequest(
-        items=[EmbeddingInput(item_id="item-1", text="hello world")]
-    )
-    expected = EmbeddingResult(
-        vectors=[EmbeddingVector(item_id="item-1", values=(1.0, 0.0))]
-    )
+    request = EmbeddingRequest(items=[EmbeddingInput(item_id="item-1", text="hello world")])
+    expected = EmbeddingResult(vectors=[EmbeddingVector(item_id="item-1", values=(1.0, 0.0))])
     provider.embed.return_value = expected
 
     result = await embed_step(provider, request)
@@ -50,9 +46,7 @@ async def test_embed_step_wraps_unknown_error() -> None:
 
     provider = AsyncMock()
     provider.embed.side_effect = ValueError("boom")
-    request = EmbeddingRequest(
-        items=[EmbeddingInput(item_id="item-1", text="hello world")]
-    )
+    request = EmbeddingRequest(items=[EmbeddingInput(item_id="item-1", text="hello world")])
 
     with pytest.raises(EmbeddingError) as excinfo:
         await embed_step(provider, request)

@@ -89,18 +89,12 @@ async def crawl_site(
         try:
             result = await fetcher.fetch(FetchRequest(url=HttpUrl(current_url)))
         except Exception as exc:  # noqa: BLE001 - surfaced in the result list
-            logger.debug(
-                "crawl fetch failed", extra={"url": current_url, "error": str(exc)}
-            )
+            logger.debug("crawl fetch failed", extra={"url": current_url, "error": str(exc)})
             continue
 
         title, links = _parse_html(result)
         blob_key = None
-        if (
-            request.store_pages
-            and blob_store is not None
-            and _is_html(result.content_type)
-        ):
+        if request.store_pages and blob_store is not None and _is_html(result.content_type):
             blob_key = _blob_key(request, current_url, result)
             blob_store.put_bytes(blob_key, result.content)
             stored_pages += 1
@@ -139,10 +133,7 @@ async def crawl_site(
             absolute = urljoin(current_url, link)
             if absolute in seen:
                 continue
-            if (
-                request.same_host_only
-                and urlparse(absolute).netloc != parsed_seed.netloc
-            ):
+            if request.same_host_only and urlparse(absolute).netloc != parsed_seed.netloc:
                 continue
             seen.add(absolute)
             queue.append((absolute, depth + 1, current_url))

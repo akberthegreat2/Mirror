@@ -94,9 +94,7 @@ class PostgresWorkerBackend(WorkerBackend):
     def _start_sync(self) -> None:
         self._db.connect()
         migration = _MIGRATION.read_text(encoding="utf-8")
-        statements = [
-            statement.strip() for statement in migration.split(";") if statement.strip()
-        ]
+        statements = [statement.strip() for statement in migration.split(";") if statement.strip()]
         for statement in statements:
             self._db.execute(statement)
         self._started = True
@@ -166,13 +164,9 @@ class PostgresWorkerBackend(WorkerBackend):
         )
         return None if not rows else _job_from_row(rows[0])
 
-    async def claim(
-        self, worker_id: str, execution_class: str = "default"
-    ) -> WorkerJob | None:
+    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
         self._ensure_started()
-        rows = await asyncio.to_thread(
-            self._claim_sync, worker_id, execution_class, None
-        )
+        rows = await asyncio.to_thread(self._claim_sync, worker_id, execution_class, None)
         return None if not rows else _job_from_row(rows[0])
 
     async def claim_job(self, job_id: UUID, worker_id: str) -> WorkerJob | None:
@@ -180,9 +174,7 @@ class PostgresWorkerBackend(WorkerBackend):
         rows = await asyncio.to_thread(self._claim_sync, worker_id, None, job_id)
         return None if not rows else _job_from_row(rows[0])
 
-    def _claim_sync(
-        self, worker_id: str, execution_class: str | None, job_id: UUID | None
-    ) -> list[dict[str, Any]]:
+    def _claim_sync(self, worker_id: str, execution_class: str | None, job_id: UUID | None) -> list[dict[str, Any]]:
         now = _utcnow()
         expires = now + timedelta(seconds=self.lease_seconds)
         class_filter = "AND execution_class = %s" if execution_class else ""
@@ -252,9 +244,7 @@ class PostgresWorkerBackend(WorkerBackend):
     async def cancel(self, job_id: UUID, reason: str | None = None) -> WorkerJob:
         return await self._transition(job_id, JobState.CANCELLED, reason)
 
-    async def _transition(
-        self, job_id: UUID, state: JobState, error: str | None
-    ) -> WorkerJob:
+    async def _transition(self, job_id: UUID, state: JobState, error: str | None) -> WorkerJob:
         self._ensure_started()
         rows = await asyncio.to_thread(
             self._db.execute,
@@ -316,18 +306,11 @@ class PostgresExecutionStore(ExecutionStore):
         )
 
     def get(self, run_id: UUID) -> ExecutionRecord | None:
-        rows = self._db.execute(
-            "SELECT * FROM mirror_execution_runs WHERE run_id=%s", (str(run_id),)
-        )
+        rows = self._db.execute("SELECT * FROM mirror_execution_runs WHERE run_id=%s", (str(run_id),))
         return None if not rows else _execution_from_row(rows[0])
 
     def list(self) -> list[ExecutionRecord]:
-        return [
-            _execution_from_row(row)
-            for row in self._db.execute(
-                "SELECT * FROM mirror_execution_runs ORDER BY created_at, run_id"
-            )
-        ]
+        return [_execution_from_row(row) for row in self._db.execute("SELECT * FROM mirror_execution_runs ORDER BY created_at, run_id")]
 
     def close(self) -> None:
         self._db.close()
@@ -362,11 +345,7 @@ class PostgresCheckpointStore(CheckpointStore):
             "SELECT step_id,payload FROM mirror_checkpoints WHERE run_id=%s ORDER BY created_at DESC LIMIT 1",
             (str(run_id),),
         )
-        return (
-            None
-            if not rows
-            else (rows[0]["step_id"], decode_metadata_value(rows[0]["payload"]))
-        )
+        return None if not rows else (rows[0]["step_id"], decode_metadata_value(rows[0]["payload"]))
 
     def delete(self, run_id: UUID, step_id: str) -> None:
         self._db.execute(
@@ -391,9 +370,7 @@ class PostgresArtifactStore(ArtifactStore):
         )
 
     def get_bytes(self, key: str) -> bytes | None:
-        rows = self._db.execute(
-            "SELECT payload FROM mirror_artifacts WHERE key=%s", (key,)
-        )
+        rows = self._db.execute("SELECT payload FROM mirror_artifacts WHERE key=%s", (key,))
         return None if not rows else bytes(rows[0]["payload"])
 
     def delete(self, key: str) -> None:
@@ -433,21 +410,14 @@ class PostgresDeadLetterQueue(DeadLetterQueue):
         )
 
     def get(self, run_id: UUID) -> DeadLetterRecord | None:
-        rows = self._db.execute(
-            "SELECT * FROM mirror_dead_letters WHERE run_id=%s", (str(run_id),)
-        )
+        rows = self._db.execute("SELECT * FROM mirror_dead_letters WHERE run_id=%s", (str(run_id),))
         return None if not rows else _dead_letter_from_row(rows[0])
 
     def replay(self, run_id: UUID) -> DeadLetterRecord | None:
         return self.get(run_id)
 
     def list(self) -> list[DeadLetterRecord]:
-        return [
-            _dead_letter_from_row(row)
-            for row in self._db.execute(
-                "SELECT * FROM mirror_dead_letters ORDER BY created_at, run_id"
-            )
-        ]
+        return [_dead_letter_from_row(row) for row in self._db.execute("SELECT * FROM mirror_dead_letters ORDER BY created_at, run_id")]
 
     def close(self) -> None:
         self._db.close()
@@ -487,9 +457,7 @@ class PostgresMetadataStore(MetadataStore):
 
     def list(self, namespace: str | None = None) -> list[MetadataRecord]:
         if namespace is None:
-            rows = self._db.execute(
-                "SELECT * FROM mirror_metadata ORDER BY namespace,key"
-            )
+            rows = self._db.execute("SELECT * FROM mirror_metadata ORDER BY namespace,key")
         else:
             rows = self._db.execute(
                 "SELECT * FROM mirror_metadata WHERE namespace=%s ORDER BY namespace,key",
@@ -516,9 +484,7 @@ class PostgresLeaseManager(LeaseManager):
         self._db = _PostgresConnection(dsn)
         self.ttl_seconds = ttl_seconds
 
-    def acquire(
-        self, job_id: UUID, worker_id: str, ttl_seconds: int = 60
-    ) -> WorkerLease:
+    def acquire(self, job_id: UUID, worker_id: str, ttl_seconds: int = 60) -> WorkerLease:
         expires = _utcnow() + timedelta(seconds=ttl_seconds or self.ttl_seconds)
         rows = self._db.execute(
             """
@@ -531,9 +497,7 @@ class PostgresLeaseManager(LeaseManager):
             (str(job_id), worker_id, expires, _utcnow()),
         )
         if not rows:
-            raise RuntimeError(
-                f"Lease for {job_id} is currently owned by another live worker"
-            )
+            raise RuntimeError(f"Lease for {job_id} is currently owned by another live worker")
         return _lease_from_row(rows[0])
 
     def renew(self, lease: WorkerLease, ttl_seconds: int = 60) -> WorkerLease:
@@ -543,9 +507,7 @@ class PostgresLeaseManager(LeaseManager):
             (expires, str(lease.job_id), lease.worker_id),
         )
         if not rows:
-            raise RuntimeError(
-                f"Lease for {lease.job_id} is no longer owned by {lease.worker_id}"
-            )
+            raise RuntimeError(f"Lease for {lease.job_id} is no longer owned by {lease.worker_id}")
         return _lease_from_row(rows[0])
 
     def release(self, lease: WorkerLease) -> None:
@@ -562,12 +524,7 @@ class PostgresLeaseManager(LeaseManager):
         return None if not rows else _lease_from_row(rows[0])
 
     def list(self) -> list[WorkerLease]:
-        return [
-            _lease_from_row(row)
-            for row in self._db.execute(
-                "SELECT job_id,worker_id,expires_at FROM mirror_leases ORDER BY expires_at,job_id"
-            )
-        ]
+        return [_lease_from_row(row) for row in self._db.execute("SELECT job_id,worker_id,expires_at FROM mirror_leases ORDER BY expires_at,job_id")]
 
     def close(self) -> None:
         self._db.close()

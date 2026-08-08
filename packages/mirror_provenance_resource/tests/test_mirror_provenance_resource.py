@@ -27,9 +27,7 @@ async def test_resource_provenance_provider_creates_envelopes() -> None:
     """Provider should create immutable resource envelopes."""
 
     provider_impl = ResourceProvenanceProvider()
-    producer = ProducerRef(
-        capability="demo", capability_version="1.0", provider="resource"
-    )
+    producer = ProducerRef(capability="demo", capability_version="1.0", provider="resource")
     result = await provider_impl.provenance(
         ProvenanceRequest(
             envelopes=[

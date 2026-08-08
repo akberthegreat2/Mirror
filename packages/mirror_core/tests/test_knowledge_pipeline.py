@@ -41,9 +41,7 @@ class ChunkPayload(BaseModel):
 
 
 @pytest.mark.asyncio
-async def test_knowledge_slice_runs_through_normalize_enrich_dedup_chunk_embed_store_retrieve() -> (
-    None
-):
+async def test_knowledge_slice_runs_through_normalize_enrich_dedup_chunk_embed_store_retrieve() -> None:
     """A knowledge request should flow through the full deterministic pipeline."""
 
     normalizer = TextNormalizationProvider()
@@ -169,21 +167,10 @@ async def test_knowledge_slice_runs_through_normalize_enrich_dedup_chunk_embed_s
     )
     assert len(provenance_result.envelopes) == len(chunked.chunks)
     assert all(envelope.fingerprint for envelope in provenance_result.envelopes)
-    assert {
-        envelope.metadata["source"] for envelope in provenance_result.envelopes
-    } == {"knowledge", "story"}
+    assert {envelope.metadata["source"] for envelope in provenance_result.envelopes} == {"knowledge", "story"}
     assert all(len(envelope.parents) == 1 for envelope in provenance_result.envelopes)
 
-    embeddings = await embedder.embed(
-        EmbeddingRequest(
-            items=[
-                EmbeddingInput(
-                    item_id=chunk.chunk_id, text=chunk.text, metadata=chunk.metadata
-                )
-                for chunk in chunked.chunks
-            ]
-        )
-    )
+    embeddings = await embedder.embed(EmbeddingRequest(items=[EmbeddingInput(item_id=chunk.chunk_id, text=chunk.text, metadata=chunk.metadata) for chunk in chunked.chunks]))
     records = [
         VectorRecord(
             record_id=vector.item_id,
@@ -197,9 +184,7 @@ async def test_knowledge_slice_runs_through_normalize_enrich_dedup_chunk_embed_s
     ]
     await vector_store.upsert(VectorUpsertRequest(records=records))
 
-    result = await retriever.retrieve(
-        RetrievalRequest(query="How does Mirror retrieve the best chunk?", top_k=1)
-    )
+    result = await retriever.retrieve(RetrievalRequest(query="How does Mirror retrieve the best chunk?", top_k=1))
 
     assert result.matches
     assert result.matches[0].document_id == "doc-2"
