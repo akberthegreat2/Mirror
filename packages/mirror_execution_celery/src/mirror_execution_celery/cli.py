@@ -5,7 +5,13 @@ from __future__ import annotations
 import argparse
 import os
 
-from .transport import CeleryExecutionTransport, configure_worker_task, create_celery_app, queue_name
+from .transport import (
+    REAPER_QUEUE,
+    CeleryExecutionTransport,
+    configure_worker_task,
+    create_celery_app,
+    queue_name,
+)
 
 
 def main() -> None:
@@ -20,15 +26,17 @@ def main() -> None:
         raise SystemExit("MIRROR_POSTGRES_DSN is required")
     app = create_celery_app()
     configure_worker_task(app, postgres_dsn=postgres_dsn, worker_id=args.worker_id)
-    app.worker_main([
-        "worker",
-        "--loglevel",
-        args.loglevel,
-        "--queues",
-        queue_name(args.execution_class),
-        "--hostname",
-        f"mirror@{args.worker_id or 'worker'}",
-    ])
+    app.worker_main(
+        [
+            "worker",
+            "--loglevel",
+            args.loglevel,
+            "--queues",
+            f"{queue_name(args.execution_class)},{REAPER_QUEUE}",
+            "--hostname",
+            f"mirror@{args.worker_id or 'worker'}",
+        ]
+    )
 
 
 def submit_main() -> None:
@@ -38,7 +46,9 @@ def submit_main() -> None:
 
     parser = argparse.ArgumentParser(description="Submit a Mirror pipeline to Celery")
     parser.add_argument("pipeline", help="JSON file containing a Mirror pipeline")
-    parser.add_argument("--inputs", default="{}", help="JSON object containing pipeline inputs")
+    parser.add_argument(
+        "--inputs", default="{}", help="JSON object containing pipeline inputs"
+    )
     parser.add_argument("--execution-class", default="default")
     args = parser.parse_args()
 
@@ -63,7 +73,10 @@ def submit_main() -> None:
         try:
             pipeline_model = Pipeline.model_validate(pipeline_data)
             plan = mirror_app.compile_pipeline(pipeline_model)
-            provider_selections = {step_id: compiled.provider.name for step_id, compiled in plan.steps.items()}
+            provider_selections = {
+                step_id: compiled.provider.name
+                for step_id, compiled in plan.steps.items()
+            }
         finally:
             await mirror_app.shutdown()
         await backend.start()
@@ -85,3 +98,19 @@ def submit_main() -> None:
             await backend.stop()
 
     asyncio.run(submit())
+
+
+def beat_main() -> None:
+    """Run Celery Beat for Mirror's durable lease-reaper schedule."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run the Mirror Celery Beat scheduler")
+    parser.add_argument("--loglevel", default="INFO")
+    args = parser.parse_args()
+
+    postgres_dsn = os.environ.get("MIRROR_POSTGRES_DSN")
+    if not postgres_dsn:
+        raise SystemExit("MIRROR_POSTGRES_DSN is required")
+    app = create_celery_app()
+    configure_worker_task(app, postgres_dsn=postgres_dsn)
+    app.start(["beat", "--loglevel", args.loglevel])

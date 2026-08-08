@@ -3,12 +3,13 @@
 Mirror's root `docker-compose.yml` is a development deployment, not a
 production Kubernetes specification.
 
-It contains three services:
+It contains four services:
 
 ```text
 postgres  durable state
 redis     Celery broker
 worker    generic Mirror worker
+beat      lease-reclamation scheduler
 ```
 
 ## Start
@@ -22,6 +23,7 @@ docker compose up --build -d
 ```bash
 docker compose ps
 docker compose logs -f worker
+docker compose logs -f beat
 ```
 
 ## Reset

@@ -23,6 +23,7 @@ test = ["pytest>=7.0", "pytest-asyncio>=0.21"]
 [project.scripts]
 mirror-celery-worker = "mirror_execution_celery.cli:main"
 mirror-celery-submit = "mirror_execution_celery.cli:submit_main"
+mirror-celery-beat = "mirror_execution_celery.cli:beat_main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

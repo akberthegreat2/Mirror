@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Any, cast
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from mirror_core.conditions import ConditionEvaluator
 from mirror_core.exceptions import ExecutionError
@@ -21,6 +21,7 @@ from mirror_core.executor_support import (
     PolicyInvoker,
     RunnerContext,
 )
+from mirror_core.imports import resolve_model
 from mirror_core.metadata import MetadataRecord, MetadataStore
 from mirror_core.middleware import (
     MiddlewareChain,
@@ -389,17 +390,19 @@ class Executor:
         runner: Runner | None = None,
     ) -> ExecutionResult:
         """Resume a run from the latest or a specific checkpoint snapshot."""
+        snapshot: dict[str, Any]
         if step_id is None:
             latest = self._checkpoint_coordinator.latest(run_id)
             if latest is None:
                 raise ExecutionError(f"No checkpoint available for run {run_id}")
             step_id, snapshot = latest
         else:
-            snapshot = self._checkpoint_coordinator.load(run_id, step_id)
-            if snapshot is None:
+            loaded_snapshot = self._checkpoint_coordinator.load(run_id, step_id)
+            if loaded_snapshot is None:
                 raise ExecutionError(
                     f"No checkpoint available for run {run_id} step {step_id!r}"
                 )
+            snapshot = loaded_snapshot
         self._record_metadata(
             MetadataRecord.replay_pointer(
                 run_id,
@@ -480,9 +483,8 @@ class Executor:
             model_type = getattr(module, class_name)
             if isinstance(model_type, type) and issubclass(model_type, BaseModel):
                 return model_type.model_validate(payload)
-        except Exception:
-            pass
-        return payload
+        except (ImportError, AttributeError, TypeError, ValueError, ValidationError):
+            return payload
 
     async def _run_step(
         self,
@@ -551,10 +553,14 @@ class Executor:
                     f"Runner for step {step.id!r} returned {type(payload).__name__}; expected a Pydantic model"
                 )
             expected = compiled.capability.result_model
-            if expected is not None and not isinstance(payload, expected):
-                raise ExecutionError(
-                    f"Runner for step {step.id!r} returned {type(payload).__name__}; expected {expected.__name__}"
-                )
+            if expected is not None:
+                expected_type = resolve_model(expected)
+                if not isinstance(payload, expected_type):
+                    raise ExecutionError(
+                        f"Runner for step {step.id!r} returned "
+                        f"{type(payload).__name__}; expected "
+                        f"{expected_type.__name__}"
+                    )
             envelope = self._build_result_envelope(
                 run, compiled, step, payload, provider_config
             )
@@ -576,7 +582,7 @@ class Executor:
             raise ExecutionError(
                 f"Capability {compiled.capability.name!r} has no request model"
             )
-        return request_model.model_validate(inputs)
+        return resolve_model(request_model).model_validate(inputs)
 
     def _build_result_envelope(
         self,
@@ -599,10 +605,14 @@ class Executor:
             for d in compiled.dependencies
             if d in run.results
         ]
+        result_model = compiled.capability.result_model
+        resource_type = (
+            resolve_model(result_model).__name__
+            if result_model is not None
+            else type(payload).__name__
+        )
         return ResourceEnvelope.create(
-            resource_type=compiled.capability.result_model.__name__
-            if compiled.capability.result_model is not None
-            else type(payload).__name__,
+            resource_type=resource_type,
             schema_version=compiled.capability.api_version,
             payload=payload,
             producer=producer,

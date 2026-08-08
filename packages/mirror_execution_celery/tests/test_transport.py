@@ -3,8 +3,12 @@ from __future__ import annotations
 import os
 
 import pytest
-
-from mirror_execution_celery.transport import create_celery_app, queue_name
+from mirror_execution_celery.transport import (
+    REAPER_QUEUE,
+    configure_worker_task,
+    create_celery_app,
+    queue_name,
+)
 
 
 def test_execution_class_queue_names() -> None:
@@ -34,3 +38,13 @@ def test_live_redis_url_is_configurable() -> None:
     url = os.environ["MIRROR_TEST_REDIS_URL"]
     client = Redis.from_url(url)
     assert client.ping() is True
+
+
+def test_configure_worker_registers_lease_reaper_schedule() -> None:
+    app = create_celery_app(broker_url="redis://localhost:6399/0")
+    configure_worker_task(app, postgres_dsn="postgresql://mirror@localhost/mirror")
+    assert "mirror.requeue_expired" in app.tasks
+    schedule = app.conf.beat_schedule["mirror-lease-reaper"]
+    assert schedule["task"] == "mirror.requeue_expired"
+    assert schedule["options"]["queue"] == REAPER_QUEUE
+    assert schedule["schedule"] > 0

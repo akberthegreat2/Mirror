@@ -5,7 +5,6 @@ import os
 from uuid import uuid4
 
 import pytest
-
 from mirror_core.workers import JobState, WorkerJob
 from mirror_worker_postgres import (
     PostgresCheckpointStore,
@@ -72,13 +71,26 @@ def test_postgres_durable_stores() -> None:
         from mirror_core.metadata import MetadataRecord
         from mirror_core.workers import DeadLetterRecord, ExecutionRecord
 
-        execution.record(ExecutionRecord(run_id=run_id, outcome="succeeded", payload={"x": 1}))
+        execution.record(
+            ExecutionRecord(run_id=run_id, outcome="succeeded", payload={"x": 1})
+        )
         assert execution.get(run_id) is not None
         checkpoints.save(run_id, "step-1", {"state": "done"})
         assert checkpoints.load(run_id, "step-1") == {"state": "done"}
-        metadata.put(MetadataRecord(namespace="integration", key=str(run_id), payload={"ok": True}))
+        metadata.put(
+            MetadataRecord(
+                namespace="integration", key=str(run_id), payload={"ok": True}
+            )
+        )
         assert metadata.get("integration", str(run_id)) is not None
-        dead_letters.record(DeadLetterRecord(run_id=run_id, pipeline_id="integration", reason="test", terminal_status="failed"))
+        dead_letters.record(
+            DeadLetterRecord(
+                run_id=run_id,
+                pipeline_id="integration",
+                reason="test",
+                terminal_status="failed",
+            )
+        )
         assert dead_letters.get(run_id) is not None
         lease = leases.acquire(run_id, "worker-a", ttl_seconds=10)
         assert leases.get(run_id) == lease

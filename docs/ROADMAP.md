@@ -27,27 +27,28 @@
 - [x] Better CLI help and diagnostics
 - [x] Workspace bootstrap docs (`conftest.py`, `sitecustomize.py`)
 - [x] End-to-end developer guide
-- [ ] Django control-plane package
-- [ ] Django admin metadata models
-- [ ] Auth and roles for operators
-- [ ] Admin views for runs, workers, crawled URLs, and archives
+- [x] Django control-plane package
+- [x] Django admin metadata models
+- [x] Django migrations and admin registrations
+- [x] REST control-plane package
+- [x] Pipeline blob repository and immutable versions
+- [ ] Application-specific auth/role policy beyond Django model permissions
+- [x] Admin views for runs, workers, crawled URLs, and archives
 
 ## Phase 4 — Beta runtime
 
-- [ ] Crawl persistence
-- [ ] Scheduler backend
-- [ ] SQLite worker backend
+- [x] Crawl persistence contracts
+- [x] Scheduler backend
+- [x] SQLite worker backend
 - [x] PostgreSQL durable worker/metadata stores
 - [ ] MySQL metadata store
-- [ ] Blob storage adapters
+- [x] Core blob storage boundary
 - [x] Redis broker through Celery execution backend
 - [x] Generic distributed workers and execution-class routing
-- [ ] Import smoke tests for every package
-- [ ] Discovery smoke tests for every package
-- [ ] Contract smoke tests for every package
-- [ ] Lab certification suite (requires live PostgreSQL certification environment)
+- [x] Import/discovery/manifest certification tests
+- [ ] Full live lab certification (requires live PostgreSQL/Redis/Celery environment)
 - [ ] Compatibility matrix suite
-- [ ] Beta release checklist
+- [x] Beta release checklist and certification documentation
 
 ## Phase 5 — Knowledge infrastructure (initial slice)
 
@@ -82,3 +83,15 @@ The following ideas are tracked as proposed ADRs rather than alpha commitments:
 - distributed execution and Celery worker integration (implemented; certification remains a deployment test);
 - open-source-first provider policy;
 - executor internal decomposition.
+
+## Phase D — Certification and interface convergence
+
+- [x] Interface-neutral manifest projection
+- [x] CLI manifest inspection
+- [x] Dashboard and REST interface manifests
+- [x] Immutable managed pipeline versions
+- [x] Repository-wide ruff gate
+- [x] Repository-wide mypy gate
+- [x] Django migration smoke
+- [x] Capability/provider manifest certification
+- [x] Final documentation and handover review

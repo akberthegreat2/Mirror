@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from mirror_core.extensions.models import InterfaceManifest
+
 
 @dataclass(frozen=True, slots=True)
 class ControlPlaneEntitySpec:
@@ -55,7 +57,15 @@ CONTROL_PLANE_MANIFEST = ControlPlaneManifest(
             plural_label="Pipelines",
             model_name="Pipeline",
             description="Named pipeline definition and governance record.",
-            operations=("list", "get", "create", "update", "delete", "materialize", "run"),
+            operations=(
+                "list",
+                "get",
+                "create",
+                "update",
+                "delete",
+                "materialize",
+                "run",
+            ),
             blob_backed=True,
         ),
         ControlPlaneEntitySpec(
@@ -64,8 +74,8 @@ CONTROL_PLANE_MANIFEST = ControlPlaneManifest(
             plural_label="Pipeline Versions",
             model_name="PipelineVersion",
             description="Immutable version snapshot of a pipeline definition.",
-            operations=("list", "get", "create", "update"),
-            read_only=False,
+            operations=("list", "get", "create"),
+            read_only=True,
             blob_backed=True,
         ),
         ControlPlaneEntitySpec(
@@ -140,3 +150,22 @@ def control_plane_manifest() -> ControlPlaneManifest:
     """Return the canonical control-plane manifest."""
 
     return CONTROL_PLANE_MANIFEST
+
+
+interface = InterfaceManifest(
+    name="dashboard",
+    interface_type="dashboard",
+    factory="mirror_control_django.views:DashboardView",
+    requires_capabilities=[],
+    metadata={
+        "description": "Django admin/control-plane interface for Mirror metadata and pipeline operations."
+    },
+)
+
+__all__ = [
+    "CONTROL_PLANE_MANIFEST",
+    "ControlPlaneEntitySpec",
+    "ControlPlaneManifest",
+    "control_plane_manifest",
+    "interface",
+]

@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.entry-points."mirror.providers"]
-resource = "mirror_provenance_resource.capability:capability"
+resource = "mirror_provenance_resource.provider:provider"
 
 [tool.setuptools.packages.find]
 where = ["src"]

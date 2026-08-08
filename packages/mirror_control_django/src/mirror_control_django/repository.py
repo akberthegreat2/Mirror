@@ -8,18 +8,17 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from uuid import UUID
 
 from django.db.models import Max
-
 from mirror_core.pipeline import Pipeline as CorePipeline
 from mirror_core.storage import FileSystemBlobStore
 
 from mirror_control_django import models
-
+from mirror_control_django.manifest import CONTROL_PLANE_MANIFEST
 
 DEFAULT_BLOB_ENV = "MIRROR_CONTROL_BLOB_ROOT"
 DEFAULT_BLOB_DIR = ".mirror/control-plane/blobs"
+MANAGED_PIPELINE_ORIGIN = "managed"
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +72,14 @@ class ControlPlaneRepository:
     def __init__(self, blob_store: FileSystemBlobStore | None = None) -> None:
         self.blob_store = blob_store or default_blob_store()
 
-    def ensure_project(self, *, slug: str, name: str | None = None, description: str = "", metadata: dict[str, Any] | None = None) -> models.Project:
+    def ensure_project(
+        self,
+        *,
+        slug: str,
+        name: str | None = None,
+        description: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> models.Project:
         project, _ = models.Project.objects.get_or_create(
             slug=slug,
             defaults={
@@ -97,7 +103,7 @@ class ControlPlaneRepository:
         project_slug: str,
         pipeline_slug: str,
         name: str | None = None,
-        origin: str = models.Pipeline.Origin.MANAGED,
+        origin: str = MANAGED_PIPELINE_ORIGIN,
         read_only: bool = False,
         source_ref: str = "",
         source_hash_value: str = "",
@@ -147,7 +153,7 @@ class ControlPlaneRepository:
             project_slug=project_slug,
             pipeline_slug=pipeline_slug,
             name=pipeline.id,
-            origin=models.Pipeline.Origin.CODE,
+            origin="code",
             read_only=True,
             source_ref=source_ref,
             source_hash_value=source_hash_value,
@@ -185,7 +191,7 @@ class ControlPlaneRepository:
             project_slug=project_slug,
             pipeline_slug=pipeline_slug,
             name=pipeline.id,
-            origin=models.Pipeline.Origin.MANAGED,
+            origin=MANAGED_PIPELINE_ORIGIN,
             read_only=False,
             metadata=metadata,
         )
@@ -208,6 +214,55 @@ class ControlPlaneRepository:
         managed.current_version_hash = digest
         managed.is_read_only = False
         managed.save()
+        return managed, version
+
+    def materialize_definition(
+        self,
+        *,
+        project_slug: str,
+        pipeline_slug: str,
+        definition: bytes,
+        name: str | None = None,
+        metadata: dict[str, Any] | None = None,
+        notes: str = "",
+    ) -> tuple[models.Pipeline, models.PipelineVersion]:
+        """Validate and store a new immutable managed pipeline version."""
+
+        pipeline = deserialize_pipeline_definition(definition)
+        managed = self.get_or_create_pipeline(
+            project_slug=project_slug,
+            pipeline_slug=pipeline_slug,
+            name=name or pipeline.id,
+            origin=MANAGED_PIPELINE_ORIGIN,
+            read_only=False,
+            metadata=metadata,
+        )
+        next_version = (
+            managed.versions.aggregate(Max("version"))["version__max"] or 0
+        ) + 1
+        blob_key = self._definition_blob_key(project_slug, pipeline_slug, next_version)
+        self.blob_store.put_bytes(blob_key, definition)
+        digest = content_hash(definition)
+        version = models.PipelineVersion.objects.create(
+            pipeline=managed,
+            version=next_version,
+            definition_ref=blob_key,
+            definition_hash=digest,
+            definition_format="json",
+            notes=notes,
+            metadata=metadata or {},
+        )
+        managed.definition_ref = blob_key
+        managed.current_version_number = next_version
+        managed.current_version_hash = digest
+        managed.save(
+            update_fields=[
+                "definition_ref",
+                "current_version_number",
+                "current_version_hash",
+                "updated_at",
+            ]
+        )
         return managed, version
 
     def load_pipeline_definition(self, version: models.PipelineVersion) -> CorePipeline:
@@ -256,12 +311,15 @@ class ControlPlaneRepository:
             "definition_preview": preview,
         }
 
-    def _definition_blob_key(self, project_slug: str, pipeline_slug: str, version: int) -> str:
+    def _definition_blob_key(
+        self, project_slug: str, pipeline_slug: str, version: int
+    ) -> str:
         return f"pipelines/{project_slug}/{pipeline_slug}/v{version}.json"
 
 
 __all__ = [
     "CONTROL_PLANE_MANIFEST",
+    "MANAGED_PIPELINE_ORIGIN",
     "ControlPlaneRepository",
     "PipelineArtifact",
     "content_hash",

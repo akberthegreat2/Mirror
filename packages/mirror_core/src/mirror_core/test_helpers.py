@@ -20,7 +20,9 @@ def _type_path(value: object | str | None) -> str | None:
         return None
     if isinstance(value, str):
         return value
-    return f"{value.__module__}:{value.__qualname__}"
+    if isinstance(value, type):
+        return f"{value.__module__}:{value.__qualname__}"
+    raise TypeError(f"Expected a type or import path, got {type(value).__name__}")
 
 
 def dependency(*, name: str, version: str | None = None) -> Dependency:

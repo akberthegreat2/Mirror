@@ -9,10 +9,12 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, cast, runtime_checkable
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from mirror_core.metadata import decode_metadata_value, encode_metadata_value
 
 
 class JobState(str, Enum):
@@ -118,7 +120,9 @@ class WorkerBackend(Protocol):
         """Submit a job and return its stored representation."""
         ...
 
-    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
+    async def claim(
+        self, worker_id: str, execution_class: str = "default"
+    ) -> WorkerJob | None:
         """Claim the next queued job for a worker."""
         ...
 
@@ -243,12 +247,17 @@ class InlineWorker:
         self._jobs_by_id[stored.job_id] = stored
         return stored
 
-    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
+    async def claim(
+        self, worker_id: str, execution_class: str = "default"
+    ) -> WorkerJob | None:
         """Claim the next queued job for a worker in one execution class."""
         self._ensure_started()
         while self._jobs:
             job = self._jobs.popleft()
-            if job.state is not JobState.QUEUED or job.execution_class != execution_class:
+            if (
+                job.state is not JobState.QUEUED
+                or job.execution_class != execution_class
+            ):
                 continue
             now = _utcnow()
             claimed = job.model_copy(
@@ -270,7 +279,14 @@ class InlineWorker:
         if job is None or job.state is not JobState.QUEUED:
             return None
         now = _utcnow()
-        claimed = job.model_copy(update={"state": JobState.RUNNING, "worker_id": worker_id, "claimed_at": now, "lease_expires_at": now + timedelta(seconds=60)})
+        claimed = job.model_copy(
+            update={
+                "state": JobState.RUNNING,
+                "worker_id": worker_id,
+                "claimed_at": now,
+                "lease_expires_at": now + timedelta(seconds=60),
+            }
+        )
         self._jobs_by_id[job_id] = claimed
         return claimed
 
@@ -459,7 +475,9 @@ class SQLiteWorkerBackend:
         conn.commit()
         return stored
 
-    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
+    async def claim(
+        self, worker_id: str, execution_class: str = "default"
+    ) -> WorkerJob | None:
         self._ensure_started()
         conn = self._connection()
         conn.execute("BEGIN IMMEDIATE")
@@ -503,19 +521,38 @@ class SQLiteWorkerBackend:
         self._ensure_started()
         conn = self._connection()
         conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute("SELECT * FROM jobs WHERE job_id = ? AND state = ?", (str(job_id), JobState.QUEUED.value)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM jobs WHERE job_id = ? AND state = ?",
+            (str(job_id), JobState.QUEUED.value),
+        ).fetchone()
         if row is None:
             conn.commit()
             return None
         now = _utcnow()
         expires = now + timedelta(seconds=60)
-        conn.execute("UPDATE jobs SET state=?, worker_id=?, updated_at=?, claimed_at=?, lease_expires_at=? WHERE job_id=?", (JobState.RUNNING.value, worker_id, now.isoformat(), now.isoformat(), expires.isoformat(), str(job_id)))
+        conn.execute(
+            "UPDATE jobs SET state=?, worker_id=?, updated_at=?, claimed_at=?, lease_expires_at=? WHERE job_id=?",
+            (
+                JobState.RUNNING.value,
+                worker_id,
+                now.isoformat(),
+                now.isoformat(),
+                expires.isoformat(),
+                str(job_id),
+            ),
+        )
         conn.commit()
-        return self._row_to_job(conn.execute("SELECT * FROM jobs WHERE job_id=?", (str(job_id),)).fetchone())
+        return self._row_to_job(
+            conn.execute("SELECT * FROM jobs WHERE job_id=?", (str(job_id),)).fetchone()
+        )
 
     async def get(self, job_id: UUID) -> WorkerJob | None:
         self._ensure_started()
-        row = self._connection().execute("SELECT * FROM jobs WHERE job_id=?", (str(job_id),)).fetchone()
+        row = (
+            self._connection()
+            .execute("SELECT * FROM jobs WHERE job_id=?", (str(job_id),))
+            .fetchone()
+        )
         return None if row is None else self._row_to_job(row)
 
     async def heartbeat(self, worker_id: str, job_id: UUID | None = None) -> None:
@@ -764,7 +801,7 @@ class SQLiteDeadLetterQueue:
 
     def list(self) -> list[DeadLetterRecord]:
         rows = self._conn.execute(
-            "SELECT * FROM dead_letters ORDER BY created_at, run_id"
+            "SELECT * FROM dead_letters ORDER BY created_at DESC, run_id DESC"
         ).fetchall()
         return [self._row_to_record(row) for row in rows]
 
@@ -898,7 +935,7 @@ class SQLiteCheckpointStore:
             (
                 str(run_id),
                 step_id,
-                json.dumps(_checkpoint_encode(payload), sort_keys=True),
+                json.dumps(encode_metadata_value(payload), sort_keys=True),
                 _utcnow().isoformat(),
             ),
         )
@@ -911,7 +948,7 @@ class SQLiteCheckpointStore:
         ).fetchone()
         if row is None:
             return None
-        return _checkpoint_decode(json.loads(row["payload"]))
+        return cast(dict[str, Any], decode_metadata_value(json.loads(row["payload"])))
 
     def latest(self, run_id: UUID) -> tuple[str, dict[str, Any]] | None:
         row = self._conn.execute(
@@ -926,7 +963,9 @@ class SQLiteCheckpointStore:
         ).fetchone()
         if row is None:
             return None
-        return row["step_id"], _checkpoint_decode(json.loads(row["payload"]))
+        return row["step_id"], cast(
+            dict[str, Any], decode_metadata_value(json.loads(row["payload"]))
+        )
 
     def delete(self, run_id: UUID, step_id: str) -> None:
         self._conn.execute(

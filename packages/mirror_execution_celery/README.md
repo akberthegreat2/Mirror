@@ -16,3 +16,16 @@ mirror-celery-worker --execution-class default
 
 Workers are generic. They consume execution IDs/jobs; they do not contain
 capability-specific crawler, scraper, search, or analyzer logic.
+
+## Automatic lease reclamation
+
+Run the Beat scheduler alongside the workers:
+
+```bash
+mirror-celery-beat --loglevel INFO
+```
+
+Beat schedules `mirror.requeue_expired` every 15 seconds by default. Set
+`MIRROR_REAPER_INTERVAL_SECONDS` to change the interval. The task only moves
+expired durable jobs back to `queued`; Mirror Core remains responsible for retry
+and execution policy.

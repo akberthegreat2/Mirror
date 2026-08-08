@@ -34,20 +34,45 @@ class PipelineAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         fields = list(super().get_readonly_fields(request, obj))
         if obj is not None and obj.is_read_only:
-            fields.extend(["project", "slug", "name", "origin", "source_ref", "source_hash", "metadata"])
+            fields.extend(
+                [
+                    "project",
+                    "slug",
+                    "name",
+                    "origin",
+                    "source_ref",
+                    "source_hash",
+                    "metadata",
+                ]
+            )
         return tuple(dict.fromkeys(fields))
 
 
 @admin.register(models.PipelineVersion)
 class PipelineVersionAdmin(admin.ModelAdmin):
     form = PipelineVersionForm
-    list_display = ("pipeline", "version", "definition_hash", "definition_format", "created_at")
+    list_display = (
+        "pipeline",
+        "version",
+        "definition_hash",
+        "definition_format",
+        "created_at",
+    )
     list_filter = ("definition_format", "pipeline")
     search_fields = ("pipeline__slug", "definition_ref", "definition_hash")
     readonly_fields = ("definition_hash", "definition_ref")
 
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     def save_model(self, request, obj, form, change):
         repo = ControlPlaneRepository()
+        if not change:
+            latest = obj.pipeline.versions.order_by("-version").first()
+            obj.version = 1 if latest is None else latest.version + 1
         definition_text = form.cleaned_data.get("definition_text", "")
         payload = definition_text.encode("utf-8")
         if not obj.definition_ref:
@@ -61,12 +86,26 @@ class PipelineVersionAdmin(admin.ModelAdmin):
         obj.pipeline.definition_ref = obj.definition_ref
         obj.pipeline.current_version_number = obj.version
         obj.pipeline.current_version_hash = obj.definition_hash
-        obj.pipeline.save(update_fields=["definition_ref", "current_version_number", "current_version_hash", "updated_at"])
+        obj.pipeline.save(
+            update_fields=[
+                "definition_ref",
+                "current_version_number",
+                "current_version_hash",
+                "updated_at",
+            ]
+        )
 
 
 @admin.register(models.ExecutionRun)
 class ExecutionRunAdmin(admin.ModelAdmin):
-    list_display = ("run_id", "pipeline_name", "pipeline_version", "status", "worker_id", "created_at")
+    list_display = (
+        "run_id",
+        "pipeline_name",
+        "pipeline_version",
+        "status",
+        "worker_id",
+        "created_at",
+    )
     list_filter = ("status", "execution_class")
     search_fields = ("run_id", "pipeline_name", "worker_id")
 
@@ -113,6 +152,13 @@ class CheckpointAdmin(admin.ModelAdmin):
 
 @admin.register(models.DeadLetter)
 class DeadLetterAdmin(admin.ModelAdmin):
-    list_display = ("run_id", "pipeline_name", "step_id", "terminal_status", "retry_count", "created_at")
+    list_display = (
+        "run_id",
+        "pipeline_name",
+        "step_id",
+        "terminal_status",
+        "retry_count",
+        "created_at",
+    )
     list_filter = ("terminal_status",)
     search_fields = ("run_id", "pipeline_name", "step_id", "reason")

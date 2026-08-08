@@ -94,11 +94,12 @@ class ConditionEvaluator:
             if len(node.args) != 1 or node.keywords:
                 raise ExecutionError(f"exists() expects one argument in {condition!r}")
             arg = node.args[0]
-            return (
-                arg.id in inputs
-                if isinstance(arg, ast.Name)
-                else self._evaluate(arg, inputs, condition) is not None
-            )
+            if isinstance(arg, ast.Name):
+                return arg.id in inputs
+            try:
+                return self._evaluate(arg, inputs, condition) is not None
+            except ExecutionError:
+                return False
         raise ExecutionError(f"Unsupported condition expression: {condition!r}")
 
 

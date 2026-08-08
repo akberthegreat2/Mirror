@@ -60,7 +60,7 @@ class WARCProvider(AsyncLifecycle, Archive):
             raise ArchiveError(
                 "WARC provider requires the 'warcio' dependency"
             ) from exc
-        return WARCWriter  # type: ignore[no-any-return]
+        return WARCWriter
 
     async def setup(self) -> None:
         """Open an initial WARC segment.

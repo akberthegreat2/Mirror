@@ -3,26 +3,35 @@
 from __future__ import annotations
 
 import os
-from typing import Any
 from uuid import UUID
 
 from celery import Celery
 from celery.utils.log import get_task_logger
-
-from mirror_core.workers import WorkerJob
-from mirror_worker_postgres import PostgresDeadLetterQueue, PostgresLeaseManager, PostgresMetadataStore, PostgresWorkerBackend, PostgresCheckpointStore
 from mirror_core.application import Application
 from mirror_core.settings import MirrorSettings
 from mirror_core.worker_runtime import WorkerRuntime
+from mirror_core.workers import WorkerJob
+from mirror_worker_postgres import (
+    PostgresCheckpointStore,
+    PostgresDeadLetterQueue,
+    PostgresLeaseManager,
+    PostgresMetadataStore,
+    PostgresWorkerBackend,
+)
 
 logger = get_task_logger(__name__)
+REAPER_QUEUE = "mirror.reaper"
 
 
 def queue_name(execution_class: str) -> str:
     """Map an execution class to an infrastructure queue name."""
     normalized = execution_class.strip().lower()
-    if not normalized or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789_-" for char in normalized):
-        raise ValueError("execution_class must contain only letters, numbers, '_' or '-'")
+    if not normalized or any(
+        char not in "abcdefghijklmnopqrstuvwxyz0123456789_-" for char in normalized
+    ):
+        raise ValueError(
+            "execution_class must contain only letters, numbers, '_' or '-'"
+        )
     return f"mirror.{normalized}"
 
 
@@ -30,7 +39,9 @@ def create_celery_app(
     *, broker_url: str | None = None, app_name: str = "mirror"
 ) -> Celery:
     """Create the real Celery application used by Mirror workers."""
-    broker = broker_url or os.environ.get("MIRROR_CELERY_BROKER_URL", "redis://localhost:6379/0")
+    broker = broker_url or os.environ.get(
+        "MIRROR_CELERY_BROKER_URL", "redis://localhost:6379/0"
+    )
     app = Celery(app_name, broker=broker)
     app.conf.update(
         task_ignore_result=True,
@@ -41,6 +52,7 @@ def create_celery_app(
         task_serializer="json",
         accept_content=["json"],
         result_expires=0,
+        task_routes={"mirror.requeue_expired": {"queue": REAPER_QUEUE}},
     )
     return app
 
@@ -77,7 +89,9 @@ def configure_worker_task(
     lease_seconds: int = 60,
 ) -> None:
     """Register the generic Mirror execution task on a Celery app."""
-    worker_name = worker_id or os.environ.get("MIRROR_WORKER_ID") or _default_worker_id()
+    worker_name = (
+        worker_id or os.environ.get("MIRROR_WORKER_ID") or _default_worker_id()
+    )
 
     @app.task(name="mirror.execute_job", bind=False, acks_late=True)
     def execute_job(job_id: str) -> None:
@@ -93,6 +107,32 @@ def configure_worker_task(
                 lease_seconds=lease_seconds,
             )
         )
+
+    @app.task(name="mirror.requeue_expired", bind=False)
+    def requeue_expired() -> int:
+        """Requeue expired durable jobs without changing Mirror retry policy."""
+        import asyncio
+
+        async def _requeue() -> int:
+            backend = PostgresWorkerBackend(postgres_dsn, lease_seconds=lease_seconds)
+            await backend.start()
+            try:
+                return len(backend.requeue_expired())
+            finally:
+                await backend.stop()
+
+        return asyncio.run(_requeue())
+
+    interval = float(os.environ.get("MIRROR_REAPER_INTERVAL_SECONDS", "15"))
+    if interval <= 0:
+        raise ValueError("MIRROR_REAPER_INTERVAL_SECONDS must be greater than zero")
+    beat_schedule = dict(app.conf.beat_schedule or {})
+    beat_schedule["mirror-lease-reaper"] = {
+        "task": "mirror.requeue_expired",
+        "schedule": interval,
+        "options": {"queue": REAPER_QUEUE},
+    }
+    app.conf.beat_schedule = beat_schedule
 
 
 def _default_worker_id() -> str:

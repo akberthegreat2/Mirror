@@ -1,4 +1,4 @@
-# PR: Phase five beta gauntlet
+# PR: Phase five beta gauntlet (superseded by Phase D hardening)
 
 ## Problem
 
@@ -23,7 +23,8 @@ Add a beta gauntlet that combines smoke tests, lab validation, compatibility che
 - the gauntlet turns framework trust into a repeatable checklist;
 - the suite is split so offline CI stays fast and online/lab CI can run separately.
 
-## Deferred
+## Current status
 
-- full benchmark baselines for every provider family;
-- production deployment manifests for every target platform.
+The certification gates described here are implemented and hardened in Phase D.
+Full benchmark baselines and production deployment manifests remain future
+work.

@@ -460,8 +460,13 @@ def _decode_metadata_value(value: Any) -> Any:
                 enum_type = getattr(importlib.import_module(module_name), class_name)
                 if isinstance(enum_type, type) and issubclass(enum_type, Enum):
                     return enum_type(value[_METADATA_VALUE])
-            except Exception:  # pragma: no cover - best-effort reconstruction
-                pass
+            except (
+                ImportError,
+                AttributeError,
+                TypeError,
+                ValueError,
+            ):  # pragma: no cover
+                return value[_METADATA_VALUE]
             return value[_METADATA_VALUE]
         return {key: _decode_metadata_value(item) for key, item in value.items()}
     return value
@@ -489,7 +494,7 @@ __all__ = [
     "MetadataNamespaces",
     "MetadataRecord",
     "MetadataStore",
-    "encode_metadata_value",
-    "decode_metadata_value",
     "SQLiteMetadataStore",
+    "decode_metadata_value",
+    "encode_metadata_value",
 ]

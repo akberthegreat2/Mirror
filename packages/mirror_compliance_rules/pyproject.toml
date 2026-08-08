@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.entry-points."mirror.providers"]
-rules = "mirror_compliance_rules.capability:capability"
+rules = "mirror_compliance_rules.provider:provider"
 
 [tool.setuptools.packages.find]
 where = ["src"]

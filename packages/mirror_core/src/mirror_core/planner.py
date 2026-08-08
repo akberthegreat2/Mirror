@@ -48,7 +48,7 @@ class ExecutionPlan(BaseModel):
     config_fingerprint: str
     input_names: frozenset[str] = Field(default_factory=frozenset)
 
-    def model_post_init(self, __context: Any) -> None:
+    def model_post_init(self, __context: Any, /) -> None:
         """Freeze the compiled steps mapping after validation."""
         object.__setattr__(self, "steps", MappingProxyType(dict(self.steps)))
 
@@ -142,7 +142,9 @@ class Planner:
             for step_id, compiled in compiled_steps.items()
         }
         fingerprint = hashlib.sha256(
-            json.dumps(fingerprint_payload, sort_keys=True, separators=(",", ":")).encode()
+            json.dumps(
+                fingerprint_payload, sort_keys=True, separators=(",", ":")
+            ).encode()
         ).hexdigest()
         return ExecutionPlan(
             pipeline_id=pipeline.id,

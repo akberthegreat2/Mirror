@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
 from uuid import uuid4
 
 from django.db import models
@@ -26,7 +27,7 @@ class Project(TimestampedModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["slug"]
+        ordering: ClassVar[list[str]] = ["slug"]
 
     def __str__(self) -> str:
         return self.name
@@ -44,7 +45,9 @@ class Pipeline(TimestampedModel):
     )
     slug = models.SlugField(max_length=120)
     name = models.CharField(max_length=200)
-    origin = models.CharField(max_length=20, choices=Origin.choices, default=Origin.MANAGED)
+    origin = models.CharField(
+        max_length=20, choices=Origin.choices, default=Origin.MANAGED
+    )
     is_read_only = models.BooleanField(default=False)
     source_ref = models.CharField(max_length=500, blank=True)
     source_hash = models.CharField(max_length=128, blank=True)
@@ -54,8 +57,8 @@ class Pipeline(TimestampedModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["project__slug", "slug"]
-        constraints = [
+        ordering: ClassVar[list[str]] = ["project__slug", "slug"]
+        constraints: ClassVar[list[models.UniqueConstraint]] = [
             models.UniqueConstraint(
                 fields=("project", "slug"), name="uniq_mirror_control_pipeline_slug"
             )
@@ -79,10 +82,15 @@ class PipelineVersion(TimestampedModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["pipeline__project__slug", "pipeline__slug", "version"]
-        constraints = [
+        ordering: ClassVar[list[str]] = [
+            "pipeline__project__slug",
+            "pipeline__slug",
+            "version",
+        ]
+        constraints: ClassVar[list[models.UniqueConstraint]] = [
             models.UniqueConstraint(
-                fields=("pipeline", "version"), name="uniq_mirror_control_pipeline_version"
+                fields=("pipeline", "version"),
+                name="uniq_mirror_control_pipeline_version",
             )
         ]
 
@@ -106,7 +114,9 @@ class ExecutionRun(TimestampedModel):
     )
     pipeline_name = models.CharField(max_length=200, blank=True)
     pipeline_version = models.PositiveIntegerField(null=True, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.QUEUED
+    )
     execution_class = models.CharField(max_length=40, default="default")
     worker_id = models.CharField(max_length=120, blank=True)
     queue_name = models.CharField(max_length=120, blank=True)
@@ -117,7 +127,7 @@ class ExecutionRun(TimestampedModel):
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["-created_at", "run_id"]
+        ordering: ClassVar[list[str]] = ["-created_at", "run_id"]
 
     def __str__(self) -> str:
         return str(self.run_id)
@@ -139,7 +149,9 @@ class ExecutionStep(TimestampedModel):
     step_id = models.CharField(max_length=200)
     capability = models.CharField(max_length=200)
     provider = models.CharField(max_length=200, blank=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.QUEUED)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.QUEUED
+    )
     input_payload = models.JSONField(default=dict, blank=True)
     output_payload = models.JSONField(default=dict, blank=True)
     error_text = models.TextField(blank=True)
@@ -148,8 +160,8 @@ class ExecutionStep(TimestampedModel):
     completed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ["run__created_at", "run_id", "step_id"]
-        constraints = [
+        ordering: ClassVar[list[str]] = ["run__created_at", "run_id", "step_id"]
+        constraints: ClassVar[list[models.UniqueConstraint]] = [
             models.UniqueConstraint(
                 fields=("run", "step_id"), name="uniq_mirror_control_execution_step"
             )
@@ -170,12 +182,14 @@ class Worker(TimestampedModel):
     worker_id = models.CharField(primary_key=True, max_length=120)
     backend = models.CharField(max_length=120, blank=True)
     execution_class = models.CharField(max_length=40, default="default")
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OFFLINE)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.OFFLINE
+    )
     heartbeat_at = models.DateTimeField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["worker_id"]
+        ordering: ClassVar[list[str]] = ["worker_id"]
 
     def __str__(self) -> str:
         return self.worker_id
@@ -195,8 +209,8 @@ class Schedule(TimestampedModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["name"]
-        constraints = [
+        ordering: ClassVar[list[str]] = ["name"]
+        constraints: ClassVar[list[models.UniqueConstraint]] = [
             models.UniqueConstraint(
                 fields=("pipeline", "name"), name="uniq_mirror_control_schedule"
             )
@@ -216,20 +230,30 @@ class CrawledURL(TimestampedModel):
 
     url = models.URLField(max_length=2048)
     project = models.ForeignKey(
-        Project, null=True, blank=True, on_delete=models.SET_NULL, related_name="crawled_urls"
+        Project,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="crawled_urls",
     )
     pipeline = models.ForeignKey(
-        Pipeline, null=True, blank=True, on_delete=models.SET_NULL, related_name="crawled_urls"
+        Pipeline,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="crawled_urls",
     )
     run_id = models.UUIDField(null=True, blank=True, db_index=True)
-    status = models.CharField(max_length=20, choices=Status.choices, default=Status.DISCOVERED)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.DISCOVERED
+    )
     discovered_at = models.DateTimeField(auto_now_add=True)
     fetched_at = models.DateTimeField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["-discovered_at", "url"]
-        indexes = [models.Index(fields=["url"])]
+        ordering: ClassVar[list[str]] = ["-discovered_at", "url"]
+        indexes: ClassVar[list[models.Index]] = [models.Index(fields=["url"])]
 
     def __str__(self) -> str:
         return self.url
@@ -239,7 +263,11 @@ class ArchiveRecord(TimestampedModel):
     """Archived resource reference produced by Archive."""
 
     pipeline = models.ForeignKey(
-        Pipeline, null=True, blank=True, on_delete=models.SET_NULL, related_name="archives"
+        Pipeline,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="archives",
     )
     run_id = models.UUIDField(null=True, blank=True, db_index=True)
     resource_key = models.CharField(max_length=500)
@@ -248,8 +276,8 @@ class ArchiveRecord(TimestampedModel):
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["-created_at", "resource_key"]
-        indexes = [models.Index(fields=["resource_key"])]
+        ordering: ClassVar[list[str]] = ["-created_at", "resource_key"]
+        indexes: ClassVar[list[models.Index]] = [models.Index(fields=["resource_key"])]
 
     def __str__(self) -> str:
         return self.resource_key
@@ -263,8 +291,8 @@ class Checkpoint(TimestampedModel):
     payload = models.JSONField(default=dict, blank=True)
 
     class Meta:
-        ordering = ["-created_at", "run_id", "step_id"]
-        constraints = [
+        ordering: ClassVar[list[str]] = ["-created_at", "run_id", "step_id"]
+        constraints: ClassVar[list[models.UniqueConstraint]] = [
             models.UniqueConstraint(
                 fields=("run_id", "step_id"), name="uniq_mirror_control_checkpoint"
             )
@@ -279,7 +307,11 @@ class DeadLetter(TimestampedModel):
 
     run_id = models.UUIDField(primary_key=True, editable=False)
     pipeline = models.ForeignKey(
-        Pipeline, null=True, blank=True, on_delete=models.SET_NULL, related_name="dead_letters"
+        Pipeline,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="dead_letters",
     )
     pipeline_name = models.CharField(max_length=200)
     step_id = models.CharField(max_length=200, blank=True)
@@ -293,7 +325,7 @@ class DeadLetter(TimestampedModel):
     lease_id = models.CharField(max_length=120, blank=True)
 
     class Meta:
-        ordering = ["-created_at", "run_id"]
+        ordering: ClassVar[list[str]] = ["-created_at", "run_id"]
 
     def __str__(self) -> str:
         return str(self.run_id)

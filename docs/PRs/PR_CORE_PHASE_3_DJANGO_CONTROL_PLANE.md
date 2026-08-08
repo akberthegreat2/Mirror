@@ -12,6 +12,11 @@ Implement a reusable Django control-plane app and a separate REST control-plane
 package on top of Mirror's manifest catalog and pipeline repository contracts.
 Mirror Core remains Django-free.
 
+## Status
+
+Implemented. The remaining work is live deployment/lab validation and future
+application-specific authorization policy.
+
 ## What this snapshot provides
 
 - control-plane ADRs and docs that describe the desired boundary;

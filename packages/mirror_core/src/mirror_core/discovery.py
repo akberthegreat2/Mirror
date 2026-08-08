@@ -48,7 +48,12 @@ class DiscoveryResult:
 
     @property
     def all_manifests(self) -> list[ExtensionManifest]:
-        return self.capabilities + self.providers + self.middleware + self.interfaces
+        return [
+            *self.capabilities,
+            *self.providers,
+            *self.middleware,
+            *self.interfaces,
+        ]
 
     def has_errors(self) -> bool:
         return bool(self.errors)

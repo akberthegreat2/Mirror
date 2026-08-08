@@ -20,12 +20,12 @@ from mirror_core.extensions.registry import ExtensionRegistryManager
 from mirror_core.imports import import_symbol, resolve_model
 from mirror_core.lifecycle import AsyncLifecycle
 from mirror_core.metadata import MetadataStore
-from mirror_core.workers import CheckpointStore, DeadLetterQueue, WorkerJob
 from mirror_core.middleware import Middleware, MiddlewareChain
 from mirror_core.pipeline import Pipeline
 from mirror_core.resource import ResourceEnvelope
 from mirror_core.settings import MirrorSettings
 from mirror_core.signals import SignalBus
+from mirror_core.workers import CheckpointStore, DeadLetterQueue, WorkerJob
 
 logger = logging.getLogger(__name__)
 
@@ -112,13 +112,17 @@ class Application:
     def compile_pipeline(self, pipeline: Pipeline) -> Any:
         """Compile a pipeline through the canonical planner without executing it."""
         if not self._started:
-            raise ApplicationError("Application must be started before compiling pipelines")
+            raise ApplicationError(
+                "Application must be started before compiling pipelines"
+            )
         defaults = {
             capability: str(config["provider"])
             for capability, config in self.settings.components.items()
             if "provider" in config
         }
-        return PipelineCompiler(self._registry, default_providers=defaults).compile(pipeline)
+        return PipelineCompiler(self._registry, default_providers=defaults).compile(
+            pipeline
+        )
 
     async def run_pipeline(
         self,
@@ -170,7 +174,9 @@ class Application:
         payload = job.payload
         pipeline_data = payload.get("pipeline")
         if pipeline_data is None:
-            raise ApplicationError("Distributed execution job is missing a pipeline definition")
+            raise ApplicationError(
+                "Distributed execution job is missing a pipeline definition"
+            )
         inputs = payload.get("inputs", {})
         if not isinstance(inputs, dict):
             raise ApplicationError("Distributed execution job inputs must be an object")
@@ -181,15 +187,30 @@ class Application:
             pipeline = pipeline.model_copy(
                 update={
                     "steps": [
-                        step.model_copy(update={"provider": provider_selections.get(step.id, step.provider)})
+                        step.model_copy(
+                            update={
+                                "provider": provider_selections.get(
+                                    step.id, step.provider
+                                )
+                            }
+                        )
                         for step in pipeline.steps
                     ]
                 }
             )
         plan = self.compile_pipeline(pipeline)
-        if expected_fingerprint is not None and plan.config_fingerprint != expected_fingerprint:
-            raise ApplicationError("Distributed job plan fingerprint does not match the worker compilation")
-        return await self._executor.execute_run(plan, inputs=inputs) if self._executor is not None else await self.run_pipeline_detailed(pipeline, inputs=inputs)
+        if (
+            expected_fingerprint is not None
+            and plan.config_fingerprint != expected_fingerprint
+        ):
+            raise ApplicationError(
+                "Distributed job plan fingerprint does not match the worker compilation"
+            )
+        return (
+            await self._executor.execute_run(plan, inputs=inputs)
+            if self._executor is not None
+            else await self.run_pipeline_detailed(pipeline, inputs=inputs)
+        )
 
     async def shutdown(self) -> None:
         """Cancel active runs and release every owned resource once."""

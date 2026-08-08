@@ -38,7 +38,10 @@ def validate_manifests(
             errors.append(
                 (
                     manifest.extension_id,
-                    f"Duplicate extension ID: {manifest.extension_id} (also defined by {id_map[manifest.extension_id].package_name})",
+                    (
+                        f"Duplicate extension ID: {manifest.extension_id} "
+                        f"(also defined by {id_map[manifest.extension_id].package_name})"
+                    ),
                 )
             )
             invalid_ids.add(manifest.extension_id)

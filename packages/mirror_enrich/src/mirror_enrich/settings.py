@@ -1,12 +1,14 @@
 """Settings for the Enrichment capability."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
 class EnrichmentSettings(BaseModel):
     """Runtime defaults for deterministic text enrichment."""
 
-    unicode_form: str = Field(default="NFKC")
+    unicode_form: Literal["NFC", "NFKC", "NFD", "NFKD"] = "NFKC"
     collapse_whitespace: bool = Field(default=True)
     strip_edges: bool = Field(default=True)
     summary_word_limit: int = Field(default=24, ge=1, le=128)

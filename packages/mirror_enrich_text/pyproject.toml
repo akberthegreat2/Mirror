@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.entry-points."mirror.providers"]
-text = "mirror_enrich_text.capability:capability"
+text = "mirror_enrich_text.provider:provider"
 
 [tool.setuptools.packages.find]
 where = ["src"]

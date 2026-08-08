@@ -8,12 +8,12 @@ from typing import Any, BinaryIO
 if sys.version_info >= (3, 11):
     import tomllib as tomli
 else:
-    import tomli  # type: ignore[import-not-found]
+    import tomli
 
 
 def loads(s: str) -> dict[str, Any]:
-    return tomli.loads(s)  # type: ignore[no-any-return]
+    return dict(tomli.loads(s))
 
 
 def load(f: BinaryIO) -> dict[str, Any]:
-    return tomli.load(f)  # type: ignore[no-any-return]
+    return dict(tomli.load(f))

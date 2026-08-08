@@ -10,7 +10,7 @@ Mirror beta must provide:
 
 - crawl persistence for discovered URLs and fetched results;
 - worker backends suitable for local development and production queues;
-- a Django control plane for users, auth, and admin operations;
+- a Django control plane for metadata, pipeline management, and admin operations;
 - docs, ADRs, tests, and PR notes for every user-facing promise.
 
 Scheduler support has already graduated into the stable core package (`mirror_core.scheduler`). Metadata storage now lives in `mirror_core.metadata` and is re-exported from `mirror_core.storage` for compatibility; blob storage remains in `mirror_core.storage`.
@@ -27,8 +27,8 @@ Scheduler support has already graduated into the stable core package (`mirror_co
 
 ## Deferred to later releases
 
-- cluster-scale distributed execution
 - advanced SaaS tenancy and billing
 - higher-level search products
 - integration with multiple external task systems beyond the supported beta
   backends
+- live-lab certification of every provider in every deployment environment

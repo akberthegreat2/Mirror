@@ -39,7 +39,10 @@ PostgreSQL is the durable source of truth.
 - Redis broker routing;
 - execution-class queues;
 - generic worker task;
+- automatic `mirror.requeue_expired` lease-reclamation task;
+- Celery Beat scheduling on the dedicated `mirror.reaper` queue;
 - worker bootstrap command;
+- Beat bootstrap command;
 - pipeline submission command.
 
 Celery does not own Mirror retry semantics.
@@ -63,15 +66,11 @@ The repository now includes:
 The repository test suite passed:
 
 ```text
-259 passed, 5 skipped
+291 passed, 5 skipped
 ```
 
-The sandbox also executed a live Redis + Celery worker smoke test against the
-bundled Redis server binary successfully.
-
-PostgreSQL integration tests are included and automatically run when
-`MIRROR_TEST_POSTGRES_DSN` is provided. The sandbox does not have a runnable
-PostgreSQL server binary, so those tests remain skipped here.
+The five skipped tests are explicitly marked external-integration tests. No
+Redis or PostgreSQL shim is used to turn those tests green.
 
 The uploaded `postgresql-wheel` artifact was importable as the Python
 `postgresql` package, but it is a PyPy 3.8-oriented wheel and does not provide a
@@ -109,6 +108,12 @@ The distributed path was checked against `docs/ARCHITECTURE.md`:
 - Scrapy is integrated as a provider rather than replaced with a home-grown
   crawler.
 - No Redis/PostgreSQL shim is included.
+- SQLite durable stores have direct round-trip/reopen tests.
+- The condition evaluator has direct adversarial security regression tests.
+- The duplicate unused extension resolver was removed.
+- Lease reclamation is automatically scheduled by Celery Beat in the distributed
+  deployment.
 
-The remaining certification gate is a live PostgreSQL deployment test. The
-repository's CI configuration is prepared to run it automatically.
+The remaining external certification gate is a live PostgreSQL/Redis deployment
+test against real services. The repository's CI configuration is prepared to
+run those integration tests when the services are available.

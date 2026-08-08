@@ -71,7 +71,8 @@ The compose file starts:
 
 - PostgreSQL 18 — durable execution state;
 - Redis 8 — Celery broker;
-- Mirror Celery worker — generic execution worker.
+- Mirror Celery worker — generic execution worker;
+- Celery Beat — schedules automatic expired-lease reclamation.
 
 Useful commands:
 
@@ -84,7 +85,9 @@ docker compose down -v
 
 The worker does **not** have a `crawl worker`, `fetch worker`, or `scrape
 worker`. Workers consume execution classes such as `default`, `io`, `cpu`, and
-`gpu`. Capability identity stays in the compiled Mirror plan.
+`gpu`. Capability identity stays in the compiled Mirror plan. Celery Beat
+periodically invokes `mirror.requeue_expired` on the dedicated `mirror.reaper`
+queue so a worker crash does not require manual lease repair.
 
 ## What is durable?
 

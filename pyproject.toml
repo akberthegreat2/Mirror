@@ -20,3 +20,31 @@ plugins = ["pydantic.mypy"]
 [[tool.mypy.overrides]]
 module = ["tomllib", "tomli", "yaml", "warcio"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "mirror_control_django.*",
+    "mirror_control_api.*",
+    "mirror_execution_celery.*",
+    "mirror_crawl_scrapy.*",
+    "mirror_archive_warc.*",
+]
+ignore_missing_imports = true
+allow_subclassing_any = true
+allow_untyped_defs = true
+allow_untyped_decorators = true
+warn_return_any = false
+
+[[tool.mypy.overrides]]
+module = [
+    "django.*",
+    "rest_framework.*",
+    "celery.*",
+    "scrapy.*",
+    "warcio.*",
+]
+ignore_missing_imports = true
+disable_error_code = ["import-untyped"]
+
+[tool.ruff]
+line-length = 400

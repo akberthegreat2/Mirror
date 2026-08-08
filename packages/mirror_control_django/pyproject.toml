@@ -38,3 +38,6 @@ strict = true
 explicit_package_bases = true
 mypy_path = ["src"]
 plugins = ["pydantic.mypy"]
+
+[project.entry-points."mirror.interfaces"]
+dashboard = "mirror_control_django.manifest:interface"

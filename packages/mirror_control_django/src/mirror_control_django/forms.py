@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from django import forms
+from typing import ClassVar
 
+from django import forms
 from mirror_core.pipeline import Pipeline as CorePipeline
 
 from mirror_control_django import models
-from mirror_control_django.repository import ControlPlaneRepository, deserialize_pipeline_definition
+from mirror_control_django.repository import (
+    ControlPlaneRepository,
+    deserialize_pipeline_definition,
+)
 
 
 class PipelineVersionForm(forms.ModelForm):
@@ -21,7 +25,7 @@ class PipelineVersionForm(forms.ModelForm):
 
     class Meta:
         model = models.PipelineVersion
-        fields = [
+        fields: ClassVar[list[str]] = [
             "pipeline",
             "version",
             "definition_ref",
@@ -39,7 +43,9 @@ class PipelineVersionForm(forms.ModelForm):
             if payload is not None:
                 self.fields["definition_text"].initial = payload.decode("utf-8")
         else:
-            self.fields["definition_text"].initial = CorePipeline(id="pipeline", steps=[]).model_dump_json(indent=2)
+            self.fields["definition_text"].initial = CorePipeline(
+                id="pipeline", steps=[]
+            ).model_dump_json(indent=2)
         if self.instance.pk and getattr(self.instance.pipeline, "is_read_only", False):
             self.fields["definition_text"].disabled = True
 

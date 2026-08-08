@@ -30,3 +30,19 @@ mirror-celery-worker --execution-class cpu
 ```
 
 The worker does not contain crawler-specific or scraper-specific code.
+
+## Lease reclamation
+
+A claimed job has a durable PostgreSQL lease. If its worker disappears, the
+lease expires. Celery Beat invokes Mirror's `mirror.requeue_expired` task every
+15 seconds by default, routing the task to `mirror.reaper`. The task only
+requeues expired durable jobs; it does not perform retries or select providers.
+
+Run Beat separately in a local deployment:
+
+```bash
+mirror-celery-beat --loglevel INFO
+```
+
+Set `MIRROR_REAPER_INTERVAL_SECONDS` to change the schedule. The Docker Compose
+stack already includes a Beat service.

@@ -1,6 +1,9 @@
 """Reusable contract tests for Archive providers."""
 
+from __future__ import annotations
+
 from collections.abc import AsyncIterator
+from typing import cast
 from uuid import uuid4
 
 import pytest
@@ -14,12 +17,7 @@ from mirror_archive.protocol import Archive
 
 
 class ArchiveContract(BaseContract):
-    """Contract suite that every Archive provider should satisfy.
-
-    Provider packages subclass this suite and set :attr:`provider_class`.
-    Providers with required constructor settings may override the ``provider``
-    fixture.
-    """
+    """Provider-independent structural contract for Archive implementations."""
 
     __test__ = False
     provider_class: type[Archive] | None = None
@@ -27,7 +25,7 @@ class ArchiveContract(BaseContract):
     @pytest.fixture
     def provider(self) -> Archive:
         if self.provider_class is None:
-            raise NotImplementedError("provider_class must be set")
+            raise RuntimeError("provider_class must be set")
         return self.provider_class()
 
     @pytest_asyncio.fixture
@@ -40,24 +38,25 @@ class ArchiveContract(BaseContract):
             if isinstance(provider, AsyncLifecycle):
                 await provider.teardown()
 
-    @staticmethod
-    def valid_request() -> ArchiveRequest:
+    def valid_request(self) -> ArchiveRequest:
+        """Build a deterministic request for contract tests."""
         return ArchiveRequest(
             resource_id=uuid4(),
             payload=ArchivePayload(
                 content=b"mirror archive contract",
-                target_uri="https://example.com/resource",
+                target_uri="https://example.com/contract",
                 media_type="text/plain",
             ),
             metadata={"contract": "archive"},
         )
 
-    @pytest.mark.asyncio
-    async def test_capability_protocol(self, provider: Archive) -> None:
+    def test_capability_protocol(self, provider: Archive) -> None:
+        """Verify that the provider satisfies the Archive protocol."""
         assert isinstance(provider, Archive)
 
     @pytest.mark.asyncio
     async def test_result_model(self, started_provider: Archive) -> None:
+        """Verify that successful calls return the published result model."""
         result = await started_provider.archive(self.valid_request())
         assert isinstance(result, ArchiveResult)
         assert result.size == len(b"mirror archive contract")
@@ -67,12 +66,14 @@ class ArchiveContract(BaseContract):
     async def test_invalid_request_is_translated(
         self, started_provider: Archive
     ) -> None:
-        invalid = ArchiveRequest.model_construct(resource_id=uuid4(), payload=None)
+        """Verify that providers reject malformed payloads through their contract."""
+        invalid = ArchiveRequest.model_construct(resource_id=uuid4(), payload=cast(ArchivePayload, None))
         with pytest.raises(ArchiveError):
             await started_provider.archive(invalid)
 
     @pytest.mark.asyncio
     async def test_lifecycle_is_idempotent(self, provider: Archive) -> None:
+        """Verify setup/teardown can safely be called more than once."""
         if not isinstance(provider, AsyncLifecycle):
             pytest.skip("Provider does not implement AsyncLifecycle")
         await provider.setup()

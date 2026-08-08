@@ -30,6 +30,7 @@ from mirror_core.executor import (
     StepState,
 )
 from mirror_core.extensions.registry import ExtensionRegistryManager
+from mirror_core.interfaces import InterfaceCatalog
 from mirror_core.lifecycle import AsyncLifecycle
 from mirror_core.metadata import (
     InMemoryMetadataStore,
@@ -135,6 +136,7 @@ __all__ = [
     "InMemoryMetadataStore",
     "InMemoryScheduler",
     "InlineWorker",
+    "InterfaceCatalog",
     "JobState",
     "LeaseManager",
     "LifecycleError",

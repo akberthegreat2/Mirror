@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import hashlib
-
-from rest_framework import serializers
-
 from mirror_control_django import models
 from mirror_control_django.repository import ControlPlaneRepository
+from rest_framework import serializers
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -17,7 +14,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class PipelineVersionSerializer(serializers.ModelSerializer):
-    definition_text = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    definition_text = serializers.CharField(
+        write_only=True, required=False, allow_blank=True
+    )
     definition_preview = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -36,7 +35,14 @@ class PipelineVersionSerializer(serializers.ModelSerializer):
             "definition_text",
             "definition_preview",
         )
-        read_only_fields = ("definition_hash", "definition_ref", "created_at", "updated_at")
+        read_only_fields = (
+            "version",
+            "definition_hash",
+            "definition_ref",
+            "definition_format",
+            "created_at",
+            "updated_at",
+        )
 
     def get_definition_preview(self, obj: models.PipelineVersion) -> str:
         payload = ControlPlaneRepository().blob_store.get_bytes(obj.definition_ref)
@@ -45,38 +51,37 @@ class PipelineVersionSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         definition_text = validated_data.pop("definition_text", "")
         if not definition_text:
-            raise serializers.ValidationError({"definition_text": "A pipeline version definition is required."})
+            raise serializers.ValidationError(
+                {"definition_text": "A pipeline version definition is required."}
+            )
+        pipeline = validated_data["pipeline"]
+        if pipeline.is_read_only:
+            raise serializers.ValidationError(
+                {
+                    "pipeline": "Code-defined pipelines are read-only; materialize a managed pipeline first."
+                }
+            )
         repo = ControlPlaneRepository()
-        definition_ref = repo._definition_blob_key(
-            validated_data["pipeline"].project.slug,
-            validated_data["pipeline"].slug,
-            validated_data["version"],
+        payload = definition_text.encode("utf-8")
+        try:
+            from mirror_control_django.repository import deserialize_pipeline_definition
+
+            deserialize_pipeline_definition(payload)
+        except Exception as exc:
+            raise serializers.ValidationError({"definition_text": str(exc)}) from exc
+        _, instance = repo.materialize_definition(
+            project_slug=pipeline.project.slug,
+            pipeline_slug=pipeline.slug,
+            definition=payload,
+            metadata=validated_data.get("metadata") or {},
+            notes=validated_data.get("notes", ""),
         )
-        validated_data["definition_ref"] = definition_ref
-        instance = super().create(validated_data)
-        payload = definition_text.encode("utf-8") if definition_text else b""
-        if payload:
-            repo.blob_store.put_bytes(instance.definition_ref, payload)
-            instance.definition_hash = hashlib.sha256(payload).hexdigest()
-            instance.save(update_fields=["definition_ref", "definition_hash"])
         return instance
 
     def update(self, instance, validated_data):
-        definition_text = validated_data.pop("definition_text", None)
-        instance = super().update(instance, validated_data)
-        if definition_text is not None:
-            payload = definition_text.encode("utf-8")
-            repo = ControlPlaneRepository()
-            if not instance.definition_ref:
-                instance.definition_ref = repo._definition_blob_key(
-                    instance.pipeline.project.slug,
-                    instance.pipeline.slug,
-                    instance.version,
-                )
-            repo.blob_store.put_bytes(instance.definition_ref, payload)
-            instance.definition_hash = hashlib.sha256(payload).hexdigest()
-            instance.save(update_fields=["definition_hash", "updated_at"])
-        return instance
+        raise serializers.ValidationError(
+            "Pipeline versions are immutable; create a new version instead."
+        )
 
 
 class PipelineSerializer(serializers.ModelSerializer):

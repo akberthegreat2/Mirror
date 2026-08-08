@@ -37,8 +37,10 @@ not permanently own work.
 ## Recovery
 
 A job is persisted before it is published to Celery. If a worker dies after
-claiming it, the lease expires and the job becomes claimable again. Redis is not
-the source of truth.
+claiming it, the lease expires and the job becomes claimable again. The
+distributed Celery deployment schedules `mirror.requeue_expired` through Celery
+Beat on the dedicated `mirror.reaper` queue, so reclamation is automatic rather
+than an operator-only repair action. Redis is not the source of truth.
 
 ## Future adapters
 

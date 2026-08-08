@@ -41,7 +41,7 @@ class Dependency(BaseModel):
         frozen=True, arbitrary_types_allowed=True, populate_by_name=True
     )
 
-    target: str | None = Field(default=None, alias="name")
+    target: str = Field(..., alias="name")
     target_kind: ExtensionKind = ExtensionKind.CAPABILITY
     version_constraint: str = Field(">=0.0.0", alias="version")
     required: bool = True
@@ -60,8 +60,8 @@ class ExtensionManifest(BaseModel):
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    extension_id: str | None = Field(
-        default=None, description="Unique identifier for this extension"
+    extension_id: str = Field(
+        default="", description="Unique identifier for this extension"
     )
     name: str = Field(..., description="Human-readable name")
     description: str = ""
@@ -83,7 +83,7 @@ class ExtensionManifest(BaseModel):
 
     @model_validator(mode="after")
     def default_extension_id(self) -> ExtensionManifest:
-        if self.extension_id is None:
+        if not self.extension_id:
             object.__setattr__(self, "extension_id", self.name)
         return self
 
@@ -123,7 +123,7 @@ class CapabilityManifest(ExtensionManifest):
 
     @model_validator(mode="after")
     def default_extension_id(self) -> CapabilityManifest:
-        if self.extension_id is None:
+        if not self.extension_id:
             object.__setattr__(self, "extension_id", f"{self.name}:{self.api_version}")
         return self
 
@@ -149,7 +149,7 @@ class ProviderManifest(ExtensionManifest):
 
     @model_validator(mode="after")
     def default_extension_id(self) -> ProviderManifest:
-        if self.extension_id is None:
+        if not self.extension_id:
             object.__setattr__(self, "extension_id", f"{self.capability}:{self.name}")
         return self
 
@@ -166,7 +166,7 @@ class InterfaceManifest(ExtensionManifest):
 
     @model_validator(mode="after")
     def default_extension_id(self) -> InterfaceManifest:
-        if self.extension_id is None:
+        if not self.extension_id:
             object.__setattr__(
                 self, "extension_id", f"{self.interface_type}:{self.name}"
             )

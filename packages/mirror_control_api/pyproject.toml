@@ -38,3 +38,6 @@ strict = true
 explicit_package_bases = true
 mypy_path = ["src"]
 plugins = ["pydantic.mypy"]
+
+[project.entry-points."mirror.interfaces"]
+rest = "mirror_control_api.manifest:interface"

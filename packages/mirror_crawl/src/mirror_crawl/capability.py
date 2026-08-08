@@ -15,6 +15,6 @@ capability = CapabilityManifest(
     runner="mirror_crawl.runner:crawl_site",
     input_ports={},
     output_ports={"result": CrawlResult},
-    dependencies=[Dependency(name="fetch", version="~=1.0")],
+    dependencies=[Dependency(target="fetch", version="~=1.0")],
     metadata={"description": "Crawl a website and persist discovered URLs."},
 )

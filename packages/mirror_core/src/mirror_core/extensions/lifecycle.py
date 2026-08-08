@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from enum import Enum
 from types import MappingProxyType
-from typing import Any
+from typing import Any, ClassVar
 
 from mirror_core.exceptions import LifecycleError
 from mirror_core.extensions.discovery import discover_extensions
@@ -61,7 +61,7 @@ class ExtensionLifecycleManager:
     manifest storage to the extension registry manager.
     """
 
-    _STATE_ORDER = {
+    _STATE_ORDER: ClassVar[dict[ExtensionLifecycleState, int]] = {
         ExtensionLifecycleState.DISCOVERED: 0,
         ExtensionLifecycleState.VALIDATED: 1,
         ExtensionLifecycleState.CONFIGURED: 2,
@@ -226,12 +226,14 @@ class ExtensionLifecycleManager:
                     f"Extension {manifest.extension_id!r} cannot be deactivated "
                     f"from {record.state.value}"
                 )
-        elif next_state == ExtensionLifecycleState.UNLOADED:
-            if record.state != ExtensionLifecycleState.DEACTIVATED:
-                raise LifecycleError(
-                    f"Extension {manifest.extension_id!r} cannot be unloaded "
-                    f"from {record.state.value}"
-                )
+        elif (
+            next_state == ExtensionLifecycleState.UNLOADED
+            and record.state != ExtensionLifecycleState.DEACTIVATED
+        ):
+            raise LifecycleError(
+                f"Extension {manifest.extension_id!r} cannot be unloaded "
+                f"from {record.state.value}"
+            )
 
     def _get_or_create_record(
         self, manifest: ExtensionManifest

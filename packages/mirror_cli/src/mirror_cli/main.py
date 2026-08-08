@@ -9,6 +9,7 @@ from pathlib import Path
 import typer
 from mirror_core.application import Application
 from mirror_core.exceptions import ApplicationError
+from mirror_core.interfaces import InterfaceCatalog
 from mirror_core.pipeline import Pipeline
 from mirror_core.settings import MirrorSettings
 from mirror_core.workers import WorkerBackend
@@ -23,29 +24,23 @@ from mirror_cli.scaffold import (
     project_is_healthy,
 )
 
+manifest_app = typer.Typer(name="manifest", help="Inspect the canonical Mirror extension catalog.")
 app = typer.Typer(
     name="mirror",
     help="Mirror application framework",
     add_completion=False,
 )
 console = Console()
+app.add_typer(manifest_app, name="manifest")
 
 # Constants for CLI options/arguments (to avoid B008)
 ARG_NAME = typer.Argument(..., help="Project directory name")
-OPT_ROOT = typer.Option(
-    None, "--root", "-r", help="Parent directory for the generated project"
-)
-OPT_APP_ROOT = typer.Option(
-    None, "--root", "-r", help="Project root that contains apps/"
-)
+OPT_ROOT = typer.Option(None, "--root", "-r", help="Parent directory for the generated project")
+OPT_APP_ROOT = typer.Option(None, "--root", "-r", help="Project root that contains apps/")
 OPT_DOCTOR_ROOT = typer.Option(None, "--root", "-r", help="Project root to inspect")
 OPT_CONFIG = typer.Option(None, "--config", "-c", help="Path to Mirror settings file")
-OPT_PIPELINE = typer.Option(
-    ..., "--pipeline", "-p", help="Path to pipeline definition file"
-)
-OPT_INPUTS = typer.Option(
-    None, "--inputs", "-i", help="JSON/TOML/YAML runtime inputs file"
-)
+OPT_PIPELINE = typer.Option(..., "--pipeline", "-p", help="Path to pipeline definition file")
+OPT_INPUTS = typer.Option(None, "--inputs", "-i", help="JSON/TOML/YAML runtime inputs file")
 OPT_BACKEND = typer.Option(
     "sqlite",
     "--backend",
@@ -60,6 +55,36 @@ OPT_DATABASE = typer.Option(
 )
 
 
+@manifest_app.command("show")
+def manifest_show() -> None:
+    """Print the interface-neutral extension catalog as JSON."""
+    document = InterfaceCatalog().document()
+    console.print_json(json.dumps(document, sort_keys=True))
+
+
+@manifest_app.command("capability")
+def manifest_capability(name: str = typer.Argument(..., help="Capability name.")) -> None:
+    """Show one discovered capability manifest."""
+    for manifest in InterfaceCatalog().discover().capabilities:
+        if manifest.name == name or manifest.extension_id == name:
+            console.print_json(manifest.model_dump_json(indent=2))
+            return
+    raise typer.BadParameter(f"Unknown capability: {name}")
+
+
+@manifest_app.command("provider")
+def manifest_provider(
+    capability: str = typer.Argument(..., help="Capability name."),
+    name: str = typer.Argument(..., help="Provider name."),
+) -> None:
+    """Show one discovered provider manifest."""
+    for manifest in InterfaceCatalog().discover().providers:
+        if manifest.capability == capability and (manifest.name == name or manifest.extension_id == name):
+            console.print_json(manifest.model_dump_json(indent=2))
+            return
+    raise typer.BadParameter(f"Unknown provider: {capability}/{name}")
+
+
 async def _list_capabilities_async() -> None:
     """List discovered capabilities without leaking application resources."""
     table = Table(title="Discovered Capabilities")
@@ -70,7 +95,8 @@ async def _list_capabilities_async() -> None:
     try:
         async with Application(settings=MirrorSettings()) as app_obj:
             for cap in app_obj.registry.list_capabilities():
-                name, version = cap.split(":", 1)
+                name = cap.name
+                version = cap.api_version
                 description = "N/A"
                 try:
                     config = app_obj.registry.get_capability(name, version)
@@ -97,8 +123,9 @@ async def _list_providers_async() -> None:
 
     try:
         async with Application(settings=MirrorSettings()) as app_obj:
-            for prov_key in app_obj.registry.list_providers():
-                capability, name = prov_key.split(":", 1)
+            for provider in app_obj.registry.list_providers():
+                capability = provider.capability
+                name = provider.name
                 try:
                     config = app_obj.registry.get_provider(capability, name)
                     table.add_row(name, capability, str(config.priority))
@@ -161,15 +188,11 @@ def run(
     """Compile and execute one pipeline with explicit runtime inputs."""
 
     async def _run() -> None:
-        settings = (
-            MirrorSettings.from_file(config) if config is not None else MirrorSettings()
-        )
+        settings = MirrorSettings.from_file(config) if config is not None else MirrorSettings()
         pipeline_obj = _load_pipeline(pipeline)
         runtime_inputs = _load_mapping(inputs) if inputs is not None else {}
         async with Application(settings=settings) as app_obj:
-            result = await app_obj.run_pipeline_detailed(
-                pipeline_obj, inputs=runtime_inputs
-            )
+            result = await app_obj.run_pipeline_detailed(pipeline_obj, inputs=runtime_inputs)
         console.print(f"[green]Pipeline finished[/green] {result.outcome.value}")
         console.print(f"Run ID: {result.run_id}")
 
@@ -186,7 +209,7 @@ def _load_mapping(path: Path) -> dict[str, object]:
         raise FileNotFoundError(f"File does not exist: {path}")
     if path.suffix in {".yaml", ".yml"}:
         try:
-            import yaml  # type: ignore[import-untyped]
+            import yaml
         except ImportError as exc:
             raise RuntimeError("YAML files require PyYAML") from exc
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -246,9 +269,10 @@ def worker(
 
 @app.command("worker-check")
 def worker_check() -> None:
-    """Report the status of the provisional local worker contracts."""
+    """Report the availability of the shipped worker execution contracts."""
     console.print(
-        "[yellow]Worker execution is experimental and not enabled in alpha.[/yellow]"
+        "[green]Worker execution is available[/green] "
+        "(inline, SQLite, PostgreSQL, and Celery transports)."
     )
 
 

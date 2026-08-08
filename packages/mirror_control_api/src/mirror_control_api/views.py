@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
+from mirror_control_django import models
+from mirror_control_django.manifest import control_plane_manifest
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -21,8 +23,6 @@ from mirror_control_api.serializers import (
     ScheduleSerializer,
     WorkerSerializer,
 )
-from mirror_control_django import models
-from mirror_control_django.manifest import control_plane_manifest
 
 
 class ManifestViewSet(viewsets.ViewSet):
@@ -45,23 +45,61 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
 
 class PipelineViewSet(viewsets.ModelViewSet):
-    queryset = models.Pipeline.objects.select_related("project").prefetch_related("versions")
+    queryset = models.Pipeline.objects.select_related("project").prefetch_related(
+        "versions"
+    )
     serializer_class = PipelineSerializer
 
     @action(detail=True, methods=["post"])
     def materialize(self, request, pk=None):
         pipeline = self.get_object()
-        serializer = PipelineSerializer(pipeline, context=self.get_serializer_context())
-        return Response(serializer.data)
+        definition_text = request.data.get("definition_text", "")
+        if not definition_text:
+            return Response({"detail": "definition_text is required"}, status=400)
+        if pipeline.is_read_only:
+            return Response(
+                {"detail": "Code-defined pipelines are read-only"}, status=400
+            )
+        from mirror_control_django.repository import ControlPlaneRepository
+
+        repo = ControlPlaneRepository()
+        managed, _version = repo.materialize_definition(
+            project_slug=pipeline.project.slug,
+            pipeline_slug=pipeline.slug,
+            definition=str(definition_text).encode("utf-8"),
+            metadata=request.data.get("metadata") or {},
+            notes=str(request.data.get("notes", "")),
+        )
+        return Response(
+            PipelineSerializer(managed, context=self.get_serializer_context()).data,
+            status=201,
+        )
 
 
 class PipelineVersionViewSet(viewsets.ModelViewSet):
-    queryset = models.PipelineVersion.objects.select_related("pipeline", "pipeline__project")
+    queryset = models.PipelineVersion.objects.select_related(
+        "pipeline", "pipeline__project"
+    )
     serializer_class = PipelineVersionSerializer
+
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {
+                "detail": "Pipeline versions are immutable; create a new version instead."
+            },
+            status=405,
+        )
+
+    partial_update = update
+
+    def destroy(self, request, *args, **kwargs):
+        return Response({"detail": "Pipeline versions are immutable."}, status=405)
 
 
 class ExecutionRunViewSet(viewsets.ModelViewSet):
-    queryset = models.ExecutionRun.objects.select_related("pipeline", "pipeline__project")
+    queryset = models.ExecutionRun.objects.select_related(
+        "pipeline", "pipeline__project"
+    )
     serializer_class = ExecutionRunSerializer
 
 

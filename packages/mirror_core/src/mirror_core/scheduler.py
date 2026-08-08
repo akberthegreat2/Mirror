@@ -477,7 +477,9 @@ class SQLiteScheduler:
             if row["last_run_at"]
             else None,
             trigger=trigger,
-            execution_class=row["execution_class"] if "execution_class" in row.keys() else row["queue_name"],
+            execution_class=row["execution_class"]
+            if "execution_class" in row
+            else row["queue_name"],
             queue_name=row["queue_name"],
             next_run_at=_parse_datetime(row["next_run_at"])
             if row["next_run_at"]
@@ -586,7 +588,7 @@ class SchedulerCoordinator:
                 payload={
                     "state": updated.state.value,
                     "execution_class": updated.execution_class,
-                        "queue_name": updated.queue_name,
+                    "queue_name": updated.queue_name,
                 },
             )
         )
@@ -601,7 +603,7 @@ class SchedulerCoordinator:
                 payload={
                     "state": updated.state.value,
                     "execution_class": updated.execution_class,
-                        "queue_name": updated.queue_name,
+                    "queue_name": updated.queue_name,
                 },
             )
         )

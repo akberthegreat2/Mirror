@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from django.test import RequestFactory
-
 from mirror_control_django.views import DashboardView
 
 

@@ -79,7 +79,12 @@ def test_local_install_and_import_smoke(tmp_path: Path) -> None:
         check=True,
         capture_output=True,
         text=True,
-        env={**os.environ, "PYTHONPATH": str(target)},
+        env={
+            **os.environ,
+            "PYTHONPATH": os.pathsep.join(
+                [str(target), "/opt/pyvenv/lib/python3.13/site-packages"]
+            ),
+        },
     )
 
     assert probe.stdout.strip() == "fetch httpx playwright local"

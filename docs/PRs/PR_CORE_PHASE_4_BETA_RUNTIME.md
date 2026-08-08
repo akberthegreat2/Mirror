@@ -28,8 +28,9 @@ Add beta runtime features in the smallest production-shaped way:
 - The runtime is covered by tests.
 - The docs describe the crawl/scheduler/storage/worker story.
 
-## Deferred
+## Historical status
 
-- Django control plane integration;
-- Celery and Redis worker backends;
-- advanced SaaS admin features.
+This PR records the original beta-runtime slice. The Django control plane and
+Celery/Redis backend items originally deferred here were implemented in later
+phases. See `PR_CORE_PHASE_3_DJANGO_CONTROL_PLANE.md`,
+`PR_DISTRIBUTED_WORKERS.md`, and `PR_CORE_PHASE_D_BETA_CERTIFICATION.md`.

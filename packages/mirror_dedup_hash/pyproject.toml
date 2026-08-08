@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.entry-points."mirror.providers"]
-hash = "mirror_dedup_hash.capability:capability"
+hash = "mirror_dedup_hash.provider:provider"
 
 [tool.setuptools.packages.find]
 where = ["src"]

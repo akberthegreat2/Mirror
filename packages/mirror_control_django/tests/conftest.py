@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from django.conf import settings
 
 
@@ -33,13 +34,17 @@ def _configure() -> None:
             "django.contrib.auth.middleware.AuthenticationMiddleware",
             "django.contrib.messages.middleware.MessageMiddleware",
         ],
-        DATABASES={"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}},
+        DATABASES={
+            "default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}
+        },
         TEMPLATES=[
             {
                 "BACKEND": "django.template.backends.django.DjangoTemplates",
                 "DIRS": [str(base_dir / "src")],
                 "APP_DIRS": True,
-                "OPTIONS": {"context_processors": ["django.template.context_processors.request"]},
+                "OPTIONS": {
+                    "context_processors": ["django.template.context_processors.request"]
+                },
             }
         ],
         ALLOWED_HOSTS=["testserver", "localhost", "127.0.0.1"],
@@ -48,12 +53,22 @@ def _configure() -> None:
     )
 
 
-_configure()
+def _bootstrap() -> None:
+    _configure()
+    import django
 
-import django
+    django.setup()
 
-django.setup()
+    from django.core.management import call_command
 
-from django.core.management import call_command
+    call_command("migrate", run_syncdb=True, verbosity=0)
 
-call_command("migrate", run_syncdb=True, verbosity=0)
+
+_bootstrap()
+
+
+@pytest.fixture(autouse=True)
+def _flush_db() -> None:
+    from django.core.management import call_command
+
+    call_command("flush", verbosity=0, interactive=False)

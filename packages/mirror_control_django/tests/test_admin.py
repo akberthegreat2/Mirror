@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from django.contrib import admin
-
 from mirror_control_django import models
 
 

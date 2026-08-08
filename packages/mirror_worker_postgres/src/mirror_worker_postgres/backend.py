@@ -5,14 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 import psycopg
-from psycopg.rows import dict_row
-
 from mirror_core.metadata import (
     MetadataRecord,
     MetadataStore,
@@ -32,7 +31,7 @@ from mirror_core.workers import (
     WorkerJob,
     WorkerLease,
 )
-
+from psycopg.rows import dict_row
 
 _MIGRATION = Path(__file__).with_name("migrations") / "001_initial.sql"
 
@@ -95,7 +94,9 @@ class PostgresWorkerBackend(WorkerBackend):
     def _start_sync(self) -> None:
         self._db.connect()
         migration = _MIGRATION.read_text(encoding="utf-8")
-        statements = [statement.strip() for statement in migration.split(";") if statement.strip()]
+        statements = [
+            statement.strip() for statement in migration.split(";") if statement.strip()
+        ]
         for statement in statements:
             self._db.execute(statement)
         self._started = True
@@ -137,12 +138,22 @@ class PostgresWorkerBackend(WorkerBackend):
                 cancelled_at=EXCLUDED.cancelled_at, lease_expires_at=EXCLUDED.lease_expires_at
             """,
             (
-                str(job.job_id), job.kind, str(job.run_id) if job.run_id else None,
-                job.pipeline_id, job.step_id, job.execution_class,
-                json.dumps(encode_metadata_value(job.payload)), job.state.value,
-                job.worker_id, job.error, json.dumps(encode_metadata_value(job.metadata)),
-                job.submitted_at, job.claimed_at, job.completed_at,
-                job.cancelled_at, job.lease_expires_at,
+                str(job.job_id),
+                job.kind,
+                str(job.run_id) if job.run_id else None,
+                job.pipeline_id,
+                job.step_id,
+                job.execution_class,
+                json.dumps(encode_metadata_value(job.payload)),
+                job.state.value,
+                job.worker_id,
+                job.error,
+                json.dumps(encode_metadata_value(job.metadata)),
+                job.submitted_at,
+                job.claimed_at,
+                job.completed_at,
+                job.cancelled_at,
+                job.lease_expires_at,
             ),
         )
 
@@ -155,9 +166,13 @@ class PostgresWorkerBackend(WorkerBackend):
         )
         return None if not rows else _job_from_row(rows[0])
 
-    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
+    async def claim(
+        self, worker_id: str, execution_class: str = "default"
+    ) -> WorkerJob | None:
         self._ensure_started()
-        rows = await asyncio.to_thread(self._claim_sync, worker_id, execution_class, None)
+        rows = await asyncio.to_thread(
+            self._claim_sync, worker_id, execution_class, None
+        )
         return None if not rows else _job_from_row(rows[0])
 
     async def claim_job(self, job_id: UUID, worker_id: str) -> WorkerJob | None:
@@ -182,10 +197,9 @@ class PostgresWorkerBackend(WorkerBackend):
             self._db.connect()
             assert self._db._connection is not None
             connection = self._db._connection
-            with connection.transaction():
-                with connection.cursor() as cursor:
-                    cursor.execute(
-                        f"""
+            with connection.transaction(), connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
                         WITH candidate AS (
                             SELECT job_id FROM mirror_jobs
                             WHERE state = 'queued'
@@ -202,11 +216,11 @@ class PostgresWorkerBackend(WorkerBackend):
                         WHERE j.job_id = candidate.job_id
                         RETURNING j.*
                         """,
-                        tuple(params),
-                    )
-                    if cursor.description is None:
-                        return []
-                    return list(cursor.fetchall())
+                    tuple(params),
+                )
+                if cursor.description is None:
+                    return []
+                return list(cursor.fetchall())
 
     async def heartbeat(self, worker_id: str, job_id: UUID | None = None) -> None:
         self._ensure_started()
@@ -238,7 +252,9 @@ class PostgresWorkerBackend(WorkerBackend):
     async def cancel(self, job_id: UUID, reason: str | None = None) -> WorkerJob:
         return await self._transition(job_id, JobState.CANCELLED, reason)
 
-    async def _transition(self, job_id: UUID, state: JobState, error: str | None) -> WorkerJob:
+    async def _transition(
+        self, job_id: UUID, state: JobState, error: str | None
+    ) -> WorkerJob:
         self._ensure_started()
         rows = await asyncio.to_thread(
             self._db.execute,
@@ -287,17 +303,31 @@ class PostgresExecutionStore(ExecutionStore):
             ON CONFLICT(run_id) DO UPDATE SET outcome=EXCLUDED.outcome,payload=EXCLUDED.payload,
               worker_id=EXCLUDED.worker_id,started_at=EXCLUDED.started_at,completed_at=EXCLUDED.completed_at,metadata=EXCLUDED.metadata
             """,
-            (str(record.run_id), record.outcome, json.dumps(encode_metadata_value(record.payload)),
-             record.worker_id, record.created_at, record.started_at, record.completed_at,
-             json.dumps(encode_metadata_value(record.metadata))),
+            (
+                str(record.run_id),
+                record.outcome,
+                json.dumps(encode_metadata_value(record.payload)),
+                record.worker_id,
+                record.created_at,
+                record.started_at,
+                record.completed_at,
+                json.dumps(encode_metadata_value(record.metadata)),
+            ),
         )
 
     def get(self, run_id: UUID) -> ExecutionRecord | None:
-        rows = self._db.execute("SELECT * FROM mirror_execution_runs WHERE run_id=%s", (str(run_id),))
+        rows = self._db.execute(
+            "SELECT * FROM mirror_execution_runs WHERE run_id=%s", (str(run_id),)
+        )
         return None if not rows else _execution_from_row(rows[0])
 
     def list(self) -> list[ExecutionRecord]:
-        return [_execution_from_row(row) for row in self._db.execute("SELECT * FROM mirror_execution_runs ORDER BY created_at, run_id")]
+        return [
+            _execution_from_row(row)
+            for row in self._db.execute(
+                "SELECT * FROM mirror_execution_runs ORDER BY created_at, run_id"
+            )
+        ]
 
     def close(self) -> None:
         self._db.close()
@@ -309,22 +339,40 @@ class PostgresCheckpointStore(CheckpointStore):
     def __init__(self, dsn: str) -> None:
         self._db = _PostgresConnection(dsn)
 
-    def save(self, run_id: UUID, step_id: str, payload: dict[str, Any]) -> None:
+    def save(self, run_id: UUID, step_id: str, payload: Mapping[str, Any]) -> None:
         self._db.execute(
             "INSERT INTO mirror_checkpoints(run_id,step_id,payload,created_at) VALUES (%s,%s,%s::jsonb,%s) ON CONFLICT(run_id,step_id) DO UPDATE SET payload=EXCLUDED.payload,created_at=EXCLUDED.created_at",
-            (str(run_id), step_id, json.dumps(encode_metadata_value(payload)), _utcnow()),
+            (
+                str(run_id),
+                step_id,
+                json.dumps(encode_metadata_value(payload)),
+                _utcnow(),
+            ),
         )
 
     def load(self, run_id: UUID, step_id: str) -> dict[str, Any] | None:
-        rows = self._db.execute("SELECT payload FROM mirror_checkpoints WHERE run_id=%s AND step_id=%s", (str(run_id), step_id))
+        rows = self._db.execute(
+            "SELECT payload FROM mirror_checkpoints WHERE run_id=%s AND step_id=%s",
+            (str(run_id), step_id),
+        )
         return None if not rows else decode_metadata_value(rows[0]["payload"])
 
     def latest(self, run_id: UUID) -> tuple[str, dict[str, Any]] | None:
-        rows = self._db.execute("SELECT step_id,payload FROM mirror_checkpoints WHERE run_id=%s ORDER BY created_at DESC LIMIT 1", (str(run_id),))
-        return None if not rows else (rows[0]["step_id"], decode_metadata_value(rows[0]["payload"]))
+        rows = self._db.execute(
+            "SELECT step_id,payload FROM mirror_checkpoints WHERE run_id=%s ORDER BY created_at DESC LIMIT 1",
+            (str(run_id),),
+        )
+        return (
+            None
+            if not rows
+            else (rows[0]["step_id"], decode_metadata_value(rows[0]["payload"]))
+        )
 
     def delete(self, run_id: UUID, step_id: str) -> None:
-        self._db.execute("DELETE FROM mirror_checkpoints WHERE run_id=%s AND step_id=%s", (str(run_id), step_id))
+        self._db.execute(
+            "DELETE FROM mirror_checkpoints WHERE run_id=%s AND step_id=%s",
+            (str(run_id), step_id),
+        )
 
     def close(self) -> None:
         self._db.close()
@@ -337,10 +385,15 @@ class PostgresArtifactStore(ArtifactStore):
         self._db = _PostgresConnection(dsn)
 
     def put_bytes(self, key: str, payload: bytes) -> None:
-        self._db.execute("INSERT INTO mirror_artifacts(key,payload,created_at) VALUES (%s,%s,%s) ON CONFLICT(key) DO UPDATE SET payload=EXCLUDED.payload", (key, payload, _utcnow()))
+        self._db.execute(
+            "INSERT INTO mirror_artifacts(key,payload,created_at) VALUES (%s,%s,%s) ON CONFLICT(key) DO UPDATE SET payload=EXCLUDED.payload",
+            (key, payload, _utcnow()),
+        )
 
     def get_bytes(self, key: str) -> bytes | None:
-        rows = self._db.execute("SELECT payload FROM mirror_artifacts WHERE key=%s", (key,))
+        rows = self._db.execute(
+            "SELECT payload FROM mirror_artifacts WHERE key=%s", (key,)
+        )
         return None if not rows else bytes(rows[0]["payload"])
 
     def delete(self, key: str) -> None:
@@ -363,21 +416,38 @@ class PostgresDeadLetterQueue(DeadLetterQueue):
             VALUES (%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s,%s,%s,%s,%s)
             ON CONFLICT(run_id) DO UPDATE SET reason=EXCLUDED.reason,policy_state=EXCLUDED.policy_state,provenance=EXCLUDED.provenance,retry_count=EXCLUDED.retry_count,terminal_status=EXCLUDED.terminal_status,worker_id=EXCLUDED.worker_id,lease_id=EXCLUDED.lease_id
             """,
-            (str(record.run_id), record.pipeline_id, record.step_id, record.reason,
-             json.dumps(encode_metadata_value(record.original_inputs)), json.dumps(encode_metadata_value(record.policy_state)),
-             json.dumps(encode_metadata_value(record.provenance)), record.retry_count, record.terminal_status,
-             record.worker_id, record.lease_id, record.created_at),
+            (
+                str(record.run_id),
+                record.pipeline_id,
+                record.step_id,
+                record.reason,
+                json.dumps(encode_metadata_value(record.original_inputs)),
+                json.dumps(encode_metadata_value(record.policy_state)),
+                json.dumps(encode_metadata_value(record.provenance)),
+                record.retry_count,
+                record.terminal_status,
+                record.worker_id,
+                record.lease_id,
+                record.created_at,
+            ),
         )
 
     def get(self, run_id: UUID) -> DeadLetterRecord | None:
-        rows = self._db.execute("SELECT * FROM mirror_dead_letters WHERE run_id=%s", (str(run_id),))
+        rows = self._db.execute(
+            "SELECT * FROM mirror_dead_letters WHERE run_id=%s", (str(run_id),)
+        )
         return None if not rows else _dead_letter_from_row(rows[0])
 
     def replay(self, run_id: UUID) -> DeadLetterRecord | None:
         return self.get(run_id)
 
     def list(self) -> list[DeadLetterRecord]:
-        return [_dead_letter_from_row(row) for row in self._db.execute("SELECT * FROM mirror_dead_letters ORDER BY created_at, run_id")]
+        return [
+            _dead_letter_from_row(row)
+            for row in self._db.execute(
+                "SELECT * FROM mirror_dead_letters ORDER BY created_at, run_id"
+            )
+        ]
 
     def close(self) -> None:
         self._db.close()
@@ -392,22 +462,48 @@ class PostgresMetadataStore(MetadataStore):
     def put(self, record: MetadataRecord) -> None:
         self._db.execute(
             "INSERT INTO mirror_metadata(namespace,key,payload,created_at) VALUES (%s,%s,%s::jsonb,%s) ON CONFLICT(namespace,key) DO UPDATE SET payload=EXCLUDED.payload,created_at=EXCLUDED.created_at",
-            (record.namespace, record.key, json.dumps(encode_metadata_value(record.payload)), record.created_at),
+            (
+                record.namespace,
+                record.key,
+                json.dumps(encode_metadata_value(record.payload)),
+                record.created_at,
+            ),
         )
 
     def get(self, namespace: str, key: str) -> MetadataRecord | None:
-        rows = self._db.execute("SELECT * FROM mirror_metadata WHERE namespace=%s AND key=%s", (namespace, key))
+        rows = self._db.execute(
+            "SELECT * FROM mirror_metadata WHERE namespace=%s AND key=%s",
+            (namespace, key),
+        )
         if not rows:
             return None
         row = rows[0]
-        return MetadataRecord(namespace=row["namespace"], key=row["key"], payload=decode_metadata_value(row["payload"]), created_at=_dt(row["created_at"]) or _utcnow())
+        return MetadataRecord(
+            namespace=row["namespace"],
+            key=row["key"],
+            payload=decode_metadata_value(row["payload"]),
+            created_at=_dt(row["created_at"]) or _utcnow(),
+        )
 
     def list(self, namespace: str | None = None) -> list[MetadataRecord]:
         if namespace is None:
-            rows = self._db.execute("SELECT * FROM mirror_metadata ORDER BY namespace,key")
+            rows = self._db.execute(
+                "SELECT * FROM mirror_metadata ORDER BY namespace,key"
+            )
         else:
-            rows = self._db.execute("SELECT * FROM mirror_metadata WHERE namespace=%s ORDER BY namespace,key", (namespace,))
-        return [MetadataRecord(namespace=row["namespace"], key=row["key"], payload=decode_metadata_value(row["payload"]), created_at=_dt(row["created_at"]) or _utcnow()) for row in rows]
+            rows = self._db.execute(
+                "SELECT * FROM mirror_metadata WHERE namespace=%s ORDER BY namespace,key",
+                (namespace,),
+            )
+        return [
+            MetadataRecord(
+                namespace=row["namespace"],
+                key=row["key"],
+                payload=decode_metadata_value(row["payload"]),
+                created_at=_dt(row["created_at"]) or _utcnow(),
+            )
+            for row in rows
+        ]
 
     def close(self) -> None:
         self._db.close()
@@ -420,7 +516,9 @@ class PostgresLeaseManager(LeaseManager):
         self._db = _PostgresConnection(dsn)
         self.ttl_seconds = ttl_seconds
 
-    def acquire(self, job_id: UUID, worker_id: str, ttl_seconds: int = 60) -> WorkerLease:
+    def acquire(
+        self, job_id: UUID, worker_id: str, ttl_seconds: int = 60
+    ) -> WorkerLease:
         expires = _utcnow() + timedelta(seconds=ttl_seconds or self.ttl_seconds)
         rows = self._db.execute(
             """
@@ -433,25 +531,43 @@ class PostgresLeaseManager(LeaseManager):
             (str(job_id), worker_id, expires, _utcnow()),
         )
         if not rows:
-            raise RuntimeError(f"Lease for {job_id} is currently owned by another live worker")
+            raise RuntimeError(
+                f"Lease for {job_id} is currently owned by another live worker"
+            )
         return _lease_from_row(rows[0])
 
     def renew(self, lease: WorkerLease, ttl_seconds: int = 60) -> WorkerLease:
         expires = _utcnow() + timedelta(seconds=ttl_seconds or self.ttl_seconds)
-        rows = self._db.execute("UPDATE mirror_leases SET expires_at=%s WHERE job_id=%s AND worker_id=%s RETURNING job_id,worker_id,expires_at", (expires, str(lease.job_id), lease.worker_id))
+        rows = self._db.execute(
+            "UPDATE mirror_leases SET expires_at=%s WHERE job_id=%s AND worker_id=%s RETURNING job_id,worker_id,expires_at",
+            (expires, str(lease.job_id), lease.worker_id),
+        )
         if not rows:
-            raise RuntimeError(f"Lease for {lease.job_id} is no longer owned by {lease.worker_id}")
+            raise RuntimeError(
+                f"Lease for {lease.job_id} is no longer owned by {lease.worker_id}"
+            )
         return _lease_from_row(rows[0])
 
     def release(self, lease: WorkerLease) -> None:
-        self._db.execute("DELETE FROM mirror_leases WHERE job_id=%s AND worker_id=%s", (str(lease.job_id), lease.worker_id))
+        self._db.execute(
+            "DELETE FROM mirror_leases WHERE job_id=%s AND worker_id=%s",
+            (str(lease.job_id), lease.worker_id),
+        )
 
     def get(self, job_id: UUID) -> WorkerLease | None:
-        rows = self._db.execute("SELECT job_id,worker_id,expires_at FROM mirror_leases WHERE job_id=%s", (str(job_id),))
+        rows = self._db.execute(
+            "SELECT job_id,worker_id,expires_at FROM mirror_leases WHERE job_id=%s",
+            (str(job_id),),
+        )
         return None if not rows else _lease_from_row(rows[0])
 
     def list(self) -> list[WorkerLease]:
-        return [_lease_from_row(row) for row in self._db.execute("SELECT job_id,worker_id,expires_at FROM mirror_leases ORDER BY expires_at,job_id")]
+        return [
+            _lease_from_row(row)
+            for row in self._db.execute(
+                "SELECT job_id,worker_id,expires_at FROM mirror_leases ORDER BY expires_at,job_id"
+            )
+        ]
 
     def close(self) -> None:
         self._db.close()
@@ -459,24 +575,58 @@ class PostgresLeaseManager(LeaseManager):
 
 def _job_from_row(row: dict[str, Any]) -> WorkerJob:
     return WorkerJob(
-        job_id=UUID(str(row["job_id"])), kind=row["kind"],
+        job_id=UUID(str(row["job_id"])),
+        kind=row["kind"],
         run_id=UUID(str(row["run_id"])) if row["run_id"] else None,
-        pipeline_id=row["pipeline_id"], step_id=row["step_id"],
-        execution_class=row["execution_class"], payload=decode_metadata_value(row["payload"]),
-        state=JobState(row["state"]), worker_id=row["worker_id"], error=row["error"],
-        metadata=decode_metadata_value(row["metadata"]), submitted_at=_dt(row["submitted_at"]) or _utcnow(),
-        claimed_at=_dt(row["claimed_at"]), completed_at=_dt(row["completed_at"]),
-        cancelled_at=_dt(row["cancelled_at"]), lease_expires_at=_dt(row["lease_expires_at"]),
+        pipeline_id=row["pipeline_id"],
+        step_id=row["step_id"],
+        execution_class=row["execution_class"],
+        payload=decode_metadata_value(row["payload"]),
+        state=JobState(row["state"]),
+        worker_id=row["worker_id"],
+        error=row["error"],
+        metadata=decode_metadata_value(row["metadata"]),
+        submitted_at=_dt(row["submitted_at"]) or _utcnow(),
+        claimed_at=_dt(row["claimed_at"]),
+        completed_at=_dt(row["completed_at"]),
+        cancelled_at=_dt(row["cancelled_at"]),
+        lease_expires_at=_dt(row["lease_expires_at"]),
     )
 
 
 def _execution_from_row(row: dict[str, Any]) -> ExecutionRecord:
-    return ExecutionRecord(run_id=UUID(str(row["run_id"])), outcome=row["outcome"], payload=decode_metadata_value(row["payload"]), worker_id=row["worker_id"], created_at=_dt(row["created_at"]) or _utcnow(), started_at=_dt(row["started_at"]), completed_at=_dt(row["completed_at"]), metadata=decode_metadata_value(row["metadata"]))
+    return ExecutionRecord(
+        run_id=UUID(str(row["run_id"])),
+        outcome=row["outcome"],
+        payload=decode_metadata_value(row["payload"]),
+        worker_id=row["worker_id"],
+        created_at=_dt(row["created_at"]) or _utcnow(),
+        started_at=_dt(row["started_at"]),
+        completed_at=_dt(row["completed_at"]),
+        metadata=decode_metadata_value(row["metadata"]),
+    )
 
 
 def _dead_letter_from_row(row: dict[str, Any]) -> DeadLetterRecord:
-    return DeadLetterRecord(run_id=UUID(str(row["run_id"])), pipeline_id=row["pipeline_id"], step_id=row["step_id"], reason=row["reason"], original_inputs=decode_metadata_value(row["original_inputs"]), policy_state=decode_metadata_value(row["policy_state"]), provenance=decode_metadata_value(row["provenance"]), retry_count=row["retry_count"], terminal_status=row["terminal_status"], worker_id=row["worker_id"], lease_id=row["lease_id"], created_at=_dt(row["created_at"]) or _utcnow())
+    return DeadLetterRecord(
+        run_id=UUID(str(row["run_id"])),
+        pipeline_id=row["pipeline_id"],
+        step_id=row["step_id"],
+        reason=row["reason"],
+        original_inputs=decode_metadata_value(row["original_inputs"]),
+        policy_state=decode_metadata_value(row["policy_state"]),
+        provenance=decode_metadata_value(row["provenance"]),
+        retry_count=row["retry_count"],
+        terminal_status=row["terminal_status"],
+        worker_id=row["worker_id"],
+        lease_id=row["lease_id"],
+        created_at=_dt(row["created_at"]) or _utcnow(),
+    )
 
 
 def _lease_from_row(row: dict[str, Any]) -> WorkerLease:
-    return WorkerLease(job_id=UUID(str(row["job_id"])), worker_id=row["worker_id"], expires_at=_dt(row["expires_at"]) or _utcnow())
+    return WorkerLease(
+        job_id=UUID(str(row["job_id"])),
+        worker_id=row["worker_id"],
+        expires_at=_dt(row["expires_at"]) or _utcnow(),
+    )

@@ -35,9 +35,7 @@ def test_run_requires_pipeline() -> None:
     assert result.exit_code == 2
 
 
-def test_startproject_creates_scaffold(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_startproject_creates_scaffold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The project scaffold command should create the expected layout."""
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["startproject", "demo"])
@@ -53,9 +51,7 @@ def test_startproject_creates_scaffold(
     assert (project_root / "docs" / "README.md").exists()
 
 
-def test_startapp_creates_app_scaffold(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_startapp_creates_app_scaffold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The app scaffold command should create a reusable app package."""
     monkeypatch.chdir(tmp_path)
     assert runner.invoke(app, ["startproject", "demo"]).exit_code == 0
@@ -72,9 +68,7 @@ def test_startapp_creates_app_scaffold(
     assert (app_root / "README.md").exists()
 
 
-def test_doctor_reports_healthy_scaffold(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_doctor_reports_healthy_scaffold(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The doctor command should report success for a generated project."""
     monkeypatch.chdir(tmp_path)
     assert runner.invoke(app, ["startproject", "demo"]).exit_code == 0
@@ -84,9 +78,7 @@ def test_doctor_reports_healthy_scaffold(
     assert "[OK]" in result.output
 
 
-def test_generated_manage_py_can_run_doctor(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_generated_manage_py_can_run_doctor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The generated manage.py should execute the doctor command."""
     import os
     import subprocess
@@ -94,10 +86,12 @@ def test_generated_manage_py_can_run_doctor(
 
     root = Path(__file__).resolve().parents[3]
     env = os.environ.copy()
+    extra_site = "/opt/pyvenv/lib/python3.13/site-packages"
     env["PYTHONPATH"] = os.pathsep.join(
         [
             *(str(src) for src in sorted((root / "packages").glob("*/src"))),
             str(root),
+            extra_site,
         ]
     )
     monkeypatch.chdir(tmp_path)
@@ -115,9 +109,7 @@ def test_generated_manage_py_can_run_doctor(
     assert "[OK]" in result.stdout
 
 
-def test_worker_command_initializes_backend(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_worker_command_initializes_backend(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The worker command should initialize a local backend."""
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(app, ["worker", "--backend", "sqlite"])
@@ -126,7 +118,16 @@ def test_worker_command_initializes_backend(
 
 
 def test_worker_check_command() -> None:
-    """Worker status must be honest about its experimental state."""
+    """Worker status must reflect the shipped execution mechanisms."""
     result = runner.invoke(app, ["worker-check"])
     assert result.exit_code == 0
-    assert "experimental" in result.output
+    assert "available" in result.output
+    assert "PostgreSQL" in result.output
+    assert "Celery" in result.output
+
+
+def test_manifest_show_command() -> None:
+    """The shared interface catalog is exposed through the CLI."""
+    result = runner.invoke(app, ["manifest", "show"])
+    assert result.exit_code == 0
+    assert "capabilities" in result.output
