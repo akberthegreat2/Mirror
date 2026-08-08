@@ -56,13 +56,22 @@ Concurrent runs must not share mutable execution state.
 
 ## Failure handling
 
-Execution should distinguish between:
+Step `on_error` policies have distinct runtime semantics:
 
-- abort
-- continue
-- skip
+- **abort**: fail the execution and cancel pending work.
+- **continue**: record the failed step and allow independent branches to continue; dependents that require the failed result remain unrunnable and are skipped during finalization.
+- **skip**: record the failed step and immediately mark its transitive dependents as skipped. Independent branches continue.
+- **fallback**: try the compiled fallback providers first. If all fallback providers fail, the failure is recorded and the run continues only where the failed step's result is not required.
 
 Fallback can substitute another provider when a compiled step declares fallback providers; alternate step or pipeline fallback remains outside the current runtime implementation.
+
+### Retry and timeout ownership
+
+Step-level `retry` and `timeout` fields are **execution policy** and are enforced by Core's `PolicyInvoker`. The built-in `RetryMiddleware` and `TimeoutMiddleware` are separate middleware concerns and may be used when an application explicitly wants middleware-level retry or timeout behavior.
+
+Applications should not configure both mechanisms for the same invocation unless deliberate composition is intended. If both are enabled, their effects compose rather than replace one another; middleware retry can repeat an invocation that Core itself is also retrying, and middleware timeout can bound each individual middleware attempt while Core's timeout bounds the policy invocation.
+
+The worker transport does not retry or timeout execution on its own.
 
 A terminal failure must propagate from execution and must not be hidden behind a generic finished event.
 

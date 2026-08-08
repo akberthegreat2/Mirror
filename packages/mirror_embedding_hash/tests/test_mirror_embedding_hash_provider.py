@@ -12,7 +12,9 @@ async def test_hash_embedding_provider_is_deterministic() -> None:
     """Provider should generate stable, unit-length vectors."""
 
     provider_impl = HashEmbeddingProvider()
-    request = EmbeddingRequest(items=[EmbeddingInput(item_id="item-1", text="hello world")])
+    request = EmbeddingRequest(
+        items=[EmbeddingInput(item_id="item-1", text="hello world")]
+    )
 
     result_one = await provider_impl.embed(request)
     result_two = await provider_impl.embed(request)

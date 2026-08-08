@@ -25,7 +25,9 @@ async def test_chunk_step_success() -> None:
     """The runner should delegate to the provider."""
 
     provider = AsyncMock()
-    request = ChunkRequest(documents=[ChunkDocument(document_id="doc-1", text="one two three four")])
+    request = ChunkRequest(
+        documents=[ChunkDocument(document_id="doc-1", text="one two three four")]
+    )
     expected = ChunkResult(
         chunks=[
             Chunk(
@@ -52,7 +54,9 @@ async def test_chunk_step_wraps_unknown_error() -> None:
 
     provider = AsyncMock()
     provider.chunk.side_effect = ValueError("boom")
-    request = ChunkRequest(documents=[ChunkDocument(document_id="doc-1", text="one two three four")])
+    request = ChunkRequest(
+        documents=[ChunkDocument(document_id="doc-1", text="one two three four")]
+    )
 
     with pytest.raises(ChunkError) as excinfo:
         await chunk_step(provider, request)

@@ -27,7 +27,9 @@ async def test_postgres_worker_lifecycle() -> None:
     backend = PostgresWorkerBackend(dsn, lease_seconds=2)
     await backend.start()
     try:
-        job = await backend.submit(WorkerJob(kind="integration", execution_class="io", payload={"value": 1}))
+        job = await backend.submit(
+            WorkerJob(kind="integration", execution_class="io", payload={"value": 1})
+        )
         claimed = await backend.claim("worker-a", "io")
         assert claimed is not None
         assert claimed.job_id == job.job_id
@@ -69,11 +71,17 @@ def test_postgres_durable_stores() -> None:
         from mirror_core.metadata import MetadataRecord
         from mirror_core.workers import DeadLetterRecord, ExecutionRecord
 
-        execution.record(ExecutionRecord(run_id=run_id, outcome="succeeded", payload={"x": 1}))
+        execution.record(
+            ExecutionRecord(run_id=run_id, outcome="succeeded", payload={"x": 1})
+        )
         assert execution.get(run_id) is not None
         checkpoints.save(run_id, "step-1", {"state": "done"})
         assert checkpoints.load(run_id, "step-1") == {"state": "done"}
-        metadata.put(MetadataRecord(namespace="integration", key=str(run_id), payload={"ok": True}))
+        metadata.put(
+            MetadataRecord(
+                namespace="integration", key=str(run_id), payload={"ok": True}
+            )
+        )
         assert metadata.get("integration", str(run_id)) is not None
         dead_letters.record(
             DeadLetterRecord(

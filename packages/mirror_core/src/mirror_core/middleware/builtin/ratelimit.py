@@ -27,16 +27,22 @@ class RateLimitSettings(BaseModel):
 class RateLimitMiddleware:
     """Rate limit invocations using a token bucket algorithm."""
 
-    def __init__(self, settings: RateLimitSettings | None = None, /, **overrides: Any) -> None:
+    def __init__(
+        self, settings: RateLimitSettings | None = None, /, **overrides: Any
+    ) -> None:
         if settings is None:
             settings = RateLimitSettings.model_validate(overrides)
         elif overrides:
             settings = settings.model_copy(update=overrides)
         self.settings = settings
-        self._buckets: dict[str, tuple[float, float]] = defaultdict(lambda: (time.monotonic(), self.settings.burst))
+        self._buckets: dict[str, tuple[float, float]] = defaultdict(
+            lambda: (time.monotonic(), self.settings.burst)
+        )
         self._lock = asyncio.Lock()
 
-    async def __call__(self, invocation: MiddlewareInvocation, next_middleware: NextMiddleware) -> Any:
+    async def __call__(
+        self, invocation: MiddlewareInvocation, next_middleware: NextMiddleware
+    ) -> Any:
         key = self._resolve_key(invocation)
         while True:
             async with self._lock:

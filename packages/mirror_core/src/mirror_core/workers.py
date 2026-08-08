@@ -53,7 +53,9 @@ class WorkerJob(BaseModel):
         if self.run_id is None:
             object.__setattr__(self, "run_id", self.job_id)
         if self.pipeline_id is None:
-            object.__setattr__(self, "pipeline_id", self.metadata.get("pipeline_id", self.kind))
+            object.__setattr__(
+                self, "pipeline_id", self.metadata.get("pipeline_id", self.kind)
+            )
         if self.step_id is None and self.metadata.get("step_id") is not None:
             object.__setattr__(self, "step_id", str(self.metadata["step_id"]))
 
@@ -118,7 +120,9 @@ class WorkerBackend(Protocol):
         """Submit a job and return its stored representation."""
         ...
 
-    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
+    async def claim(
+        self, worker_id: str, execution_class: str = "default"
+    ) -> WorkerJob | None:
         """Claim the next queued job for a worker."""
         ...
 
@@ -203,7 +207,9 @@ class ArtifactStore(Protocol):
 class LeaseManager(Protocol):
     """Lease contract used to coordinate workers."""
 
-    def acquire(self, job_id: UUID, worker_id: str, ttl_seconds: int = 60) -> WorkerLease: ...
+    def acquire(
+        self, job_id: UUID, worker_id: str, ttl_seconds: int = 60
+    ) -> WorkerLease: ...
 
     def renew(self, lease: WorkerLease, ttl_seconds: int = 60) -> WorkerLease: ...
 
@@ -234,17 +240,24 @@ class InlineWorker:
     async def submit(self, job: WorkerJob) -> WorkerJob:
         """Enqueue a new job."""
         self._ensure_started()
-        stored = job.model_copy(update={"state": JobState.QUEUED, "submitted_at": _utcnow()})
+        stored = job.model_copy(
+            update={"state": JobState.QUEUED, "submitted_at": _utcnow()}
+        )
         self._jobs.append(stored)
         self._jobs_by_id[stored.job_id] = stored
         return stored
 
-    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
+    async def claim(
+        self, worker_id: str, execution_class: str = "default"
+    ) -> WorkerJob | None:
         """Claim the next queued job for a worker in one execution class."""
         self._ensure_started()
         while self._jobs:
             job = self._jobs.popleft()
-            if job.state is not JobState.QUEUED or job.execution_class != execution_class:
+            if (
+                job.state is not JobState.QUEUED
+                or job.execution_class != execution_class
+            ):
                 continue
             now = _utcnow()
             claimed = job.model_copy(
@@ -462,7 +475,9 @@ class SQLiteWorkerBackend:
         conn.commit()
         return stored
 
-    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
+    async def claim(
+        self, worker_id: str, execution_class: str = "default"
+    ) -> WorkerJob | None:
         self._ensure_started()
         conn = self._connection()
         conn.execute("BEGIN IMMEDIATE")
@@ -497,7 +512,9 @@ class SQLiteWorkerBackend:
             ),
         )
         conn.commit()
-        claimed = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (row["job_id"],)).fetchone()
+        claimed = conn.execute(
+            "SELECT * FROM jobs WHERE job_id = ?", (row["job_id"],)
+        ).fetchone()
         return self._row_to_job(claimed)
 
     async def claim_job(self, job_id: UUID, worker_id: str) -> WorkerJob | None:
@@ -525,11 +542,17 @@ class SQLiteWorkerBackend:
             ),
         )
         conn.commit()
-        return self._row_to_job(conn.execute("SELECT * FROM jobs WHERE job_id=?", (str(job_id),)).fetchone())
+        return self._row_to_job(
+            conn.execute("SELECT * FROM jobs WHERE job_id=?", (str(job_id),)).fetchone()
+        )
 
     async def get(self, job_id: UUID) -> WorkerJob | None:
         self._ensure_started()
-        row = self._connection().execute("SELECT * FROM jobs WHERE job_id=?", (str(job_id),)).fetchone()
+        row = (
+            self._connection()
+            .execute("SELECT * FROM jobs WHERE job_id=?", (str(job_id),))
+            .fetchone()
+        )
         return None if row is None else self._row_to_job(row)
 
     async def heartbeat(self, worker_id: str, job_id: UUID | None = None) -> None:
@@ -562,7 +585,9 @@ class SQLiteWorkerBackend:
 
     async def cancel(self, job_id: UUID, reason: str | None = None) -> WorkerJob:
         self._ensure_started()
-        return self._transition(job_id, JobState.CANCELLED, error=reason, cancelled=True)
+        return self._transition(
+            job_id, JobState.CANCELLED, error=reason, cancelled=True
+        )
 
     def requeue_expired(self, *, now: datetime | None = None) -> list[WorkerJob]:
         """Move expired running jobs back to the queue."""
@@ -583,7 +608,9 @@ class SQLiteWorkerBackend:
                 """,
                 (JobState.QUEUED.value, now.isoformat(), row["job_id"]),
             )
-            updated = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (row["job_id"],)).fetchone()
+            updated = conn.execute(
+                "SELECT * FROM jobs WHERE job_id = ?", (row["job_id"],)
+            ).fetchone()
             requeued.append(self._row_to_job(updated))
         conn.commit()
         return requeued
@@ -592,7 +619,9 @@ class SQLiteWorkerBackend:
     def jobs(self) -> list[WorkerJob]:
         self._ensure_started()
         conn = self._connection()
-        rows = conn.execute("SELECT * FROM jobs ORDER BY created_at, kind, job_id").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM jobs ORDER BY created_at, kind, job_id"
+        ).fetchall()
         return [self._row_to_job(row) for row in rows]
 
     def close(self) -> None:
@@ -610,11 +639,17 @@ class SQLiteWorkerBackend:
         cancelled: bool = False,
     ) -> WorkerJob:
         conn = self._connection()
-        row = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (str(job_id),)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM jobs WHERE job_id = ?", (str(job_id),)
+        ).fetchone()
         if row is None:
             raise KeyError(f"Unknown job: {job_id}")
         updated_at = _utcnow().isoformat()
-        completed_at = updated_at if state in {JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED} else None
+        completed_at = (
+            updated_at
+            if state in {JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED}
+            else None
+        )
         cancelled_at = updated_at if cancelled else None
         conn.execute(
             """
@@ -625,7 +660,9 @@ class SQLiteWorkerBackend:
             (state.value, error, updated_at, completed_at, cancelled_at, str(job_id)),
         )
         conn.commit()
-        updated = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (str(job_id),)).fetchone()
+        updated = conn.execute(
+            "SELECT * FROM jobs WHERE job_id = ?", (str(job_id),)
+        ).fetchone()
         return self._row_to_job(updated)
 
     def _connection(self) -> sqlite3.Connection:
@@ -672,7 +709,9 @@ class SQLiteWorkerBackend:
             )
             """
         )
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_state_class_created ON jobs(state, execution_class, created_at)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_jobs_state_class_created ON jobs(state, execution_class, created_at)"
+        )
         conn.commit()
 
     def _row_to_job(self, row: sqlite3.Row | None) -> WorkerJob:
@@ -691,10 +730,18 @@ class SQLiteWorkerBackend:
             error=row["error"],
             metadata=json.loads(row["metadata"]),
             submitted_at=_parse_datetime(row["created_at"]),
-            claimed_at=_parse_datetime(row["claimed_at"]) if row["claimed_at"] else None,
-            completed_at=_parse_datetime(row["completed_at"]) if row["completed_at"] else None,
-            cancelled_at=_parse_datetime(row["cancelled_at"]) if row["cancelled_at"] else None,
-            lease_expires_at=_parse_datetime(row["lease_expires_at"]) if row["lease_expires_at"] else None,
+            claimed_at=_parse_datetime(row["claimed_at"])
+            if row["claimed_at"]
+            else None,
+            completed_at=_parse_datetime(row["completed_at"])
+            if row["completed_at"]
+            else None,
+            cancelled_at=_parse_datetime(row["cancelled_at"])
+            if row["cancelled_at"]
+            else None,
+            lease_expires_at=_parse_datetime(row["lease_expires_at"])
+            if row["lease_expires_at"]
+            else None,
         )
 
 
@@ -747,11 +794,15 @@ class SQLiteDeadLetterQueue:
         self._conn.commit()
 
     def get(self, run_id: UUID) -> DeadLetterRecord | None:
-        row = self._conn.execute("SELECT * FROM dead_letters WHERE run_id = ?", (str(run_id),)).fetchone()
+        row = self._conn.execute(
+            "SELECT * FROM dead_letters WHERE run_id = ?", (str(run_id),)
+        ).fetchone()
         return None if row is None else self._row_to_record(row)
 
     def list(self) -> list[DeadLetterRecord]:
-        rows = self._conn.execute("SELECT * FROM dead_letters ORDER BY created_at DESC, run_id DESC").fetchall()
+        rows = self._conn.execute(
+            "SELECT * FROM dead_letters ORDER BY created_at DESC, run_id DESC"
+        ).fetchall()
         return [self._row_to_record(row) for row in rows]
 
     def replay(self, run_id: UUID) -> DeadLetterRecord | None:
@@ -851,7 +902,11 @@ class InMemoryCheckpointStore:
         """Delete a checkpoint snapshot."""
         self._checkpoints.pop((run_id, step_id), None)
         if self._latest.get(run_id) == step_id:
-            remaining = [candidate for (candidate_run_id, candidate), _ in self._checkpoints.items() if candidate_run_id == run_id]
+            remaining = [
+                candidate
+                for (candidate_run_id, candidate), _ in self._checkpoints.items()
+                if candidate_run_id == run_id
+            ]
             if remaining:
                 self._latest[run_id] = remaining[-1]
             else:
@@ -908,7 +963,9 @@ class SQLiteCheckpointStore:
         ).fetchone()
         if row is None:
             return None
-        return row["step_id"], cast(dict[str, Any], decode_metadata_value(json.loads(row["payload"])))
+        return row["step_id"], cast(
+            dict[str, Any], decode_metadata_value(json.loads(row["payload"]))
+        )
 
     def delete(self, run_id: UUID, step_id: str) -> None:
         self._conn.execute(
@@ -972,7 +1029,12 @@ class InMemoryDeadLetterQueue:
         return record
 
     def list(self) -> list[DeadLetterRecord]:
-        return list(self._records.values())
+        """Return dead letters newest-first, matching durable backends."""
+        return sorted(
+            self._records.values(),
+            key=lambda record: (record.created_at, str(record.run_id)),
+            reverse=True,
+        )
 
 
 class InMemoryLeaseManager:
@@ -981,7 +1043,9 @@ class InMemoryLeaseManager:
     def __init__(self) -> None:
         self._leases: dict[UUID, WorkerLease] = {}
 
-    def acquire(self, job_id: UUID, worker_id: str, ttl_seconds: int = 60) -> WorkerLease:
+    def acquire(
+        self, job_id: UUID, worker_id: str, ttl_seconds: int = 60
+    ) -> WorkerLease:
         """Acquire a lease for one job."""
         lease = WorkerLease(
             job_id=job_id,

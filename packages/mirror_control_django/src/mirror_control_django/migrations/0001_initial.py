@@ -406,7 +406,11 @@ class Migration(migrations.Migration):
             ],
             options={
                 "ordering": ["-created_at", "resource_key"],
-                "indexes": [models.Index(fields=["resource_key"], name="mirror_cont_resourc_df8942_idx")],
+                "indexes": [
+                    models.Index(
+                        fields=["resource_key"], name="mirror_cont_resourc_df8942_idx"
+                    )
+                ],
             },
         ),
         migrations.CreateModel(
@@ -450,7 +454,9 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name="pipeline",
-            constraint=models.UniqueConstraint(fields=("project", "slug"), name="uniq_mirror_control_pipeline_slug"),
+            constraint=models.UniqueConstraint(
+                fields=("project", "slug"), name="uniq_mirror_control_pipeline_slug"
+            ),
         ),
         migrations.AddIndex(
             model_name="crawledurl",
@@ -458,6 +464,8 @@ class Migration(migrations.Migration):
         ),
         migrations.AddConstraint(
             model_name="schedule",
-            constraint=models.UniqueConstraint(fields=("pipeline", "name"), name="uniq_mirror_control_schedule"),
+            constraint=models.UniqueConstraint(
+                fields=("pipeline", "name"), name="uniq_mirror_control_schedule"
+            ),
         ),
     ]

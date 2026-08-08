@@ -154,10 +154,17 @@ def control_plane_manifest() -> ControlPlaneManifest:
 
 interface = InterfaceManifest(
     name="dashboard",
+    version="0.1.0",
+    package_name="mirror-control-django",
+    api_version="1.0",
+    requires_core=">=0.1.0",
+    settings_model=None,
     interface_type="dashboard",
     factory="mirror_control_django.views:DashboardView",
     requires_capabilities=[],
-    metadata={"description": "Django admin/control-plane interface for Mirror metadata and pipeline operations."},
+    metadata={
+        "description": "Django admin/control-plane interface for Mirror metadata and pipeline operations."
+    },
 )
 
 __all__ = [

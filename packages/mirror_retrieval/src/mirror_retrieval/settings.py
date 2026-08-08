@@ -12,7 +12,11 @@ class RetrievalSettings(BaseModel):
 
     default_top_k: int = Field(default=5, ge=1, le=100)
     default_namespace: str = Field(default="default", min_length=1)
-    embedder_factory: str = Field(default="mirror_embedding_hash.provider:HashEmbeddingProvider")
+    embedder_factory: str = Field(
+        default="mirror_embedding_hash.provider:HashEmbeddingProvider"
+    )
     embedder_settings: dict[str, Any] = Field(default_factory=dict)
-    vector_store_factory: str = Field(default="mirror_vectorstore_memory.provider:MemoryVectorStoreProvider")
+    vector_store_factory: str = Field(
+        default="mirror_vectorstore_memory.provider:MemoryVectorStoreProvider"
+    )
     vector_store_settings: dict[str, Any] = Field(default_factory=dict)

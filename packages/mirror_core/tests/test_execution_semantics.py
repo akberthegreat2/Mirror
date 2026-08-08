@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from mirror_core.execution import CapabilityContext, ExecutionContext, ExecutionPolicy
-from mirror_core.executor import Executor, RunOutcome
+from mirror_core.executor import Executor, RunOutcome, StepState
 from mirror_core.extensions.models import CapabilityManifest, ProviderManifest
 from mirror_core.extensions.registry import ExtensionRegistryManager
 from mirror_core.metadata import InMemoryMetadataStore, MetadataNamespaces
@@ -72,14 +72,22 @@ async def test_executor_passes_runtime_contexts_to_runners() -> None:
     seen: dict[str, object] = {}
 
     async def runner(provider, request, runner_context=None):
-        seen["execution_context"] = runner_context.execution_context if runner_context else None
-        seen["capability_context"] = runner_context.capability_context if runner_context else None
-        seen["middleware_context"] = runner_context.middleware_context if runner_context else None
+        seen["execution_context"] = (
+            runner_context.execution_context if runner_context else None
+        )
+        seen["capability_context"] = (
+            runner_context.capability_context if runner_context else None
+        )
+        seen["middleware_context"] = (
+            runner_context.middleware_context if runner_context else None
+        )
         seen["signal_bus"] = runner_context.signal_bus if runner_context else None
         seen["step_id"] = runner_context.step_id if runner_context else None
         return await provider.fetch(request)
 
-    result = await executor.execute_run(plan, inputs={"url": "https://example.com"}, runner=runner)
+    result = await executor.execute_run(
+        plan, inputs={"url": "https://example.com"}, runner=runner
+    )
 
     assert result.outcome is RunOutcome.SUCCEEDED
     execution_context = seen["execution_context"]
@@ -210,7 +218,9 @@ async def test_executor_records_checkpoint_and_dead_letter() -> None:
     executor = Executor(
         {
             ("demo", "ok"): AsyncMock(run=AsyncMock(return_value=Payload(value=1))),
-            ("demo", "boom"): AsyncMock(run=AsyncMock(side_effect=RuntimeError("boom"))),
+            ("demo", "boom"): AsyncMock(
+                run=AsyncMock(side_effect=RuntimeError("boom"))
+            ),
         },
         checkpoint_store=checkpoint_store,
         dead_letter_queue=dead_letters,
@@ -297,7 +307,9 @@ async def test_executor_uses_fallback_provider_when_primary_fails() -> None:
     async def runner(provider, request, **kwargs):
         return await provider.run(request)
 
-    result = await executor.execute_run(plan, inputs={"url": "https://example.com"}, runner=runner)
+    result = await executor.execute_run(
+        plan, inputs={"url": "https://example.com"}, runner=runner
+    )
 
     assert result.outcome is RunOutcome.SUCCEEDED
     envelope = result.results["fetch"]
@@ -369,17 +381,28 @@ async def test_executor_records_metadata_and_triggers_compensation() -> None:
     async def runner(provider, request, **kwargs):
         return await provider.run(request)
 
-    result = await executor.execute_run(plan, inputs={"url": "https://example.com"}, runner=runner)
+    result = await executor.execute_run(
+        plan, inputs={"url": "https://example.com"}, runner=runner
+    )
 
     assert result.outcome is RunOutcome.FAILED
     compensation_handler.assert_awaited_once()
-    assert metadata_store.get(MetadataNamespaces.EXECUTION_RUNS, str(result.run_id)) is not None
-    step_record = metadata_store.get(MetadataNamespaces.STEP_RUNS, f"{result.run_id}:primary")
+    assert (
+        metadata_store.get(MetadataNamespaces.EXECUTION_RUNS, str(result.run_id))
+        is not None
+    )
+    step_record = metadata_store.get(
+        MetadataNamespaces.STEP_RUNS, f"{result.run_id}:primary"
+    )
     assert step_record is not None
     assert step_record.payload["state"] == RunOutcome.FAILED.value
-    audit_record = metadata_store.get(MetadataNamespaces.AUDIT_EVENTS, f"{result.run_id}:compensation.triggered")
+    audit_record = metadata_store.get(
+        MetadataNamespaces.AUDIT_EVENTS, f"{result.run_id}:compensation.triggered"
+    )
     assert audit_record is not None
-    terminal_record = metadata_store.get(MetadataNamespaces.TERMINAL_OUTCOMES, str(result.run_id))
+    terminal_record = metadata_store.get(
+        MetadataNamespaces.TERMINAL_OUTCOMES, str(result.run_id)
+    )
     assert terminal_record is not None
     assert terminal_record.payload["outcome"] == RunOutcome.FAILED.value
 
@@ -453,7 +476,9 @@ async def test_executor_can_resume_from_checkpoint() -> None:
     assert latest is not None
     assert latest[0] == "first"
 
-    resumed = await executor.resume_from_checkpoint(plan, run_id=failed.run_id, runner=runner)
+    resumed = await executor.resume_from_checkpoint(
+        plan, run_id=failed.run_id, runner=runner
+    )
     assert resumed.run_id == failed.run_id
     assert resumed.outcome is RunOutcome.SUCCEEDED
     assert resumed.results["second"].payload.value == 2
@@ -529,7 +554,76 @@ async def test_executor_replays_dead_letter_from_checkpoint() -> None:
     assert failed.outcome is RunOutcome.PARTIALLY_SUCCEEDED
     assert dead_letters.get(failed.run_id) is not None
 
-    replayed = await executor.replay_dead_letter(plan, run_id=failed.run_id, runner=runner)
+    replayed = await executor.replay_dead_letter(
+        plan, run_id=failed.run_id, runner=runner
+    )
     assert replayed.run_id == failed.run_id
     assert replayed.outcome is RunOutcome.SUCCEEDED
     assert dead_letters.get(failed.run_id) is None
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("on_error", ["continue", "skip"])
+async def test_on_error_policy_controls_dependent_steps(on_error: str) -> None:
+    registry = ExtensionRegistryManager()
+    registry.register_capability(
+        CapabilityManifest(
+            name="demo",
+            api_version="1.0",
+            request_model=Payload,
+            result_model=Payload,
+            output_ports={"result": Payload},
+        )
+    )
+    registry.register_provider(
+        ProviderManifest(
+            name="demo",
+            capability="demo",
+            capability_api="~=1.0",
+            factory="tests:test",
+        )
+    )
+    pipeline = Pipeline(
+        id=f"error-policy-{on_error}",
+        inputs={"value": "int"},
+        steps=[
+            Step(
+                id="failed",
+                capability="demo",
+                input={"value": "$pipeline.value"},
+                outputs=["result"],
+                on_error=on_error,
+            ),
+            Step(
+                id="dependent",
+                capability="demo",
+                input={"value": "failed.value"},
+                outputs=["result"],
+            ),
+            Step(
+                id="independent",
+                capability="demo",
+                input={"value": "$pipeline.value"},
+                outputs=["result"],
+            ),
+        ],
+    )
+    plan = Planner(registry).plan(pipeline)
+    calls: list[str] = []
+
+    async def runner(provider, request, runner_context=None):
+        step_id = runner_context.step_id
+        calls.append(step_id)
+        if step_id == "failed":
+            raise RuntimeError("boom")
+        return request
+
+    executor = Executor({("demo", "demo"): object()})
+    result = await executor.execute_run(plan, inputs={"value": 1}, runner=runner)
+
+    assert result.outcome is RunOutcome.PARTIALLY_SUCCEEDED
+    assert result.states["failed"] is StepState.FAILED
+    assert result.states["independent"] is StepState.SUCCEEDED
+    assert result.states["dependent"] is StepState.SKIPPED
+    assert calls.count("failed") == 1
+    assert calls.count("independent") == 1
+    assert "dependent" not in calls

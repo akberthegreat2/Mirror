@@ -48,10 +48,16 @@ work, install `mirror-worker-postgres` and `mirror-execution-celery`.
 Core does not import concrete providers. A provider package implements one
 capability contract and is discovered through the published extension API.
 
-That boundary is tested by the architecture test suite and is mandatory for
-future work.
+The Core test suite is independently runnable with only Core dependencies.
+Repository-wide architecture and capability integration tests live under the
+repository-level `tests/` tree and are run from the monorepo root. Both are
+mandatory for release certification.
 
 ## Documentation
+
+Metadata enum values can be restored safely across process boundaries with
+`register_metadata_enum()` during trusted application initialization. Core never
+imports an arbitrary module named by persisted metadata.
 
 The educational Core guide is in `docs/concepts/core.md`. The constitutional
 rules are in `docs/ARCHITECTURE.md`.

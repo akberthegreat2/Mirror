@@ -27,11 +27,15 @@ def test_diff_engine_detects_change() -> None:
 
 @pytest.mark.asyncio
 async def test_diff_step() -> None:
-    result = await diff_step(FakeDiffProvider(), DiffRequest(before="hello", after="hello world"))
+    result = await diff_step(
+        FakeDiffProvider(), DiffRequest(before="hello", after="hello world")
+    )
     assert result.summary.changed is True
 
 
 @pytest.mark.asyncio
 async def test_text_diff_provider() -> None:
-    result = await TextDiffProvider().diff(DiffRequest(before="hello", after="hello world"))
+    result = await TextDiffProvider().diff(
+        DiffRequest(before="hello", after="hello world")
+    )
     assert result.summary.changed is True

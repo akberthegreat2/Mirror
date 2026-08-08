@@ -37,7 +37,11 @@ class MemoryRetrievalProvider(Retriever):
 
         namespace = request.namespace or self._settings.default_namespace
         top_k = request.top_k or self._settings.default_top_k
-        embedding = await self._embedder.embed(EmbeddingRequest(items=[EmbeddingInput(item_id="query", text=request.query)]))
+        embedding = await self._embedder.embed(
+            EmbeddingRequest(
+                items=[EmbeddingInput(item_id="query", text=request.query)]
+            )
+        )
         vector = list(embedding.vectors[0].values)
         query_result = await self._vector_store.query(
             VectorQueryRequest(
@@ -59,7 +63,9 @@ class MemoryRetrievalProvider(Retriever):
                     "record_id": match.record.record_id,
                     "document_id": match.record.document_id,
                     "chunk_id": match.record.chunk_id,
-                    **dict(match.record.metadata.get("provenance", match.record.metadata)),
+                    **dict(
+                        match.record.metadata.get("provenance", match.record.metadata)
+                    ),
                 },
                 score_details={"similarity": match.score},
             )
@@ -97,12 +103,20 @@ def _instantiate(factory: Any, settings: BaseModel | None = None) -> Any:
         return factory() if settings is None else factory(settings)
 
     accepts_settings = "settings" in signature.parameters
-    accepts_var_kwargs = any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in signature.parameters.values())
+    accepts_var_kwargs = any(
+        parameter.kind is inspect.Parameter.VAR_KEYWORD
+        for parameter in signature.parameters.values()
+    )
     if settings is None:
         return factory()
     if accepts_settings or accepts_var_kwargs:
         return factory(settings=settings)
-    positional = [parameter for parameter in signature.parameters.values() if parameter.kind in {inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD}]
+    positional = [
+        parameter
+        for parameter in signature.parameters.values()
+        if parameter.kind
+        in {inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD}
+    ]
     if positional:
         return factory(settings)
     raise TypeError(f"Factory {factory!r} does not accept a settings object")
@@ -119,10 +133,14 @@ def build_provider(settings: RetrievalSettings) -> MemoryRetrievalProvider:
     """Build a retrieval provider from configured first-party dependencies."""
 
     embedder_settings = EmbeddingSettings.model_validate(settings.embedder_settings)
-    vector_store_settings = VectorStoreSettings.model_validate(settings.vector_store_settings)
+    vector_store_settings = VectorStoreSettings.model_validate(
+        settings.vector_store_settings
+    )
     return MemoryRetrievalProvider(
         embedder=_build_dependency(settings.embedder_factory, embedder_settings),
-        vector_store=_build_dependency(settings.vector_store_factory, vector_store_settings),
+        vector_store=_build_dependency(
+            settings.vector_store_factory, vector_store_settings
+        ),
         settings=settings,
     )
 

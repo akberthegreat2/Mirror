@@ -89,7 +89,9 @@ def discover(source: DiscoverySource | None = None) -> DiscoveryResult:
         if desc is None:
             result.errors.append(
                 (
-                    getattr(obj, "extension_id", getattr(obj, "name", type(obj).__name__)),
+                    getattr(
+                        obj, "extension_id", getattr(obj, "name", type(obj).__name__)
+                    ),
                     f"Unknown manifest type: {type(obj).__name__}",
                 )
             )
@@ -99,7 +101,13 @@ def discover(source: DiscoverySource | None = None) -> DiscoveryResult:
     valid, validation_errors = validate_manifests(classified)
     result.errors.extend(validation_errors)
 
-    duplicate_ids = sorted({extension_id for extension_id, message in validation_errors if message.startswith("Duplicate extension ID:")})
+    duplicate_ids = sorted(
+        {
+            extension_id
+            for extension_id, message in validation_errors
+            if message.startswith("Duplicate extension ID:")
+        }
+    )
     for extension_id in duplicate_ids:
         result.duplicates.append(("extension", extension_id, [extension_id]))
 

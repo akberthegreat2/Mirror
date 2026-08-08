@@ -117,3 +117,40 @@ The distributed path was checked against `docs/ARCHITECTURE.md`:
 The remaining external certification gate is a live PostgreSQL/Redis deployment
 test against real services. The repository's CI configuration is prepared to
 run those integration tests when the services are available.
+
+## Final freeze hardening validation — 2026-08-08
+
+The final certification pass made Core independently testable and reconciled
+the in-memory and durable dead-letter contracts. Enum metadata decoding was
+hardened so persisted data cannot trigger arbitrary module imports; trusted
+enums can be registered with `register_metadata_enum()`.
+
+The standalone Core suite passes:
+
+```text
+119 passed
+```
+
+The full monorepo certification suite passes:
+
+```text
+296 passed, 5 skipped
+```
+
+The five skipped tests require external PostgreSQL/Redis services and remain
+explicit integration tests; no infrastructure shims are used.
+
+Ruff passes with the repository rule set:
+
+```text
+All checks passed!
+```
+
+Mypy passes for Core, CLI, PostgreSQL worker, and Celery execution packages:
+
+```text
+Success: no issues found in 53 source files
+```
+
+Repository-wide architecture/capability tests now live under `tests/`, while
+Core-owned tests remain under `packages/mirror_core/tests`.

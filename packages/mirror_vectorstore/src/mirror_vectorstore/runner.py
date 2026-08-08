@@ -24,8 +24,14 @@ async def vectorstore_step(
 
     try:
         if request.mode == VectorStoreMode.UPSERT.value:
-            result = await provider.upsert(VectorUpsertRequest(namespace=request.namespace, records=request.records))
-            return VectorStoreResult(mode=request.mode, namespace=result.namespace, upserted=result.upserted)
+            result = await provider.upsert(
+                VectorUpsertRequest(
+                    namespace=request.namespace, records=request.records
+                )
+            )
+            return VectorStoreResult(
+                mode=request.mode, namespace=result.namespace, upserted=result.upserted
+            )
 
         query_result = await provider.query(
             VectorQueryRequest(

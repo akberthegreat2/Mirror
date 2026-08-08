@@ -38,6 +38,7 @@ from mirror_core.metadata import (
     MetadataRecord,
     MetadataStore,
     SQLiteMetadataStore,
+    register_metadata_enum,
 )
 from mirror_core.middleware import (
     Middleware,
@@ -162,6 +163,7 @@ __all__ = [
     "SQLiteExecutionStore",
     "SQLiteLeaseManager",
     "SQLiteMetadataStore",
+    "register_metadata_enum",
     "SQLiteScheduler",
     "SQLiteWorkerBackend",
     "ScheduleRecord",

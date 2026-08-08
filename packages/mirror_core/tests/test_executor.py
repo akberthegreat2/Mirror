@@ -111,7 +111,9 @@ async def test_executor_does_not_force_keyword_arguments() -> None:
 @pytest.mark.asyncio
 async def test_executor_tracks_only_direct_resource_parents() -> None:
     provider = AsyncMock()
-    provider.fetch = AsyncMock(side_effect=[MockResult(content="a"), MockResult(content="b")])
+    provider.fetch = AsyncMock(
+        side_effect=[MockResult(content="a"), MockResult(content="b")]
+    )
     plan = make_plan(
         Step(
             id="a",
@@ -119,11 +121,15 @@ async def test_executor_tracks_only_direct_resource_parents() -> None:
             input={"url": "$pipeline.url"},
             outputs=["result"],
         ),
-        Step(id="b", capability="fetch", input={"url": "a.content"}, outputs=["result"]),
+        Step(
+            id="b", capability="fetch", input={"url": "a.content"}, outputs=["result"]
+        ),
     )
     executor = Executor({("fetch", "httpx"): provider}, max_concurrency=1)
 
-    result = await executor.execute_run(plan, inputs={"url": "https://example.com"}, runner=runner)
+    result = await executor.execute_run(
+        plan, inputs={"url": "https://example.com"}, runner=runner
+    )
 
     assert result.results["b"].parents == (result.results["a"].resource_id,)
 
@@ -209,7 +215,9 @@ async def test_middleware_can_short_circuit_provider() -> None:
 @pytest.mark.asyncio
 async def test_concurrent_runs_do_not_share_state() -> None:
     provider = AsyncMock()
-    provider.fetch = AsyncMock(side_effect=lambda request: MockResult(content=request.url))
+    provider.fetch = AsyncMock(
+        side_effect=lambda request: MockResult(content=request.url)
+    )
     plan = make_plan(
         Step(
             id="a",
@@ -235,7 +243,9 @@ async def test_step_retry_policy_is_enforced() -> None:
     from mirror_core.pipeline import RetryPolicy
 
     provider = AsyncMock()
-    provider.fetch = AsyncMock(side_effect=[ValueError("temporary"), MockResult(content="recovered")])
+    provider.fetch = AsyncMock(
+        side_effect=[ValueError("temporary"), MockResult(content="recovered")]
+    )
     plan = make_plan(
         Step(
             id="a",
@@ -308,7 +318,9 @@ async def test_cancel_stops_a_running_task() -> None:
         )
     )
     executor = Executor({("fetch", "httpx"): provider})
-    task = asyncio.create_task(executor.execute_run(plan, inputs={"url": "x"}, runner=runner))
+    task = asyncio.create_task(
+        executor.execute_run(plan, inputs={"url": "x"}, runner=runner)
+    )
     await started.wait()
     run_id = next(iter(executor._active_runs))
     executor.cancel(run_id)
@@ -322,7 +334,9 @@ async def test_cancel_stops_a_running_task() -> None:
 @pytest.mark.asyncio
 async def test_abort_after_prior_success_is_partially_succeeded() -> None:
     provider = AsyncMock()
-    provider.fetch = AsyncMock(side_effect=[MockResult(content="ok"), ValueError("boom")])
+    provider.fetch = AsyncMock(
+        side_effect=[MockResult(content="ok"), ValueError("boom")]
+    )
     plan = make_plan(
         Step(
             id="a",
@@ -380,4 +394,6 @@ async def test_resume_rejects_unknown_checkpoint_steps() -> None:
     executor = Executor({("fetch", "httpx"): AsyncMock()}, checkpoint_store=checkpoint)
 
     with pytest.raises(ExecutionError, match="unknown step ids"):
-        await executor.resume_from_checkpoint(plan, run_id=run_id, inputs={"url": "x"}, runner=runner)
+        await executor.resume_from_checkpoint(
+            plan, run_id=run_id, inputs={"url": "x"}, runner=runner
+        )

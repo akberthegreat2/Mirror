@@ -13,6 +13,7 @@ class User(BaseModel):
     profile: dict[str, object]
 
 
+
 def test_literals_and_names() -> None:
     evaluator = ConditionEvaluator()
     assert evaluator.evaluate("true", {}) is True

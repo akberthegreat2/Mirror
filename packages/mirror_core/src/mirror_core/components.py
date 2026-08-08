@@ -19,7 +19,9 @@ from mirror_core.settings import MirrorSettings
 class ComponentManager:
     """Own provider instances selected for one Application runtime."""
 
-    def __init__(self, registry: ExtensionRegistryManager, settings: MirrorSettings) -> None:
+    def __init__(
+        self, registry: ExtensionRegistryManager, settings: MirrorSettings
+    ) -> None:
         self._registry = registry
         self._settings = settings
         self._instances: dict[tuple[str, str], Any] = {}
@@ -36,13 +38,17 @@ class ComponentManager:
         for capability_name in self._settings.components:
             await self.ensure_capability(capability_name, stack)
 
-    async def ensure_capability(self, capability_name: str, stack: AsyncExitStack) -> Any:
+    async def ensure_capability(
+        self, capability_name: str, stack: AsyncExitStack
+    ) -> Any:
         """Ensure one capability provider instance exists, initializing dependencies first."""
         capability = self._registry.resolve_capability(capability_name)
         provider_name = self._select_provider_name(capability_name, capability)
         return await self._ensure_provider(capability_name, provider_name, stack)
 
-    async def ensure_provider(self, capability_name: str, provider_name: str, stack: AsyncExitStack) -> Any:
+    async def ensure_provider(
+        self, capability_name: str, provider_name: str, stack: AsyncExitStack
+    ) -> Any:
         """Ensure one explicit capability/provider pair exists."""
         return await self._ensure_provider(capability_name, provider_name, stack)
 
@@ -58,7 +64,9 @@ class ComponentManager:
             return self._instances[key]
 
         if capability_name in self._initializing:
-            raise ApplicationError(f"Dependency cycle detected while initializing {capability_name!r}")
+            raise ApplicationError(
+                f"Dependency cycle detected while initializing {capability_name!r}"
+            )
 
         self._initializing.add(capability_name)
         try:
@@ -68,18 +76,27 @@ class ComponentManager:
 
             dependency_instances: dict[str, Any] = {}
             for dependency in capability.dependencies:
-                dependency_instance = await self.ensure_capability(dependency.target, stack)
+                dependency_instance = await self.ensure_capability(
+                    dependency.target, stack
+                )
                 dependency_instances[dependency.target] = dependency_instance
 
             factory = import_symbol(provider.factory)
             settings_model = resolve_model(provider.settings_model)
-            raw_settings = self._settings.component_settings.get(capability_name, {}).get(provider.name, {})
+            raw_settings = self._settings.component_settings.get(
+                capability_name, {}
+            ).get(provider.name, {})
             settings_instance = settings_model.model_validate(raw_settings)
-            instance = self._instantiate(factory, settings_instance, dependency_instances)
+            instance = self._instantiate(
+                factory, settings_instance, dependency_instances
+            )
 
             protocol = resolve_type(capability.protocol)
             if protocol is not None and not isinstance(instance, protocol):
-                raise ApplicationError(f"Provider {provider.name!r} does not implement capability protocol {capability.name!r}")
+                raise ApplicationError(
+                    f"Provider {provider.name!r} does not implement capability "
+                    f"protocol {capability.name!r}"
+                )
             if isinstance(instance, AsyncLifecycle):
                 stack.push_async_callback(instance.teardown)
                 await instance.setup()
@@ -103,7 +120,9 @@ class ComponentManager:
                 raise
             return factory(settings_instance)
 
-    def _build_dependency_kwargs(self, factory: Any, dependency_instances: dict[str, Any]) -> dict[str, Any]:
+    def _build_dependency_kwargs(
+        self, factory: Any, dependency_instances: dict[str, Any]
+    ) -> dict[str, Any]:
         target = factory.__init__ if inspect.isclass(factory) else factory
         try:
             hints = get_type_hints(target)
@@ -128,13 +147,17 @@ class ComponentManager:
             }:
                 continue
 
-            dependency = self._match_dependency(parameter.name, hints.get(parameter.name), dependency_instances)
+            dependency = self._match_dependency(
+                parameter.name, hints.get(parameter.name), dependency_instances
+            )
             if dependency is not None:
                 kwargs[parameter.name] = dependency
         return kwargs
 
     @staticmethod
-    def _match_dependency(name: str, hint: Any, dependency_instances: dict[str, Any]) -> Any | None:
+    def _match_dependency(
+        name: str, hint: Any, dependency_instances: dict[str, Any]
+    ) -> Any | None:
         if name in dependency_instances:
             return dependency_instances[name]
 
@@ -145,7 +168,9 @@ class ComponentManager:
         if origin is None:
             candidates = [hint]
         else:
-            candidates = [candidate for candidate in get_args(hint) if candidate is not type(None)]
+            candidates = [
+                candidate for candidate in get_args(hint) if candidate is not type(None)
+            ]
 
         for candidate in candidates:
             candidate_name = getattr(candidate, "__name__", None)
@@ -155,9 +180,13 @@ class ComponentManager:
                     return resolved
         return None
 
-    def _select_provider_name(self, capability_name: str, capability: CapabilityManifest) -> str:
+    def _select_provider_name(
+        self, capability_name: str, capability: CapabilityManifest
+    ) -> str:
         configured = self._settings.components.get(capability_name, {}).get("provider")
-        provider_name = configured if isinstance(configured, str) and configured else None
+        provider_name = (
+            configured if isinstance(configured, str) and configured else None
+        )
         provider = self._registry.resolve_provider(capability, provider_name)
         return provider.name
 
@@ -166,7 +195,9 @@ class ComponentManager:
         try:
             return self._instances[(capability, provider)]
         except KeyError as exc:
-            raise ApplicationError(f"Provider {provider!r} is not initialized for capability {capability!r}") from exc
+            raise ApplicationError(
+                f"Provider {provider!r} is not initialized for capability {capability!r}"
+            ) from exc
 
     def clear(self) -> None:
         """Forget instances after their lifecycle stack has been closed."""

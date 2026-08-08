@@ -76,7 +76,9 @@ class PipelineVersionAdmin(admin.ModelAdmin):
         definition_text = form.cleaned_data.get("definition_text", "")
         payload = definition_text.encode("utf-8")
         if not obj.definition_ref:
-            obj.definition_ref = repo._definition_blob_key(obj.pipeline.project.slug, obj.pipeline.slug, obj.version)
+            obj.definition_ref = repo._definition_blob_key(
+                obj.pipeline.project.slug, obj.pipeline.slug, obj.version
+            )
         repo.blob_store.put_bytes(obj.definition_ref, payload)
         obj.definition_hash = content_hash(payload)
         obj.definition_format = "json"

@@ -24,7 +24,7 @@ format:
 
 test:
 	@echo "=== Running tests ==="
-	@pytest packages/*/tests
+	@pytest
 
 clean:
 	@echo "=== Cleaning ==="

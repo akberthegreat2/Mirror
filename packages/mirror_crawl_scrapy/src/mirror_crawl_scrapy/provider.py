@@ -53,7 +53,9 @@ def _run_scrapy_process(request: CrawlRequest, settings: CrawlSettings) -> Crawl
     return CrawlResult.model_validate(result["result"])
 
 
-def _scrapy_child(request_data: dict[str, Any], settings_data: dict[str, Any], result_queue: Any) -> None:
+def _scrapy_child(
+    request_data: dict[str, Any], settings_data: dict[str, Any], result_queue: Any
+) -> None:
     """Own the Scrapy reactor in a short-lived child process."""
     try:
         import scrapy
@@ -77,7 +79,9 @@ def _scrapy_child(request_data: dict[str, Any], settings_data: dict[str, Any], r
             }
 
             def start_requests(self):
-                yield scrapy.Request(seed, meta={"mirror_depth": 0, "mirror_parent": None})
+                yield scrapy.Request(
+                    seed, meta={"mirror_depth": 0, "mirror_parent": None}
+                )
 
             def parse(self, response):
                 depth = int(response.meta.get("mirror_depth", 0))
@@ -89,7 +93,10 @@ def _scrapy_child(request_data: dict[str, Any], settings_data: dict[str, Any], r
                         "depth": depth,
                         "parent_url": parent,
                         "status_code": response.status,
-                        "content_type": response.headers.get(b"Content-Type", b"").decode("latin1") or None,
+                        "content_type": response.headers.get(
+                            b"Content-Type", b""
+                        ).decode("latin1")
+                        or None,
                         "title": response.css("title::text").get(),
                     }
                 )
@@ -97,7 +104,10 @@ def _scrapy_child(request_data: dict[str, Any], settings_data: dict[str, Any], r
                     return
                 for href in response.css("a::attr(href)").getall():
                     absolute = urljoin(response.url, href)
-                    if request.same_host_only and urlparse(absolute).netloc != seed_host:
+                    if (
+                        request.same_host_only
+                        and urlparse(absolute).netloc != seed_host
+                    ):
                         continue
                     yield scrapy.Request(
                         absolute,

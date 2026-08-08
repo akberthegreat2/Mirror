@@ -37,7 +37,11 @@ class PipelineCompiler:
     ) -> ExecutionPlan:
         """Parse, validate, and compile a declarative pipeline definition."""
         try:
-            pipeline_model = pipeline if isinstance(pipeline, Pipeline) else Pipeline.model_validate(pipeline)
+            pipeline_model = (
+                pipeline
+                if isinstance(pipeline, Pipeline)
+                else Pipeline.model_validate(pipeline)
+            )
         except PydanticValidationError as exc:
             raise PlannerError("Invalid pipeline definition", cause=exc) from exc
         return Planner(

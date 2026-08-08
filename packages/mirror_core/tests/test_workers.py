@@ -24,7 +24,9 @@ async def test_inline_worker_lifecycle() -> None:
     """The inline worker should accept, claim, and finish jobs."""
     worker = InlineWorker()
     await worker.start()
-    job = await worker.submit(WorkerJob(kind="fetch", payload={"url": "https://example.com"}))
+    job = await worker.submit(
+        WorkerJob(kind="fetch", payload={"url": "https://example.com"})
+    )
     claimed = await worker.claim("worker-1")
     assert claimed is not None
     assert claimed.job_id == job.job_id
@@ -74,17 +76,31 @@ def test_in_memory_lease_manager_round_trip() -> None:
     manager.release(renewed)
 
 
-def test_in_memory_dead_letter_queue_round_trip() -> None:
-    """The dead-letter queue should preserve terminal failures in memory."""
+def test_in_memory_dead_letter_queue_round_trip_and_order() -> None:
+    """The in-memory queue should match durable newest-first ordering."""
+    from datetime import datetime, timedelta, timezone
+
     queue = InMemoryDeadLetterQueue()
-    run_id = UUID("00000000-0000-0000-0000-000000000004")
-    record = DeadLetterRecord(
-        run_id=run_id,
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    first = DeadLetterRecord(
+        run_id=UUID("00000000-0000-0000-0000-000000000004"),
         pipeline_id="demo",
         step_id="step-1",
-        reason="boom",
+        reason="first",
         terminal_status="failed",
+        created_at=base,
     )
-    queue.record(record)
-    assert queue.get(run_id) == record
-    assert queue.list() == [record]
+    second = DeadLetterRecord(
+        run_id=UUID("00000000-0000-0000-0000-000000000005"),
+        pipeline_id="demo",
+        step_id="step-2",
+        reason="second",
+        terminal_status="failed",
+        created_at=base + timedelta(seconds=1),
+    )
+    queue.record(first)
+    queue.record(second)
+    assert queue.get(first.run_id) == first
+    assert [record.run_id for record in queue.list()] == [second.run_id, first.run_id]
+    assert queue.replay(second.run_id) == second
+    assert queue.get(second.run_id) is None

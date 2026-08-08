@@ -195,7 +195,9 @@ class ControlPlaneRepository:
             read_only=False,
             metadata=metadata,
         )
-        next_version = (managed.versions.aggregate(Max("version"))["version__max"] or 0) + 1
+        next_version = (
+            managed.versions.aggregate(Max("version"))["version__max"] or 0
+        ) + 1
         blob_key = self._definition_blob_key(project_slug, pipeline_slug, next_version)
         self.blob_store.put_bytes(blob_key, raw)
         version = models.PipelineVersion.objects.create(
@@ -235,7 +237,9 @@ class ControlPlaneRepository:
             read_only=False,
             metadata=metadata,
         )
-        next_version = (managed.versions.aggregate(Max("version"))["version__max"] or 0) + 1
+        next_version = (
+            managed.versions.aggregate(Max("version"))["version__max"] or 0
+        ) + 1
         blob_key = self._definition_blob_key(project_slug, pipeline_slug, next_version)
         self.blob_store.put_bytes(blob_key, definition)
         digest = content_hash(definition)
@@ -272,7 +276,10 @@ class ControlPlaneRepository:
     def pipeline_document(self, pipeline: models.Pipeline) -> dict[str, Any]:
         """Return a JSON-serialisable document for dashboards and APIs."""
 
-        version = pipeline.versions.filter(version=pipeline.current_version_number).first() or pipeline.versions.order_by("-version").first()
+        version = (
+            pipeline.versions.filter(version=pipeline.current_version_number).first()
+            or pipeline.versions.order_by("-version").first()
+        )
         return {
             "project": pipeline.project.slug,
             "slug": pipeline.slug,
@@ -304,7 +311,9 @@ class ControlPlaneRepository:
             "definition_preview": preview,
         }
 
-    def _definition_blob_key(self, project_slug: str, pipeline_slug: str, version: int) -> str:
+    def _definition_blob_key(
+        self, project_slug: str, pipeline_slug: str, version: int
+    ) -> str:
         return f"pipelines/{project_slug}/{pipeline_slug}/v{version}.json"
 
 

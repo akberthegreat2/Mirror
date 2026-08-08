@@ -37,7 +37,9 @@ class LifecycleInfo(BaseModel):
 class Dependency(BaseModel):
     """A dependency on another extension (typically a capability)."""
 
-    model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True, populate_by_name=True)
+    model_config = ConfigDict(
+        frozen=True, arbitrary_types_allowed=True, populate_by_name=True
+    )
 
     target: str = Field(..., alias="name")
     target_kind: ExtensionKind = ExtensionKind.CAPABILITY
@@ -58,11 +60,15 @@ class ExtensionManifest(BaseModel):
 
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    extension_id: str = Field(default="", description="Unique identifier for this extension")
+    extension_id: str = Field(
+        default="", description="Unique identifier for this extension"
+    )
     name: str = Field(..., description="Human-readable name")
     description: str = ""
     version: str = Field("0.1.0", description="Semantic version of this extension")
-    package_name: str | None = Field(None, description="Distribution package name (for diagnostics)")
+    package_name: str | None = Field(
+        None, description="Distribution package name (for diagnostics)"
+    )
     kind: ExtensionKind
 
     api_version: str = Field("1.0", description="API version of the extension contract")
@@ -70,7 +76,9 @@ class ExtensionManifest(BaseModel):
 
     lifecycle: LifecycleInfo = Field(default_factory=LifecycleInfo)
     dependencies: list[Dependency] = Field(default_factory=list)
-    settings_model: Any | str | None = Field(None, description="Settings model object or import path")
+    settings_model: Any | str | None = Field(
+        None, description="Settings model object or import path"
+    )
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -94,9 +102,15 @@ class CapabilityManifest(ExtensionManifest):
     model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
     kind: ExtensionKind = ExtensionKind.CAPABILITY
-    protocol: Any | str | None = Field(None, description="Protocol/interface class or import path")
-    request_model: Any | str | None = Field(None, description="Request model class or import path")
-    result_model: Any | str | None = Field(None, description="Result model class or import path")
+    protocol: Any | str | None = Field(
+        None, description="Protocol/interface class or import path"
+    )
+    request_model: Any | str | None = Field(
+        None, description="Request model class or import path"
+    )
+    result_model: Any | str | None = Field(
+        None, description="Result model class or import path"
+    )
     runner: str | None = Field(None, description="Import path to the runner function")
     input_ports: dict[str, Any | str] = Field(
         default_factory=dict,
@@ -153,7 +167,9 @@ class InterfaceManifest(ExtensionManifest):
     @model_validator(mode="after")
     def default_extension_id(self) -> InterfaceManifest:
         if not self.extension_id:
-            object.__setattr__(self, "extension_id", f"{self.interface_type}:{self.name}")
+            object.__setattr__(
+                self, "extension_id", f"{self.interface_type}:{self.name}"
+            )
         return self
 
 

@@ -30,6 +30,13 @@ requiring an operator to manually run a repair command.
 6. The Docker deployment includes a Beat service so lease reclamation is part
    of the documented distributed deployment rather than an implicit manual
    operation.
+7. Step error policies have distinct semantics: `abort` terminates the run,
+   `continue` preserves independent branches, `skip` skips transitive
+   dependents, and `fallback` is resolved by Core before terminal failure is
+   recorded.
+8. Core owns step retry and timeout policy. Built-in retry/timeout middleware
+   remains an explicit middleware concern and is documented as composable, not
+   as an implicit replacement for Core policy.
 
 ## Consequences
 

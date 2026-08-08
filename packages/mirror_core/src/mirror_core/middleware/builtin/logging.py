@@ -28,7 +28,9 @@ class LoggingSettings(BaseModel):
 class LoggingMiddleware:
     """Log invocation details before and after execution."""
 
-    def __init__(self, settings: LoggingSettings | None = None, /, **overrides: Any) -> None:
+    def __init__(
+        self, settings: LoggingSettings | None = None, /, **overrides: Any
+    ) -> None:
         if settings is None:
             settings = LoggingSettings.model_validate(overrides)
         elif overrides:
@@ -36,7 +38,9 @@ class LoggingMiddleware:
         self.settings = settings
         self.level = getattr(logging, self.settings.level.upper(), logging.DEBUG)
 
-    async def __call__(self, invocation: MiddlewareInvocation, next_middleware: NextMiddleware) -> Any:
+    async def __call__(
+        self, invocation: MiddlewareInvocation, next_middleware: NextMiddleware
+    ) -> Any:
         start = time.monotonic()
         step_id = invocation.step.id
         capability = invocation.step.capability
@@ -47,7 +51,9 @@ class LoggingMiddleware:
             extra={
                 "step_id": step_id,
                 "capability": capability,
-                "invocation_args": invocation.request.model_dump(mode="json") if self.settings.log_args else None,
+                "invocation_args": invocation.request.model_dump(mode="json")
+                if self.settings.log_args
+                else None,
             },
         )
 

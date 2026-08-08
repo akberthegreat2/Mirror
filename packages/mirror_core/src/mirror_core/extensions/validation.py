@@ -38,7 +38,10 @@ def validate_manifests(
             errors.append(
                 (
                     manifest.extension_id,
-                    (f"Duplicate extension ID: {manifest.extension_id} (also defined by {id_map[manifest.extension_id].package_name})"),
+                    (
+                        f"Duplicate extension ID: {manifest.extension_id} "
+                        f"(also defined by {id_map[manifest.extension_id].package_name})"
+                    ),
                 )
             )
             invalid_ids.add(manifest.extension_id)
@@ -92,7 +95,11 @@ def validate_manifests(
             continue
 
         # Capability-specific checks
-        if isinstance(manifest, CapabilityManifest) and manifest.protocol is None and manifest.runner is None:
+        if (
+            isinstance(manifest, CapabilityManifest)
+            and manifest.protocol is None
+            and manifest.runner is None
+        ):
             errors.append(
                 (
                     manifest.extension_id,
@@ -108,7 +115,10 @@ def validate_manifests(
     # 3. Verify provider capability references (only for valid manifests)
     capability_names = {m.name for m in valid if isinstance(m, CapabilityManifest)}
     for manifest in valid:
-        if isinstance(manifest, ProviderManifest) and manifest.capability not in capability_names:
+        if (
+            isinstance(manifest, ProviderManifest)
+            and manifest.capability not in capability_names
+        ):
             errors.append(
                 (
                     manifest.extension_id,

@@ -113,7 +113,11 @@ class ScheduleRecord(BaseModel):
     def is_due(self, now: datetime | None = None) -> bool:
         """Return whether the schedule should be dispatched now."""
         now = _coerce_datetime(now or datetime.now(timezone.utc))
-        return self.state is ScheduleState.SCHEDULED and not self.is_expired(now) and self.effective_due_at() <= now
+        return (
+            self.state is ScheduleState.SCHEDULED
+            and not self.is_expired(now)
+            and self.effective_due_at() <= now
+        )
 
     def next_run(self, now: datetime | None = None) -> datetime | None:
         """Compute the next run time based on trigger metadata."""
@@ -166,7 +170,9 @@ class SchedulerBackend(Protocol):
 
     def due(self, now: datetime | None = None) -> list[ScheduleRecord]: ...
 
-    def mark_run(self, schedule_id: UUID, *, ran_at: datetime | None = None) -> ScheduleRecord: ...
+    def mark_run(
+        self, schedule_id: UUID, *, ran_at: datetime | None = None
+    ) -> ScheduleRecord: ...
 
     def pause(self, schedule_id: UUID) -> ScheduleRecord: ...
 
@@ -196,7 +202,9 @@ class InMemoryScheduler:
             ),
         )
 
-    def mark_run(self, schedule_id: UUID, *, ran_at: datetime | None = None) -> ScheduleRecord:
+    def mark_run(
+        self, schedule_id: UUID, *, ran_at: datetime | None = None
+    ) -> ScheduleRecord:
         record = self._require(schedule_id)
         ran_at = _coerce_datetime(ran_at or datetime.now(timezone.utc))
         updated_base = record.model_copy(update={"last_run_at": ran_at})
@@ -204,7 +212,9 @@ class InMemoryScheduler:
         updated = updated_base.model_copy(
             update={
                 "next_run_at": next_run_at,
-                "state": ScheduleState.DONE if next_run_at is None else ScheduleState.SCHEDULED,
+                "state": ScheduleState.DONE
+                if next_run_at is None
+                else ScheduleState.SCHEDULED,
             }
         )
         self._records[schedule_id] = updated
@@ -226,7 +236,9 @@ class InMemoryScheduler:
     def resume(self, schedule_id: UUID) -> ScheduleRecord:
         record = self._require(schedule_id)
         now = datetime.now(timezone.utc)
-        state = ScheduleState.EXPIRED if record.is_expired(now) else ScheduleState.SCHEDULED
+        state = (
+            ScheduleState.EXPIRED if record.is_expired(now) else ScheduleState.SCHEDULED
+        )
         next_run_at = record.next_run(now)
         if record.trigger.kind is ScheduleTriggerKind.ONCE:
             next_run_at = None
@@ -317,9 +329,15 @@ class SQLiteScheduler:
             """,
             (ScheduleState.SCHEDULED.value, now.isoformat()),
         ).fetchall()
-        return [self._row_to_record(row) for row in rows if self._row_to_record(row).is_due(now)]
+        return [
+            self._row_to_record(row)
+            for row in rows
+            if self._row_to_record(row).is_due(now)
+        ]
 
-    def mark_run(self, schedule_id: UUID, *, ran_at: datetime | None = None) -> ScheduleRecord:
+    def mark_run(
+        self, schedule_id: UUID, *, ran_at: datetime | None = None
+    ) -> ScheduleRecord:
         record = self._require(schedule_id)
         ran_at = _coerce_datetime(ran_at or datetime.now(timezone.utc))
         updated_base = record.model_copy(update={"last_run_at": ran_at})
@@ -327,7 +345,9 @@ class SQLiteScheduler:
         updated = updated_base.model_copy(
             update={
                 "next_run_at": next_run_at,
-                "state": ScheduleState.DONE if next_run_at is None else ScheduleState.SCHEDULED,
+                "state": ScheduleState.DONE
+                if next_run_at is None
+                else ScheduleState.SCHEDULED,
             }
         )
         self.schedule(updated)
@@ -349,7 +369,9 @@ class SQLiteScheduler:
     def resume(self, schedule_id: UUID) -> ScheduleRecord:
         record = self._require(schedule_id)
         now = datetime.now(timezone.utc)
-        state = ScheduleState.EXPIRED if record.is_expired(now) else ScheduleState.SCHEDULED
+        state = (
+            ScheduleState.EXPIRED if record.is_expired(now) else ScheduleState.SCHEDULED
+        )
         next_run_at = record.next_run(now)
         if record.trigger.kind is ScheduleTriggerKind.ONCE:
             next_run_at = None
@@ -365,7 +387,9 @@ class SQLiteScheduler:
         return updated
 
     def list(self) -> list[ScheduleRecord]:
-        rows = self._conn.execute("SELECT * FROM schedules ORDER BY COALESCE(next_run_at, due_at), name, schedule_id").fetchall()
+        rows = self._conn.execute(
+            "SELECT * FROM schedules ORDER BY COALESCE(next_run_at, due_at), name, schedule_id"
+        ).fetchall()
         return [self._row_to_record(row) for row in rows]
 
     def close(self) -> None:
@@ -449,13 +473,23 @@ class SQLiteScheduler:
             interval_seconds=row["interval_seconds"],
             payload=json.loads(row["payload"]),
             state=ScheduleState(row["state"]),
-            last_run_at=_parse_datetime(row["last_run_at"]) if row["last_run_at"] else None,
+            last_run_at=_parse_datetime(row["last_run_at"])
+            if row["last_run_at"]
+            else None,
             trigger=trigger,
-            execution_class=row["execution_class"] if "execution_class" in row else row["queue_name"],
+            execution_class=row["execution_class"]
+            if "execution_class" in row
+            else row["queue_name"],
             queue_name=row["queue_name"],
-            next_run_at=_parse_datetime(row["next_run_at"]) if row["next_run_at"] else None,
-            expires_at=_parse_datetime(row["expires_at"]) if row["expires_at"] else None,
-            disabled_at=_parse_datetime(row["disabled_at"]) if row["disabled_at"] else None,
+            next_run_at=_parse_datetime(row["next_run_at"])
+            if row["next_run_at"]
+            else None,
+            expires_at=_parse_datetime(row["expires_at"])
+            if row["expires_at"]
+            else None,
+            disabled_at=_parse_datetime(row["disabled_at"])
+            if row["disabled_at"]
+            else None,
             paused_at=_parse_datetime(row["paused_at"]) if row["paused_at"] else None,
             max_concurrency=row["max_concurrency"],
             metadata=json.loads(row["metadata"]),
@@ -511,8 +545,12 @@ class SchedulerCoordinator:
                         "state": updated.state.value,
                         "execution_class": updated.execution_class,
                         "queue_name": updated.queue_name,
-                        "last_run_at": updated.last_run_at.isoformat() if updated.last_run_at is not None else None,
-                        "next_run_at": updated.next_run_at.isoformat() if updated.next_run_at is not None else None,
+                        "last_run_at": updated.last_run_at.isoformat()
+                        if updated.last_run_at is not None
+                        else None,
+                        "next_run_at": updated.next_run_at.isoformat()
+                        if updated.next_run_at is not None
+                        else None,
                         "trigger": updated.trigger.model_dump(mode="json"),
                     },
                 )
@@ -532,7 +570,9 @@ class SchedulerCoordinator:
                     "execution_class": stored.execution_class,
                     "queue_name": stored.queue_name,
                     "due_at": stored.due_at.isoformat(),
-                    "next_run_at": stored.next_run_at.isoformat() if stored.next_run_at is not None else None,
+                    "next_run_at": stored.next_run_at.isoformat()
+                    if stored.next_run_at is not None
+                    else None,
                     "trigger": stored.trigger.model_dump(mode="json"),
                 },
             )
@@ -611,7 +651,12 @@ def _next_cron_time(expression: str, *, after: datetime) -> datetime | None:
             weekday_field,
         ) = parts
 
-    if hour_field != "*" or day_field != "*" or month_field != "*" or weekday_field != "*":
+    if (
+        hour_field != "*"
+        or day_field != "*"
+        or month_field != "*"
+        or weekday_field != "*"
+    ):
         return None
 
     after = _coerce_datetime(after).replace(microsecond=0)
@@ -649,7 +694,12 @@ def _next_cron_time(expression: str, *, after: datetime) -> datetime | None:
                 if day_offset == 0 and hour == start.hour and minute < start.minute:
                     continue
                 for second in second_candidates:
-                    if day_offset == 0 and hour == start.hour and minute == start.minute and second < start.second:
+                    if (
+                        day_offset == 0
+                        and hour == start.hour
+                        and minute == start.minute
+                        and second < start.second
+                    ):
                         continue
                     candidate = datetime(
                         day.year,

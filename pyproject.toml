@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 markers = ["integration: requires real external infrastructure"]
 # Discover every package test suite from the monorepo root.
-testpaths = ["packages"]
+testpaths = ["packages", "tests"]
 python_files = "test_*.py"
 asyncio_mode = "auto"
 addopts = "--import-mode=importlib"

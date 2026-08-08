@@ -42,6 +42,7 @@ contracts.
 - ADR-0038 executor internal decomposition
 - ADR-0039 beta certification and interface projection
 - ADR-0040 lease reclamation and durable-store certification
+- ADR-0041 core test isolation and safe metadata decoding
 
 ## Future drafts
 

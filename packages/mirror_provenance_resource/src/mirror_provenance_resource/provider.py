@@ -21,7 +21,8 @@ class ResourceProvenanceProvider(Provenancer):
         envelopes = [
             ResourceEnvelope.create(
                 resource_type=item.resource_type,
-                schema_version=item.schema_version or self._settings.default_schema_version,
+                schema_version=item.schema_version
+                or self._settings.default_schema_version,
                 payload=item.payload,
                 producer=item.producer,
                 parents=item.parents,

@@ -141,10 +141,14 @@ async def test_rotates_before_writing_record_that_exceeds_segment_limit(
 
 @pytest.mark.asyncio
 async def test_serializes_concurrent_writes(tmp_path: Path) -> None:
-    provider = StubWARCProvider(WARCSettings(output_dir=tmp_path, compress=False, max_records=100))
+    provider = StubWARCProvider(
+        WARCSettings(output_dir=tmp_path, compress=False, max_records=100)
+    )
     await provider.setup()
 
-    results = await asyncio.gather(*(provider.archive(request(str(i).encode())) for i in range(20)))
+    results = await asyncio.gather(
+        *(provider.archive(request(str(i).encode())) for i in range(20))
+    )
 
     writer = FakeWARCWriter.instances[-1]
     assert len(writer.written) == 20

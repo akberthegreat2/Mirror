@@ -174,11 +174,22 @@ short orientation and setup guide.
 
 ## Verification
 
-Run the full suite:
+Run the Core suite independently from the monorepo integration suite:
+
+```bash
+cd packages/mirror_core
+pip install -e .
+pytest
+```
+
+Run the full repository suite (including architecture and capability integration tests)
+from the repository root:
 
 ```bash
 pytest
 ```
+
+The standalone Core suite currently passes 119 tests. The full repository certification suite currently passes 296 tests with 5 external-service tests skipped when PostgreSQL/Redis are unavailable.
 
 For PostgreSQL integration tests, provide a disposable real PostgreSQL DSN:
 

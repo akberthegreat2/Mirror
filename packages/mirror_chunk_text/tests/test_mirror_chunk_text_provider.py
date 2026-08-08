@@ -13,7 +13,9 @@ async def test_text_chunk_provider_chunks_with_overlap() -> None:
     """Provider should produce stable overlap-aware chunks."""
 
     provider_impl = TextChunkProvider(ChunkSettings(chunk_size=3, chunk_overlap=1))
-    request = ChunkRequest(documents=[ChunkDocument(document_id="doc-1", text="one two three four five")])
+    request = ChunkRequest(
+        documents=[ChunkDocument(document_id="doc-1", text="one two three four five")]
+    )
 
     result = await provider_impl.chunk(request)
 

@@ -60,7 +60,9 @@ async def test_same_pipeline_can_swap_fetch_providers(
             timestamp="2026-08-03T00:00:00+00:00",
         )
 
-    async def playwright_fetch(self: PlaywrightProvider, request: FetchRequest) -> FetchResult:
+    async def playwright_fetch(
+        self: PlaywrightProvider, request: FetchRequest
+    ) -> FetchResult:
         return FetchResult(
             url=str(request.url),
             status_code=200,
@@ -109,7 +111,9 @@ async def test_same_pipeline_can_swap_fetch_providers(
         )
         await app.start()
         try:
-            result = await app.run_pipeline_detailed(pipeline, inputs={"url": "https://example.com"})
+            result = await app.run_pipeline_detailed(
+                pipeline, inputs={"url": "https://example.com"}
+            )
         finally:
             await app.shutdown()
         assert result.outcome.value == "succeeded"
@@ -127,7 +131,9 @@ async def test_retry_middleware_is_constructed_through_application(
 
     attempts = 0
 
-    async def flaky_httpx_fetch(self: HTTPXProvider, request: FetchRequest) -> FetchResult:
+    async def flaky_httpx_fetch(
+        self: HTTPXProvider, request: FetchRequest
+    ) -> FetchResult:
         nonlocal attempts
         attempts += 1
         if attempts == 1:
@@ -169,7 +175,9 @@ async def test_retry_middleware_is_constructed_through_application(
     )
     await app.start()
     try:
-        result = await app.run_pipeline_detailed(pipeline, inputs={"url": "https://example.com"})
+        result = await app.run_pipeline_detailed(
+            pipeline, inputs={"url": "https://example.com"}
+        )
     finally:
         await app.shutdown()
 

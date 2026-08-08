@@ -30,16 +30,26 @@ class FakeClient:
     def __init__(self, pages: dict[str, FakeResponse]) -> None:
         self.pages = pages
 
-    async def get(self, url: str, *, headers: dict[str, str] | None = None) -> FakeResponse:
+    async def get(
+        self, url: str, *, headers: dict[str, str] | None = None
+    ) -> FakeResponse:
         return self.pages[url]
 
 
 @pytest.mark.asyncio
 async def test_memory_monitor_provider_works() -> None:
     monitor = ContentMonitor(
-        client=FakeClient({"https://example.com": FakeResponse("https://example.com", "<html>a</html>")}),
+        client=FakeClient(
+            {
+                "https://example.com": FakeResponse(
+                    "https://example.com", "<html>a</html>"
+                )
+            }
+        ),
         state_store=MemoryMonitorStateStore(),
     )
-    result = await MemoryMonitorProvider(monitor).check(MonitorRequest(url="https://example.com"))
+    result = await MemoryMonitorProvider(monitor).check(
+        MonitorRequest(url="https://example.com")
+    )
     assert isinstance(result, MonitorResult)
     assert result.snapshot.url == "https://example.com"

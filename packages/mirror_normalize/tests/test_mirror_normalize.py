@@ -21,7 +21,13 @@ from pydantic import ValidationError
 def test_normalization_models_validate_and_default() -> None:
     """Normalization models should validate and preserve metadata."""
 
-    request = NormalizationRequest(documents=[NormalizationDocument(document_id="doc-1", text="  Hello  ", metadata={"source": "test"})])
+    request = NormalizationRequest(
+        documents=[
+            NormalizationDocument(
+                document_id="doc-1", text="  Hello  ", metadata={"source": "test"}
+            )
+        ]
+    )
     assert request.documents[0].document_id == "doc-1"
     assert request.documents[0].metadata == {"source": "test"}
 
@@ -46,7 +52,9 @@ async def test_normalize_step_success() -> None:
     """The runner should delegate to the provider."""
 
     provider = AsyncMock()
-    request = NormalizationRequest(documents=[NormalizationDocument(document_id="doc-1", text="Hello world")])
+    request = NormalizationRequest(
+        documents=[NormalizationDocument(document_id="doc-1", text="Hello world")]
+    )
     expected = NormalizationResult(
         documents=[
             NormalizedDocument(
@@ -70,7 +78,9 @@ async def test_normalize_step_wraps_unknown_error() -> None:
 
     provider = AsyncMock()
     provider.normalize.side_effect = ValueError("boom")
-    request = NormalizationRequest(documents=[NormalizationDocument(document_id="doc-1", text="Hello world")])
+    request = NormalizationRequest(
+        documents=[NormalizationDocument(document_id="doc-1", text="Hello world")]
+    )
 
     with pytest.raises(NormalizationError) as excinfo:
         await normalize_step(provider, request)

@@ -74,7 +74,9 @@ class ExecutionContext(BaseModel):
         return dict(value)
 
     @field_serializer("results")
-    def _serialize_results(self, value: Mapping[str, ResourceEnvelope]) -> dict[str, ResourceEnvelope]:
+    def _serialize_results(
+        self, value: Mapping[str, ResourceEnvelope]
+    ) -> dict[str, ResourceEnvelope]:
         return dict(value)
 
     @field_serializer("metadata")

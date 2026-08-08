@@ -29,7 +29,9 @@ class RulesComplianceProvider(ComplianceChecker):
         """Evaluate a batch of documents against policy rules."""
 
         rules = self._merge_rules(request.rules)
-        assessments = [self._check_document(document, rules) for document in request.documents]
+        assessments = [
+            self._check_document(document, rules) for document in request.documents
+        ]
         compliant = all(assessment.compliant for assessment in assessments)
         passed_count = sum(1 for assessment in assessments if assessment.compliant)
         failed_count = len(assessments) - passed_count
@@ -64,7 +66,9 @@ class RulesComplianceProvider(ComplianceChecker):
             merged.append(defaults)
         return merged
 
-    def _check_document(self, document: ComplianceDocument, rules: list[ComplianceRule]) -> ComplianceAssessment:
+    def _check_document(
+        self, document: ComplianceDocument, rules: list[ComplianceRule]
+    ) -> ComplianceAssessment:
         """Evaluate a single document against every rule."""
 
         findings = [self._evaluate_rule(document, rule) for rule in rules]
@@ -75,11 +79,18 @@ class RulesComplianceProvider(ComplianceChecker):
             findings=findings,
         )
 
-    def _evaluate_rule(self, document: ComplianceDocument, rule: ComplianceRule) -> ComplianceFinding:
+    def _evaluate_rule(
+        self, document: ComplianceDocument, rule: ComplianceRule
+    ) -> ComplianceFinding:
         """Evaluate one document against one rule."""
 
-        normalized_text = document.text if rule.case_sensitive else document.text.casefold()
-        normalized_terms = tuple(term if rule.case_sensitive else term.casefold() for term in rule.forbidden_terms)
+        normalized_text = (
+            document.text if rule.case_sensitive else document.text.casefold()
+        )
+        normalized_terms = tuple(
+            term if rule.case_sensitive else term.casefold()
+            for term in rule.forbidden_terms
+        )
         words = TOKEN_RE.findall(normalized_text)
         unique_words = len(set(words))
         metadata_keys = set(document.metadata)
@@ -106,7 +117,9 @@ class RulesComplianceProvider(ComplianceChecker):
                     "minimum": rule.min_unique_words,
                 },
             )
-        missing_keys = [key for key in rule.required_metadata_keys if key not in metadata_keys]
+        missing_keys = [
+            key for key in rule.required_metadata_keys if key not in metadata_keys
+        ]
         if missing_keys:
             return ComplianceFinding(
                 rule_id=rule.rule_id,
@@ -115,7 +128,9 @@ class RulesComplianceProvider(ComplianceChecker):
                 message="Document is missing required metadata keys.",
                 details={"missing_keys": missing_keys},
             )
-        forbidden_hits = [term for term in normalized_terms if term and term in normalized_text]
+        forbidden_hits = [
+            term for term in normalized_terms if term and term in normalized_text
+        ]
         if forbidden_hits:
             return ComplianceFinding(
                 rule_id=rule.rule_id,

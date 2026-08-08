@@ -7,9 +7,9 @@ records go here, while large binary payloads stay in :mod:`mirror_core.storage`.
 
 from __future__ import annotations
 
-import importlib
 import json
 import sqlite3
+import sys
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from enum import Enum
@@ -19,6 +19,23 @@ from typing import Any, Protocol, runtime_checkable
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer
+
+_REGISTERED_METADATA_ENUMS: dict[str, type[Enum]] = {}
+
+
+def register_metadata_enum(enum_type: type[Enum]) -> type[Enum]:
+    """Register an enum for safe durable metadata rehydration.
+
+    Metadata decoding never imports an arbitrary module named by persisted
+    data. Applications that need enum identity after a fresh process starts
+    should register the enum during trusted application initialization.
+    Already-loaded enum modules are also supported for compatibility.
+    """
+    if not isinstance(enum_type, type) or not issubclass(enum_type, Enum):
+        raise TypeError("enum_type must be an Enum subclass")
+    key = f"{enum_type.__module__}:{enum_type.__qualname__}"
+    _REGISTERED_METADATA_ENUMS[key] = enum_type
+    return enum_type
 
 
 class MetadataNamespaces:
@@ -346,7 +363,9 @@ class SQLiteMetadataStore:
 
     def list(self, namespace: str | None = None) -> list[MetadataRecord]:
         if namespace is None:
-            rows = self._conn.execute("SELECT namespace, key, payload, created_at FROM metadata ORDER BY namespace, key").fetchall()
+            rows = self._conn.execute(
+                "SELECT namespace, key, payload, created_at FROM metadata ORDER BY namespace, key"
+            ).fetchall()
         else:
             rows = self._conn.execute(
                 """
@@ -453,18 +472,25 @@ def _decode_metadata_value(value: Any) -> Any:
         if marker == "path" and _METADATA_VALUE in value:
             return Path(value[_METADATA_VALUE])
         if marker == "enum" and _METADATA_VALUE in value and _METADATA_ENUM in value:
-            try:
-                module_name, _, class_name = value[_METADATA_ENUM].rpartition(":")
-                enum_type = getattr(importlib.import_module(module_name), class_name)
-                if isinstance(enum_type, type) and issubclass(enum_type, Enum):
+            enum_reference = value[_METADATA_ENUM]
+            enum_type = _REGISTERED_METADATA_ENUMS.get(enum_reference)
+            if enum_type is None:
+                module_name, _, class_name = enum_reference.rpartition(":")
+                module = sys.modules.get(module_name)
+                if module is not None:
+                    candidate: Any = module
+                    try:
+                        for part in class_name.split("."):
+                            candidate = getattr(candidate, part)
+                    except AttributeError:
+                        candidate = None
+                    if isinstance(candidate, type) and issubclass(candidate, Enum):
+                        enum_type = candidate
+            if enum_type is not None:
+                try:
                     return enum_type(value[_METADATA_VALUE])
-            except (
-                ImportError,
-                AttributeError,
-                TypeError,
-                ValueError,
-            ):  # pragma: no cover
-                return value[_METADATA_VALUE]
+                except ValueError:
+                    return value[_METADATA_VALUE]
             return value[_METADATA_VALUE]
         return {key: _decode_metadata_value(item) for key, item in value.items()}
     return value
@@ -494,5 +520,6 @@ __all__ = [
     "MetadataStore",
     "SQLiteMetadataStore",
     "decode_metadata_value",
+    "register_metadata_enum",
     "encode_metadata_value",
 ]

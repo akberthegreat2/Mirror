@@ -14,7 +14,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class PipelineVersionSerializer(serializers.ModelSerializer):
-    definition_text = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    definition_text = serializers.CharField(
+        write_only=True, required=False, allow_blank=True
+    )
     definition_preview = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -49,10 +51,16 @@ class PipelineVersionSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         definition_text = validated_data.pop("definition_text", "")
         if not definition_text:
-            raise serializers.ValidationError({"definition_text": "A pipeline version definition is required."})
+            raise serializers.ValidationError(
+                {"definition_text": "A pipeline version definition is required."}
+            )
         pipeline = validated_data["pipeline"]
         if pipeline.is_read_only:
-            raise serializers.ValidationError({"pipeline": "Code-defined pipelines are read-only; materialize a managed pipeline first."})
+            raise serializers.ValidationError(
+                {
+                    "pipeline": "Code-defined pipelines are read-only; materialize a managed pipeline first."
+                }
+            )
         repo = ControlPlaneRepository()
         payload = definition_text.encode("utf-8")
         try:
@@ -71,7 +79,9 @@ class PipelineVersionSerializer(serializers.ModelSerializer):
         return instance
 
     def update(self, instance, validated_data):
-        raise serializers.ValidationError("Pipeline versions are immutable; create a new version instead.")
+        raise serializers.ValidationError(
+            "Pipeline versions are immutable; create a new version instead."
+        )
 
 
 class PipelineSerializer(serializers.ModelSerializer):

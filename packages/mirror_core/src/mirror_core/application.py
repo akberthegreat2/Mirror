@@ -112,9 +112,17 @@ class Application:
     def compile_pipeline(self, pipeline: Pipeline) -> Any:
         """Compile a pipeline through the canonical planner without executing it."""
         if not self._started:
-            raise ApplicationError("Application must be started before compiling pipelines")
-        defaults = {capability: str(config["provider"]) for capability, config in self.settings.components.items() if "provider" in config}
-        return PipelineCompiler(self._registry, default_providers=defaults).compile(pipeline)
+            raise ApplicationError(
+                "Application must be started before compiling pipelines"
+            )
+        defaults = {
+            capability: str(config["provider"])
+            for capability, config in self.settings.components.items()
+            if "provider" in config
+        }
+        return PipelineCompiler(self._registry, default_providers=defaults).compile(
+            pipeline
+        )
 
     async def run_pipeline(
         self,
@@ -134,8 +142,14 @@ class Application:
     ) -> ExecutionResult:
         """Compile and execute a pipeline and return its terminal run state."""
         if not self._started or self._executor is None:
-            raise ApplicationError("Application must be started before running pipelines")
-        defaults = {capability: str(config["provider"]) for capability, config in self.settings.components.items() if "provider" in config}
+            raise ApplicationError(
+                "Application must be started before running pipelines"
+            )
+        defaults = {
+            capability: str(config["provider"])
+            for capability, config in self.settings.components.items()
+            if "provider" in config
+        }
         plan = PipelineCompiler(
             self._registry,
             default_providers=defaults,
@@ -160,7 +174,9 @@ class Application:
         payload = job.payload
         pipeline_data = payload.get("pipeline")
         if pipeline_data is None:
-            raise ApplicationError("Distributed execution job is missing a pipeline definition")
+            raise ApplicationError(
+                "Distributed execution job is missing a pipeline definition"
+            )
         inputs = payload.get("inputs", {})
         if not isinstance(inputs, dict):
             raise ApplicationError("Distributed execution job inputs must be an object")
@@ -168,11 +184,33 @@ class Application:
         expected_fingerprint = payload.get("config_fingerprint")
         provider_selections = payload.get("provider_selections", {})
         if isinstance(provider_selections, dict) and provider_selections:
-            pipeline = pipeline.model_copy(update={"steps": [step.model_copy(update={"provider": provider_selections.get(step.id, step.provider)}) for step in pipeline.steps]})
+            pipeline = pipeline.model_copy(
+                update={
+                    "steps": [
+                        step.model_copy(
+                            update={
+                                "provider": provider_selections.get(
+                                    step.id, step.provider
+                                )
+                            }
+                        )
+                        for step in pipeline.steps
+                    ]
+                }
+            )
         plan = self.compile_pipeline(pipeline)
-        if expected_fingerprint is not None and plan.config_fingerprint != expected_fingerprint:
-            raise ApplicationError("Distributed job plan fingerprint does not match the worker compilation")
-        return await self._executor.execute_run(plan, inputs=inputs) if self._executor is not None else await self.run_pipeline_detailed(pipeline, inputs=inputs)
+        if (
+            expected_fingerprint is not None
+            and plan.config_fingerprint != expected_fingerprint
+        ):
+            raise ApplicationError(
+                "Distributed job plan fingerprint does not match the worker compilation"
+            )
+        return (
+            await self._executor.execute_run(plan, inputs=inputs)
+            if self._executor is not None
+            else await self.run_pipeline_detailed(pipeline, inputs=inputs)
+        )
 
     async def shutdown(self) -> None:
         """Cancel active runs and release every owned resource once."""
@@ -202,7 +240,9 @@ class Application:
         for interface in result.interfaces:
             self._registry.register(interface)
 
-    async def _build_middleware_chains(self, stack: AsyncExitStack) -> dict[str, MiddlewareChain]:
+    async def _build_middleware_chains(
+        self, stack: AsyncExitStack
+    ) -> dict[str, MiddlewareChain]:
         capability_names = list(self.settings.components)
         requested_names = set(self.settings.global_middleware)
         for capability in capability_names:
@@ -211,7 +251,9 @@ class Application:
         if not requested_names or not capability_names:
             return {}
 
-        configs = {name: self._registry.get_middleware(name) for name in requested_names}
+        configs = {
+            name: self._registry.get_middleware(name) for name in requested_names
+        }
         instances: dict[str, Middleware] = {}
         for name in self._order_middleware(list(configs.values())):
             config = configs[name.name]
@@ -226,13 +268,23 @@ class Application:
 
         middleware_chains: dict[str, MiddlewareChain] = {}
         for capability in capability_names:
-            names = list(dict.fromkeys(self.settings.global_middleware + self.settings.middleware.get(capability, [])))
+            names = list(
+                dict.fromkeys(
+                    self.settings.global_middleware
+                    + self.settings.middleware.get(capability, [])
+                )
+            )
             ordered_configs = [configs[name] for name in names if name in configs]
             ordered = self._order_middleware(ordered_configs)
             chain_instances = []
             for config in ordered:
-                if config.applies_to is not None and capability not in config.applies_to:
-                    raise ApplicationError(f"Middleware {config.name!r} does not apply to capability {capability!r}")
+                if (
+                    config.applies_to is not None
+                    and capability not in config.applies_to
+                ):
+                    raise ApplicationError(
+                        f"Middleware {config.name!r} does not apply to capability {capability!r}"
+                    )
                 chain_instances.append(instances[config.name])
             if chain_instances:
                 middleware_chains[capability] = MiddlewareChain(chain_instances)
@@ -255,9 +307,15 @@ class Application:
         ordered: list[MiddlewareManifest] = []
         remaining = set(by_name)
         while remaining:
-            ready = [name for name in remaining if not dependencies[name].intersection(remaining)]
+            ready = [
+                name
+                for name in remaining
+                if not dependencies[name].intersection(remaining)
+            ]
             if not ready:
-                raise ApplicationError("Middleware ordering constraints contain a cycle")
+                raise ApplicationError(
+                    "Middleware ordering constraints contain a cycle"
+                )
             ready.sort(key=lambda name: (-by_name[name].priority, name))
             for name in ready:
                 ordered.append(by_name[name])

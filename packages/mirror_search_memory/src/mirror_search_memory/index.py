@@ -33,7 +33,9 @@ class MemorySearchIndex:
             "metadata": dict(metadata or {}),
         }
         self._documents[document_id] = record
-        for token in set(_tokenize(text) + _tokenize(title or "") + _tokenize(url or "")):
+        for token in set(
+            _tokenize(text) + _tokenize(title or "") + _tokenize(url or "")
+        ):
             self._inverted[token].add(document_id)
 
     def search(self, query: str, *, limit: int = 10) -> list[SearchHit]:
@@ -61,11 +63,15 @@ class MemorySearchIndex:
 class OpenSearchIndex:
     """Optional OpenSearch adapter for enterprise deployments."""
 
-    def __init__(self, *, hosts: Sequence[str], index_name: str = "mirror-documents") -> None:
+    def __init__(
+        self, *, hosts: Sequence[str], index_name: str = "mirror-documents"
+    ) -> None:
         try:
             from opensearchpy import OpenSearch  # type: ignore
         except Exception as exc:  # pragma: no cover - optional dependency
-            raise ImportError("opensearchpy is not installed; install the 'opensearch-py' package to use OpenSearchIndex") from exc
+            raise ImportError(
+                "opensearchpy is not installed; install the 'opensearch-py' package to use OpenSearchIndex"
+            ) from exc
         self._client = OpenSearch(hosts=list(hosts))
         self._index_name = index_name
 
@@ -84,7 +90,9 @@ class OpenSearchIndex:
             "url": url,
             "metadata": dict(metadata or {}),
         }
-        self._client.index(index=self._index_name, id=document_id, body=body, refresh=True)
+        self._client.index(
+            index=self._index_name, id=document_id, body=body, refresh=True
+        )
 
     def search(self, query: str, *, limit: int = 10) -> list[SearchHit]:
         response = self._client.search(
@@ -124,7 +132,9 @@ def _snippet(text: str, tokens: Sequence[str], *, width: int = 24) -> str | None
     if not text or not tokens:
         return text[:120] if text else None
     lowered = text.lower()
-    best_index = min((lowered.find(token) for token in tokens if token in lowered), default=-1)
+    best_index = min(
+        (lowered.find(token) for token in tokens if token in lowered), default=-1
+    )
     if best_index < 0:
         return text[:120]
     start = max(0, best_index - 40)

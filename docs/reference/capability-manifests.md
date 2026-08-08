@@ -55,7 +55,7 @@ optional consumers of the Core catalog rather than dependencies of Core.
 
 ## Certification
 
-`packages/mirror_core/tests/test_ecosystem_manifests.py` verifies that every
+`tests/integration/test_ecosystem_manifests.py` verifies that every
 capability entry point resolves to a real `CapabilityManifest`, every provider
 entry point resolves to a `ProviderManifest` when its optional dependencies are
 available, and the three shipped interfaces publish `InterfaceManifest`

@@ -22,7 +22,9 @@ async def test_dedup_step_success() -> None:
     """The runner should delegate to the provider."""
 
     provider = AsyncMock()
-    request = DedupRequest(documents=[DedupDocument(document_id="doc-1", text="Mirror")])
+    request = DedupRequest(
+        documents=[DedupDocument(document_id="doc-1", text="Mirror")]
+    )
     expected = DedupResult(
         documents=[
             DeduplicatedDocument(
@@ -49,7 +51,9 @@ async def test_dedup_step_wraps_unknown_error() -> None:
 
     provider = AsyncMock()
     provider.dedup.side_effect = ValueError("boom")
-    request = DedupRequest(documents=[DedupDocument(document_id="doc-1", text="Mirror")])
+    request = DedupRequest(
+        documents=[DedupDocument(document_id="doc-1", text="Mirror")]
+    )
 
     with pytest.raises(DedupError) as excinfo:
         await dedup_step(provider, request)

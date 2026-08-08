@@ -34,7 +34,9 @@ class FakeClient:
     def __init__(self, pages: dict[str, FakeResponse]) -> None:
         self.pages = pages
 
-    async def get(self, url: str, *, headers: dict[str, str] | None = None) -> FakeResponse:
+    async def get(
+        self, url: str, *, headers: dict[str, str] | None = None
+    ) -> FakeResponse:
         return self.pages[url]
 
 
@@ -57,7 +59,13 @@ def test_capability_descriptor() -> None:
 @pytest.mark.asyncio
 async def test_content_monitor_tracks_state() -> None:
     monitor = ContentMonitor(
-        client=FakeClient({"https://example.com": FakeResponse("https://example.com", "<html>a</html>")}),
+        client=FakeClient(
+            {
+                "https://example.com": FakeResponse(
+                    "https://example.com", "<html>a</html>"
+                )
+            }
+        ),
         state_store=MemoryMonitorStateStore(),
     )
     snapshot = await monitor.check("https://example.com")
@@ -69,18 +77,34 @@ async def test_content_monitor_tracks_state() -> None:
 @pytest.mark.asyncio
 async def test_monitor_step() -> None:
     monitor = ContentMonitor(
-        client=FakeClient({"https://example.com": FakeResponse("https://example.com", "<html>a</html>")}),
+        client=FakeClient(
+            {
+                "https://example.com": FakeResponse(
+                    "https://example.com", "<html>a</html>"
+                )
+            }
+        ),
         state_store=MemoryMonitorStateStore(),
     )
-    result = await monitor_step(FakeMonitorProvider(monitor), MonitorRequest(url="https://example.com"))
+    result = await monitor_step(
+        FakeMonitorProvider(monitor), MonitorRequest(url="https://example.com")
+    )
     assert result.snapshot.url == "https://example.com"
 
 
 @pytest.mark.asyncio
 async def test_memory_monitor_provider() -> None:
     monitor = ContentMonitor(
-        client=FakeClient({"https://example.com": FakeResponse("https://example.com", "<html>a</html>")}),
+        client=FakeClient(
+            {
+                "https://example.com": FakeResponse(
+                    "https://example.com", "<html>a</html>"
+                )
+            }
+        ),
         state_store=MemoryMonitorStateStore(),
     )
-    result = await MemoryMonitorProvider(monitor).check(MonitorRequest(url="https://example.com"))
+    result = await MemoryMonitorProvider(monitor).check(
+        MonitorRequest(url="https://example.com")
+    )
     assert result.snapshot.url == "https://example.com"

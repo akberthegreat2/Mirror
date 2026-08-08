@@ -14,7 +14,7 @@ from mirror_core.extensions.models import (
     ProviderManifest,
 )
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _entry_points(group: str) -> list[tuple[str, str, Path]]:
@@ -39,7 +39,9 @@ def test_every_shipped_capability_publishes_a_manifest() -> None:
     assert entries, "No capability entry points were found"
     for name, target, package in entries:
         manifest = _load_target(target)
-        assert isinstance(manifest, CapabilityManifest), f"{package.name}:{name} must expose CapabilityManifest"
+        assert isinstance(manifest, CapabilityManifest), (
+            f"{package.name}:{name} must expose CapabilityManifest"
+        )
         assert manifest.name
         assert manifest.api_version
         assert manifest.extension_id
@@ -57,14 +59,19 @@ def test_every_shipped_provider_publishes_a_manifest() -> None:
         except ImportError as exc:
             optional_failures.append(f"{package.name}:{name}: {exc}")
             continue
-        assert isinstance(manifest, ProviderManifest), f"{package.name}:{name} must expose ProviderManifest"
+        assert isinstance(manifest, ProviderManifest), (
+            f"{package.name}:{name} must expose ProviderManifest"
+        )
         assert manifest.name
         assert manifest.extension_id
         assert manifest.capability
         assert manifest.capability_api
         assert manifest.factory
     if optional_failures:
-        pytest.skip("Optional provider dependencies unavailable: " + "; ".join(optional_failures))
+        pytest.skip(
+            "Optional provider dependencies unavailable: "
+            + "; ".join(optional_failures)
+        )
 
 
 def test_all_control_plane_interfaces_publish_manifests() -> None:

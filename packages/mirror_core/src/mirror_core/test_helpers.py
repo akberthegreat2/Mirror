@@ -66,7 +66,9 @@ def capability_manifest(
         protocol=_type_path(protocol),
         runner=runner,
         input_ports={port: _type_path(tp) for port, tp in (input_ports or {}).items()},
-        output_ports={port: _type_path(tp) for port, tp in (output_ports or {}).items()},
+        output_ports={
+            port: _type_path(tp) for port, tp in (output_ports or {}).items()
+        },
         dependencies=dependencies or [],
         metadata=meta,
     )

@@ -25,10 +25,14 @@ class TextNormalizationProvider(Normalizer):
     async def normalize(self, request: NormalizationRequest) -> NormalizationResult:
         """Normalize a batch of documents."""
 
-        documents = [self._normalize_document(document) for document in request.documents]
+        documents = [
+            self._normalize_document(document) for document in request.documents
+        ]
         return NormalizationResult(documents=documents)
 
-    def _normalize_document(self, document: NormalizationDocument) -> NormalizedDocument:
+    def _normalize_document(
+        self, document: NormalizationDocument
+    ) -> NormalizedDocument:
         normalized = unicodedata.normalize(self._settings.unicode_form, document.text)
         normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
         if self._settings.lowercase:

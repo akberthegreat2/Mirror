@@ -55,7 +55,9 @@ class SQLiteMonitorStateStore:
 
     def get(self, url: str) -> str | None:
         with self._connect() as conn:
-            row = conn.execute("SELECT digest FROM monitor_state WHERE url = ?", (url,)).fetchone()
+            row = conn.execute(
+                "SELECT digest FROM monitor_state WHERE url = ?", (url,)
+            ).fetchone()
         return row[0] if row else None
 
     def set(self, url: str, digest: str) -> None:

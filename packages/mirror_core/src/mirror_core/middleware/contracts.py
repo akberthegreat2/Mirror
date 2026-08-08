@@ -13,4 +13,6 @@ NextMiddleware = Callable[[MiddlewareInvocation], Awaitable[Any]]
 class Middleware(Protocol):
     """Protocol for middleware components."""
 
-    async def __call__(self, invocation: MiddlewareInvocation, next: NextMiddleware) -> Any: ...
+    async def __call__(
+        self, invocation: MiddlewareInvocation, next: NextMiddleware
+    ) -> Any: ...

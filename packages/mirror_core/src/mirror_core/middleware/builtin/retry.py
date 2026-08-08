@@ -45,9 +45,13 @@ class RetryMiddleware:
         elif overrides:
             settings = settings.model_copy(update=overrides)
         self.settings = settings
-        self.retryable_exceptions = self._resolve_retryable_exceptions(self.settings.retryable_exception_names)
+        self.retryable_exceptions = self._resolve_retryable_exceptions(
+            self.settings.retryable_exception_names
+        )
 
-    async def __call__(self, invocation: MiddlewareInvocation, next_middleware: NextMiddleware) -> Any:
+    async def __call__(
+        self, invocation: MiddlewareInvocation, next_middleware: NextMiddleware
+    ) -> Any:
         last_exception: Exception | None = None
         attempt = 0
 
@@ -59,14 +63,20 @@ class RetryMiddleware:
                 raise
             except Exception as exc:
                 last_exception = exc
-                if self.retryable_exceptions is not None and not any(isinstance(exc, exc_type) for exc_type in self.retryable_exceptions):
+                if self.retryable_exceptions is not None and not any(
+                    isinstance(exc, exc_type) for exc_type in self.retryable_exceptions
+                ):
                     raise
                 if attempt >= self.settings.max_attempts:
                     raise
-                delay = self.settings.base_delay * (self.settings.backoff_factor ** (attempt - 1))
+                delay = self.settings.base_delay * (
+                    self.settings.backoff_factor ** (attempt - 1)
+                )
                 delay = min(delay, self.settings.max_delay)
                 if self.settings.jitter > 0:
-                    jitter_amount = random.uniform(-self.settings.jitter * delay, self.settings.jitter * delay)
+                    jitter_amount = random.uniform(
+                        -self.settings.jitter * delay, self.settings.jitter * delay
+                    )
                     delay = max(0.0, delay + jitter_amount)
                 await asyncio.sleep(delay)
 

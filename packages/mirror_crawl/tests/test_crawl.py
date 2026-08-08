@@ -39,11 +39,21 @@ class _FakeFetchProvider:
 @asynccontextmanager
 async def _local_http_server() -> Callable[[str], str]:
     pages = {
-        "/": ('<html><head><title>Home</title></head><body><a href="/about">About</a></body></html>'),
-        "/about": ('<html><head><title>About</title></head><body><a href="/">Home</a></body></html>'),
+        "/": (
+            "<html><head><title>Home</title></head><body>"
+            '<a href="/about">About</a>'
+            "</body></html>"
+        ),
+        "/about": (
+            "<html><head><title>About</title></head><body>"
+            '<a href="/">Home</a>'
+            "</body></html>"
+        ),
     }
 
-    async def handler(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handler(
+        reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         request_line = await reader.readline()
         path = request_line.decode("ascii", errors="ignore").split(" ")[1]
         while True:
@@ -52,7 +62,13 @@ async def _local_http_server() -> Callable[[str], str]:
                 break
         body = pages.get(path, "<html><body>missing</body></html>")
         payload = body.encode("utf-8")
-        writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n" + f"Content-Length: {len(payload)}\r\n".encode("ascii") + b"Connection: close\r\n\r\n" + payload)
+        writer.write(
+            b"HTTP/1.1 200 OK\r\n"
+            b"Content-Type: text/html; charset=utf-8\r\n"
+            + f"Content-Length: {len(payload)}\r\n".encode("ascii")
+            + b"Connection: close\r\n\r\n"
+            + payload
+        )
         await writer.drain()
         writer.close()
         await writer.wait_closed()
@@ -103,12 +119,22 @@ async def test_crawl_persists_discovered_urls() -> None:
     provider = LocalCrawlProvider(
         fetch=_FakeFetchProvider(
             {
-                "https://example.com/": ('<html><head><title>Home</title></head><body><a href="/about">About</a></body></html>'),
-                "https://example.com/about": ('<html><head><title>About</title></head><body><a href="/">Home</a></body></html>'),
+                "https://example.com/": (
+                    "<html><head><title>Home</title></head><body>"
+                    '<a href="/about">About</a>'
+                    "</body></html>"
+                ),
+                "https://example.com/about": (
+                    "<html><head><title>About</title></head><body>"
+                    '<a href="/">Home</a>'
+                    "</body></html>"
+                ),
             }
         )
     )
-    result = await provider.crawl(CrawlRequest(url="https://example.com", max_depth=1, max_pages=5))
+    result = await provider.crawl(
+        CrawlRequest(url="https://example.com", max_depth=1, max_pages=5)
+    )
     assert result.visited_urls[0] in {"https://example.com", "https://example.com/"}
     assert result.discovered_urls
 
@@ -123,7 +149,9 @@ async def test_crawl_runner_adapts_provider() -> None:
             }
         )
     )
-    result = await crawl_site(provider, CrawlRequest(url="https://example.com", max_depth=1, max_pages=5))
+    result = await crawl_site(
+        provider, CrawlRequest(url="https://example.com", max_depth=1, max_pages=5)
+    )
     assert result.visited_urls
 
 
@@ -133,10 +161,14 @@ async def test_crawl_using_real_local_provider() -> None:
         provider = LocalCrawlProvider(
             fetch=_FakeFetchProvider(
                 {
-                    url_for("/"): "<html><body><a href='/about'>About</a></body></html>",
+                    url_for(
+                        "/"
+                    ): "<html><body><a href='/about'>About</a></body></html>",
                     url_for("/about"): "<html><body>About</body></html>",
                 }
             )
         )
-        result = await provider.crawl(CrawlRequest(url=url_for("/"), max_depth=1, max_pages=5))
+        result = await provider.crawl(
+            CrawlRequest(url=url_for("/"), max_depth=1, max_pages=5)
+        )
         assert result.visited_urls

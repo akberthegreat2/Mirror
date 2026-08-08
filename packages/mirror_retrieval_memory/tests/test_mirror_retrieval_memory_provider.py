@@ -85,7 +85,9 @@ async def test_memory_retrieval_provider_ranks_relevant_documents() -> None:
     ]
     records: list[VectorRecord] = []
     for doc_id, text in documents:
-        embedding = await embedder.embed(EmbeddingRequest(items=[EmbeddingInput(item_id=doc_id, text=text)]))
+        embedding = await embedder.embed(
+            EmbeddingRequest(items=[EmbeddingInput(item_id=doc_id, text=text)])
+        )
         records.append(
             VectorRecord(
                 record_id=f"{doc_id}:0",
@@ -170,7 +172,9 @@ async def test_memory_retrieval_provider_exposes_provenance() -> None:
     embedder = HashEmbeddingProvider()
     store = MemoryVectorStoreProvider()
     text = "Mirror stores knowledge with provenance."
-    embedding = await embedder.embed(EmbeddingRequest(items=[EmbeddingInput(item_id="doc-1", text=text)]))
+    embedding = await embedder.embed(
+        EmbeddingRequest(items=[EmbeddingInput(item_id="doc-1", text=text)])
+    )
     record = VectorRecord(
         record_id="doc-1:0",
         vector=embedding.vectors[0].values,
