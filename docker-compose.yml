@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: mirror
+      POSTGRES_USER: mirror
+      POSTGRES_PASSWORD: mirror
+    ports:
+      - "5432:5432"
+    volumes:
+      - mirror-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mirror -d mirror"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  worker:
+    build: .
+    environment:
+      MIRROR_POSTGRES_DSN: postgresql://mirror:mirror@postgres:5432/mirror
+      MIRROR_CELERY_BROKER_URL: redis://redis:6379/0
+      MIRROR_WORKER_ID: mirror-worker-default
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["--execution-class", "default", "--loglevel", "INFO"]
+
+volumes:
+  mirror-postgres:

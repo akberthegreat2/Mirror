@@ -1,154 +1,188 @@
 # Mirror
 
-Mirror is a Python framework for building capability-driven products.
+Mirror is a capability-driven Python framework for building **fetching,
+crawling, scraping, archiving, monitoring, and knowledge workflows** without
+turning the framework kernel into a collection of vendor-specific tools.
 
-It helps you:
-- crawl and fetch content;
-- archive pages, responses, and blobs;
-- monitor changes over time;
-- normalize, chunk, embed, store, and retrieve knowledge;
-- run recurring work with workers and a scheduler;
-- build control-plane tooling and product interfaces around the same kernel.
+The important idea is simple:
 
-Mirror is open-source-first and vendor-neutral.
-Core never depends on proprietary AI vendors or SaaS services.
-If a provider exists for a closed service, it is optional and external.
-Preferred defaults in the documentation use self-hostable and open-source providers such as Ollama, sentence-transformers, Qdrant, pgvector, Camoufox, Tesseract, PyMuPDF, and similar packages.
-
-## What Mirror can do today
-
-Mirror already ships a real kernel and a working ecosystem:
-
-- a capability-agnostic core runtime;
-- installable capabilities such as fetch, archive, crawl, search, analyze, scrape, diff, monitor, normalize, enrich, chunk, dedup, embedding, provenance, compliance, retrieval, and vector storage;
-- replaceable providers for those capabilities;
-- middleware, signals, metadata storage, scheduling, workers, and lifecycle management in Core;
-- a trusted execution pipeline that compiles a DAG into an execution plan;
-- a manifest-driven extension model in Core;
-- a knowledge-infrastructure slice that can normalize text, chunk documents, embed content, store vectors, and retrieve matches;
-- install, import, and contract smoke tests that prove the packages fit together.
-
-## How Mirror works
-
-Mirror follows a simple algorithm:
-
-1. You describe work as a capability pipeline or use one of the shipped commands and scaffold templates.
-2. Mirror discovers the available capability, provider, middleware, worker, and storage packages.
-3. The planner validates the graph, selects providers, and compiles an execution plan.
-4. The executor runs only the compiled plan.
-5. Middleware observes, annotates, short-circuits, retries, or measures the run.
-6. Workers, storage, and metadata backends record progress and results.
-7. Signals report what happened without controlling the run.
-
-That is the whole shape of the kernel.
-
-## Ways to use Mirror
-
-### 1) Use the CLI
-
-The CLI is the fastest way to try Mirror:
-
-```bash
-pip install -e .[dev]
-mirror startproject demo
-cd demo
-mirror doctor
-mirror startapp monitor
-mirror worker --backend sqlite
+```text
+You choose a capability
+        ↓
+Core discovers and validates it
+        ↓
+Planner chooses the provider
+        ↓
+Executor runs the compiled plan
+        ↓
+Worker runs it inline or distributed
 ```
 
-The CLI is useful when you want the scaffold, diagnostics, or a runnable local project without building everything yourself.
+Mirror does **not** invent replacement implementations for every domain. A
+capability contract belongs to Mirror; a concrete provider belongs in its own
+package and can wrap an established project such as HTTPX, Scrapy, Playwright,
+WARC tooling, or another compatible backend.
 
-### 2) Use the scaffold project
+## Quick start
 
-`mirror startproject` creates a real project layout, including:
+For local development:
 
-- `manage.py`
-- app folders
-- settings
-- tests
-- docs
+```bash
+python -m pip install -e packages/mirror_core
+python -m pip install -e packages/mirror_fetch
+python -m pip install -e packages/mirror_fetch_httpx
+```
 
-This is the path for a new Mirror-powered app or service.
+Then use the Core application with the capability/provider you installed.
+Provider selection is explicit and is part of the compiled execution plan.
 
-### 3) Use Mirror inside a custom project
+## Distributed development
 
-If you already have a Python project, Mirror can be added as a kernel plus a set of packages:
+Mirror can run work through **Celery + Redis**, while **PostgreSQL** stores the
+durable worker state.
 
-- Core for execution and orchestration;
-- capabilities for domain contracts;
-- providers for concrete behavior;
-- optional interface packages for CLI, API, admin, or dashboards.
+```text
+                 Mirror Core
+                     │
+              Scheduler / Planner
+                     │
+              PostgreSQL WorkerBackend
+                     │
+             dispatch execution ID
+                     │
+                  Celery
+                     │
+                   Redis
+                     │
+             Generic Mirror Worker
+                     │
+                 Core Executor
+                     │
+              Capability Provider
+```
 
-This is the path for teams that already have an application and want Mirror as the workflow engine behind it.
+Start the development stack:
 
-### 4) Use Mirror in a single script or prototype
+```bash
+docker compose up --build
+```
 
-For experiments, you can wire a minimal stack in one file:
+The compose file starts:
 
-- load the core;
-- choose one capability;
-- select one provider;
-- run a plan;
-- inspect the returned resources.
+- PostgreSQL 18 — durable execution state;
+- Redis 8 — Celery broker;
+- Mirror Celery worker — generic execution worker.
 
-That path is useful for proofs of concept, tests, and demos.
+Useful commands:
 
-## Current package families
+```bash
+docker compose ps
+docker compose logs -f worker
+docker compose down
+docker compose down -v
+```
 
-Mirror currently includes families for:
+The worker does **not** have a `crawl worker`, `fetch worker`, or `scrape
+worker`. Workers consume execution classes such as `default`, `io`, `cpu`, and
+`gpu`. Capability identity stays in the compiled Mirror plan.
 
-- fetch and archive;
-- crawl and monitoring;
-- search, analyze, scrape, and diff;
-- normalization, enrichment, chunking, deduplication, embeddings, provenance, retrieval, compliance, and vector storage;
-- workers, metadata, scheduler, and storage;
-- CLI and testing helpers.
+## What is durable?
 
-The exact package list lives in the reference docs.
+PostgreSQL is the source of truth for distributed execution:
 
-## Future direction
+- jobs and execution state;
+- leases;
+- checkpoints;
+- execution history;
+- metadata;
+- artifacts;
+- dead letters.
 
-Mirror is growing into a broader capability kernel, but the roadmap is still controlled.
+Redis is deliberately **not** durable state. It is used by Celery as the broker
+and may disappear without becoming the source of truth.
 
-Near-term work focuses on:
+Celery also does not own Mirror retry semantics. Retry, timeout, cancellation,
+fallback, middleware, and execution policy remain Core responsibilities.
 
-- extension-system migration audit;
-- Docker Compose development stack;
-- Redis and Celery worker backends;
-- PostgreSQL metadata store;
-- install smoke tests;
-- import smoke tests;
-- discovery smoke tests;
-- contract smoke tests;
-- lab certification tests;
-- control-plane cleanup;
-- better developer experience.
+## Capabilities and providers
 
-The longer-term ecosystem includes open-source-first plugins for OCR, PDF, stealth, proxy management, RPA, document parsing, vector search, and knowledge workflows.
+A **capability** is a domain contract. A **provider** is a concrete implementation.
+They are separate packages and can be replaced without changing Core.
 
-Far-future ideas are tracked in the ecosystem catalog and future docs rather than being promised as core features.
+| Capability family | Current provider packages in this repository |
+|---|---|
+| Fetch | `mirror-fetch-httpx`, `mirror-fetch-playwright` |
+| Crawl | `mirror-crawl-scrapy` (Scrapy) + `mirror-crawl-local` (local/reference) |
+| Archive | `mirror-archive-warc` |
+| Scrape | `mirror-scrape-basic` |
+| Search | `mirror-search-memory` |
+| Analyze | `mirror-analyze-basic` |
+| Diff | `mirror-diff-text` |
+| Monitor | `mirror-monitor-memory` |
+| Normalize | `mirror-normalize-text` |
+| Enrich | `mirror-enrich-text` |
+| Chunk | `mirror-chunk-text` |
+| Dedup | `mirror-dedup-hash` |
+| Embedding | `mirror-embedding-hash` |
+| Retrieval | `mirror-retrieval-memory` |
+| Vector store | `mirror-vectorstore-memory` |
+| Provenance | `mirror-provenance-resource` |
+| Compliance | `mirror-compliance-rules` |
 
-## Docs map
+This table describes the repository as it exists; it is **not** a promise that
+all providers are production-grade or that a memory/local provider should be
+used for production. The capability and provider READMEs are the authoritative
+package-level references.
+
+## Package boundaries
+
+The repository deliberately separates:
+
+- `mirror-core` — framework kernel and contracts;
+- `mirror-*` capability packages — domain contracts;
+- provider packages such as `mirror-fetch-httpx` — concrete implementations;
+- `mirror-worker-postgres` — durable worker/storage implementation;
+- `mirror-execution-celery` — Celery execution mechanism;
+- `mirror-control-django` — reusable Django control plane and admin surface;
+- `mirror-control-api` — REST control-plane package built on the same catalog;
+- `mirror-cli` — command-line interface;
+- `mirror-testing` — testing helpers.
+
+Core must not import provider implementations. Providers must not create a
+second framework runtime.
+
+## Documentation
+
+Start here:
 
 - `docs/ARCHITECTURE.md` — the constitutional architecture contract.
-- `docs/ROADMAP.md` — current phases and delivery gates.
-- `docs/FUTURE.md` — deferred work and long-term direction.
-- `docs/ecosystem/` — current and future capability catalog.
-- `docs/testing/` — smoke tests, lab certification, and reference test sites.
-- `docs/adr/` — architecture decision records.
-- `docs/PRs/` — implementation phase notes.
-- `docs/reference/` — package and command references.
-- `docs/tutorials/` — step-by-step guides.
-- `docs/concepts/` — framework concepts.
-- `CONTRIBUTING.md` — contributor workflow and quality requirements.
+- `docs/getting-started/` — installation and first-use guides.
+- `docs/concepts/` — capabilities, providers, plans, executions, and workers.
+- `docs/tutorials/` — practical workflows.
+- `docs/distributed/` — Redis, Celery, PostgreSQL, Docker, recovery, and worker operations.
+- `docs/capabilities/` — capability-by-capability educational reference.
+- `docs/reference/` — package and command reference.
+- `docs/adr/` — architectural decisions; these are not tutorials.
+- `docs/PRs/` — implementation phase notes; these are not user documentation.
+
+The next documentation phase expands every capability and Core package into
+PyPI-style educational reference pages. The README intentionally remains a
+short orientation and setup guide.
 
 ## Verification
 
-Run the test suite from the repository root:
+Run the full suite:
 
 ```bash
 pytest
 ```
 
-Mirror also ships install and import smoke tests so every package can prove that it installs, imports, and registers cleanly before it reaches beta.
+For PostgreSQL integration tests, provide a disposable real PostgreSQL DSN:
+
+```bash
+export MIRROR_TEST_POSTGRES_DSN='postgresql://mirror:mirror@localhost:5432/mirror_test'
+pytest -m integration
+```
+
+Redis/Celery integration tests use a real Redis broker when the local service is
+available. No Redis or PostgreSQL shim is part of Mirror.

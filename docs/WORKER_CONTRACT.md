@@ -5,34 +5,42 @@ and stores results.
 
 ## Core contracts
 
-- `WorkerBackend` — the queue/lease transport.
-- `ExecutionStore` — where completed runs are recorded.
-- `CheckpointStore` — where resumable step state is saved.
-- `ArtifactStore` — where large files and blobs are stored.
-- `LeaseManager` — how one worker keeps exclusive access to a job.
+- `WorkerBackend` — durable queue/lease lifecycle.
+- `ExecutionStore` — completed execution metadata.
+- `CheckpointStore` — resumable step state.
+- `ArtifactStore` — large or binary artifacts.
+- `LeaseManager` — exclusive ownership of one job.
 
-## What the local runtime supports today
+A worker job has an **execution class**. Classes describe infrastructure
+requirements, not capabilities. Typical classes are `default`, `io`, `cpu`, and
+`gpu`.
 
-Mirror ships two local worker backends:
+## Distributed boundary
 
-- `InlineWorker` for tests and single-process development.
-- `SQLiteWorkerBackend` for durable local workflows.
+Mirror currently provides:
 
-These backends are intentionally small, but they are real. They let the test
-suite and the command line exercise the same lifecycle that a distributed queue
-will later use: submit, claim, heartbeat, complete, fail.
+- `InlineWorker` for tests and single-process development;
+- `SQLiteWorkerBackend` for durable local workflows;
+- `PostgresWorkerBackend` in `mirror-worker-postgres` for distributed durability;
+- `Celery` in `mirror-execution-celery` as the execution mechanism;
+- Redis as Celery's broker.
 
-## Why the contract exists
+The worker transport never owns retry, timeout, fallback, cancellation, or
+capability selection. Those remain Core semantics.
 
-The worker contract keeps the runtime honest. A future Redis or Celery adapter
-can plug in without changing how the application talks to workers.
+## Claiming
+
+Workers claim one job exclusively. PostgreSQL uses transactional row locking
+with `FOR UPDATE SKIP LOCKED` and a lease expiry. A dead worker therefore does
+not permanently own work.
+
+## Recovery
+
+A job is persisted before it is published to Celery. If a worker dies after
+claiming it, the lease expires and the job becomes claimable again. Redis is not
+the source of truth.
 
 ## Future adapters
 
-Later phases may add:
-
-- Redis-backed queues
-- remote worker pools
-- multi-host lease coordination
-- cluster scheduling
-- SaaS worker orchestration
+Other execution mechanisms may implement the same contract, for example Ray or
+Kubernetes, without changing capability packages or Core execution semantics.

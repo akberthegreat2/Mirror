@@ -19,6 +19,8 @@ from mirror_core.extensions.models import MiddlewareManifest
 from mirror_core.extensions.registry import ExtensionRegistryManager
 from mirror_core.imports import import_symbol, resolve_model
 from mirror_core.lifecycle import AsyncLifecycle
+from mirror_core.metadata import MetadataStore
+from mirror_core.workers import CheckpointStore, DeadLetterQueue, WorkerJob
 from mirror_core.middleware import Middleware, MiddlewareChain
 from mirror_core.pipeline import Pipeline
 from mirror_core.resource import ResourceEnvelope
@@ -35,6 +37,9 @@ class Application:
         self,
         settings: MirrorSettings | None = None,
         discovery_source: DiscoverySource | None = None,
+        metadata_store: MetadataStore | None = None,
+        checkpoint_store: CheckpointStore | None = None,
+        dead_letter_queue: DeadLetterQueue | None = None,
     ) -> None:
         self.settings = settings or MirrorSettings()
         self._discovery_source = discovery_source
@@ -43,6 +48,9 @@ class Application:
         self._signal_bus = SignalBus()
         self._executor: Executor | None = None
         self._component_manager = ComponentManager(self._registry, self.settings)
+        self._metadata_store = metadata_store
+        self._checkpoint_store = checkpoint_store
+        self._dead_letter_queue = dead_letter_queue
         self._lifecycle_stack: AsyncExitStack | None = None
         self._started = False
 
@@ -89,6 +97,9 @@ class Application:
                 max_concurrency=self.settings.max_concurrency,
                 signal_bus=self._signal_bus,
                 middleware_chains=middleware_chains,
+                checkpoint_store=self._checkpoint_store,
+                dead_letter_queue=self._dead_letter_queue,
+                metadata_store=self._metadata_store,
             )
             self._lifecycle_stack = stack.pop_all()
             self._started = True
@@ -97,6 +108,17 @@ class Application:
             await stack.aclose()
             self._reset_runtime_state()
             raise
+
+    def compile_pipeline(self, pipeline: Pipeline) -> Any:
+        """Compile a pipeline through the canonical planner without executing it."""
+        if not self._started:
+            raise ApplicationError("Application must be started before compiling pipelines")
+        defaults = {
+            capability: str(config["provider"])
+            for capability, config in self.settings.components.items()
+            if "provider" in config
+        }
+        return PipelineCompiler(self._registry, default_providers=defaults).compile(pipeline)
 
     async def run_pipeline(
         self,
@@ -137,6 +159,37 @@ class Application:
                 self._lifecycle_stack,
             )
         return await self._executor.execute_run(plan, inputs=inputs or {})
+
+    async def execute_worker_job(self, job: WorkerJob) -> ExecutionResult:
+        """Execute a serialized pipeline job through the canonical core runtime.
+
+        The worker transport never executes capabilities directly. It hands the
+        job back to Core, which validates the pipeline, resolves providers, and
+        runs the normal Executor.
+        """
+        payload = job.payload
+        pipeline_data = payload.get("pipeline")
+        if pipeline_data is None:
+            raise ApplicationError("Distributed execution job is missing a pipeline definition")
+        inputs = payload.get("inputs", {})
+        if not isinstance(inputs, dict):
+            raise ApplicationError("Distributed execution job inputs must be an object")
+        pipeline = Pipeline.model_validate(pipeline_data)
+        expected_fingerprint = payload.get("config_fingerprint")
+        provider_selections = payload.get("provider_selections", {})
+        if isinstance(provider_selections, dict) and provider_selections:
+            pipeline = pipeline.model_copy(
+                update={
+                    "steps": [
+                        step.model_copy(update={"provider": provider_selections.get(step.id, step.provider)})
+                        for step in pipeline.steps
+                    ]
+                }
+            )
+        plan = self.compile_pipeline(pipeline)
+        if expected_fingerprint is not None and plan.config_fingerprint != expected_fingerprint:
+            raise ApplicationError("Distributed job plan fingerprint does not match the worker compilation")
+        return await self._executor.execute_run(plan, inputs=inputs) if self._executor is not None else await self.run_pipeline_detailed(pipeline, inputs=inputs)
 
     async def shutdown(self) -> None:
         """Cancel active runs and release every owned resource once."""

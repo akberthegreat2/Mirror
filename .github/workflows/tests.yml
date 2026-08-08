@@ -1,0 +1,56 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: mirror_test
+          POSTGRES_USER: mirror
+          POSTGRES_PASSWORD: mirror
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mirror -d mirror_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install project packages
+        run: |
+          python -m pip install --upgrade pip
+          for pkg in packages/*/; do
+            if [ -f "$pkg/pyproject.toml" ]; then python -m pip install -e "$pkg"; fi
+          done
+      - name: Run full test suite
+        env:
+          MIRROR_TEST_POSTGRES_DSN: postgresql://mirror:mirror@localhost:5432/mirror_test
+          MIRROR_TEST_REDIS_URL: redis://localhost:6379/0
+        run: pytest -q
+      - name: Run live integration suite
+        env:
+          MIRROR_TEST_POSTGRES_DSN: postgresql://mirror:mirror@localhost:5432/mirror_test
+          MIRROR_TEST_REDIS_URL: redis://localhost:6379/0
+        run: pytest -q -m integration

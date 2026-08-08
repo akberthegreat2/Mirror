@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mirror-control-api"
+version = "0.1.0"
+description = "Mirror REST API control-plane app"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Mirror Contributors"}]
+requires-python = ">=3.10"
+dependencies = [
+    "mirror-control-django>=0.1.0",
+    "djangorestframework>=3.18",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7.0"]
+dev = ["ruff>=0.1.0", "mypy>=1.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mirror_control_api*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+addopts = "--import-mode=importlib"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+explicit_package_bases = true
+mypy_path = ["src"]
+plugins = ["pydantic.mypy"]

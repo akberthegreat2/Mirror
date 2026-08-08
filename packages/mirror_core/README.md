@@ -1,21 +1,57 @@
 # mirror-core
 
-`mirror-core` is the capability-agnostic kernel of Mirror. It provides extension manifests, immutable registries, a trusted pipeline compiler, isolated execution runs, middleware composition, signals, typed resource envelopes, deterministic settings, transactional application lifecycle, and a dedicated metadata contract in `mirror_core.metadata`.
+`mirror-core` is Mirror's framework kernel.
 
-Blob storage remains in `mirror_core.storage`, while metadata storage is exposed through `mirror_core.metadata` and re-exported from `mirror_core.storage` for compatibility.
+It is intentionally **capability-agnostic**. Core knows how to discover,
+validate, compile, schedule, execute, and observe work. It does not know how to
+crawl a website, call HTTPX, parse a WARC, search a database, or run an AI model.
+Those behaviors belong to capability/provider packages.
 
-It intentionally contains no Fetch, Archive, HTTP, HTML, WARC, CLI, or other domain implementation.
+## Install
 
-## Runtime contract
-
-```python
-plan = PipelineCompiler(registry, default_providers={"fetch": "httpx"}).compile(pipeline)
-result = await executor.execute_run(
-    plan,
-    inputs={"url": "https://example.com"},
-)
+```bash
+pip install mirror-core
 ```
 
-`Pipeline.inputs` declares accepted input names. Actual values are supplied at execution time.
+## Core flow
 
-See the repository `ARCHITECTURE.md` and `docs/implementation/core-hardening-phase-1.md` for ownership and lifecycle guarantees.
+```text
+Pipeline
+  ↓
+PipelineCompiler
+  ↓
+ExecutionPlan
+  ↓
+Executor
+  ↓
+Capability + Provider
+  ↓
+ResourceEnvelope
+```
+
+For local work, use `InlineWorker` or `SQLiteWorkerBackend`. For distributed
+work, install `mirror-worker-postgres` and `mirror-execution-celery`.
+
+## What Core owns
+
+- extension discovery and validation;
+- settings and lifecycle;
+- pipeline planning and compilation;
+- execution state and runtime contexts;
+- retry, timeout, fallback, and cancellation semantics;
+- middleware and signals;
+- scheduling and worker contracts;
+- metadata, checkpoint, artifact, and dead-letter contracts.
+
+## What Core does not own
+
+Core does not import concrete providers. A provider package implements one
+capability contract and is discovered through the published extension API.
+
+That boundary is tested by the architecture test suite and is mandatory for
+future work.
+
+## Documentation
+
+The educational Core guide is in `docs/concepts/core.md`. The constitutional
+rules are in `docs/ARCHITECTURE.md`.

@@ -467,6 +467,16 @@ def _decode_metadata_value(value: Any) -> Any:
     return value
 
 
+def encode_metadata_value(value: Any) -> Any:
+    """Encode a metadata value into JSON-compatible durable data."""
+    return _encode_metadata_value(value)
+
+
+def decode_metadata_value(value: Any) -> Any:
+    """Decode durable metadata data back into Python values."""
+    return _decode_metadata_value(value)
+
+
 def _parse_datetime(value: str) -> datetime:
     parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is None:
@@ -479,5 +489,7 @@ __all__ = [
     "MetadataNamespaces",
     "MetadataRecord",
     "MetadataStore",
+    "encode_metadata_value",
+    "decode_metadata_value",
     "SQLiteMetadataStore",
 ]

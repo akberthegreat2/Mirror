@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Mirror Control Plane</title>
+  <style>body{font-family:system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem} .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem} .card{border:1px solid #ddd;border-radius:12px;padding:1rem} code{background:#f6f6f6;padding:.1rem .3rem;border-radius:4px}</style>
+</head>
+<body>
+  <h1>Mirror Control Plane</h1>
+  <p>Manages projects, pipelines, versions, executions, workers, schedules, URLs, archives, checkpoints, and dead letters.</p>
+  <div class="grid">
+    <div class="card"><strong>Projects</strong><div>{{ projects }}</div></div>
+    <div class="card"><strong>Pipelines</strong><div>{{ pipelines }}</div></div>
+    <div class="card"><strong>Runs</strong><div>{{ runs }}</div></div>
+    <div class="card"><strong>Workers</strong><div>{{ workers }}</div></div>
+    <div class="card"><strong>Dead Letters</strong><div>{{ dead_letters }}</div></div>
+  </div>
+  <h2>Catalog</h2>
+  <ul>
+    {% for entity in manifest.entities %}
+      <li><strong>{{ entity.label }}</strong> — {{ entity.description }}<br><code>{{ entity.operations|join:", " }}</code></li>
+    {% endfor %}
+  </ul>
+</body>
+</html>

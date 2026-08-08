@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections import deque
 from collections.abc import Mapping
 from types import MappingProxyType
@@ -130,7 +131,19 @@ class Planner:
             )
             for step in pipeline.steps
         }
-        fingerprint = hashlib.sha256(pipeline.model_dump_json().encode()).hexdigest()
+        fingerprint_payload = pipeline.model_dump(mode="json")
+        fingerprint_payload["resolved_providers"] = {
+            step_id: {
+                "capability": compiled.capability.name,
+                "capability_version": compiled.capability.api_version,
+                "provider": compiled.provider.name,
+                "provider_version": compiled.provider.metadata.get("version"),
+            }
+            for step_id, compiled in compiled_steps.items()
+        }
+        fingerprint = hashlib.sha256(
+            json.dumps(fingerprint_payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
         return ExecutionPlan(
             pipeline_id=pipeline.id,
             steps=compiled_steps,

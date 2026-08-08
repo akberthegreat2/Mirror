@@ -1,23 +1,46 @@
-# mirror-control-django (planned)
+# mirror-control-django
 
-This page documents the proposed Django control-plane surface for Mirror. The
-repository snapshot does **not** ship a `mirror_control_django` package yet.
+`mirror-control-django` is Mirror's reusable Django control-plane app. It
+keeps Mirror Core free of Django while exposing the control-plane metadata that
+operators need to inspect and edit.
 
-The planned control-plane work is described in:
+## What it ships
 
-- ADR-0017 — Django control plane
-- ADR-0020 — Django control-plane contract
-- ADR-0021 — Control-plane metadata models
-- ADR-0022 — Admin visibility and roles
-- ADR-0023 — Optional Django dependency
+- a pure-Python control-plane manifest for discovery and interface projection;
+- Django models for projects, pipelines, versions, runs, steps, workers,
+  schedules, crawled URLs, archives, checkpoints, and dead letters;
+- Django admin registrations for the control-plane models;
+- a blob-backed pipeline repository for code-defined and managed pipelines;
+- a lightweight dashboard page for operator summaries;
+- a settings-friendly app boundary that can be embedded in an existing Django
+  project or mounted by a generated project scaffold.
 
-## Intended responsibilities
+## Control-plane contract
 
-- render a Django settings fragment for a future control-plane project;
-- describe the metadata models the control plane will manage;
-- keep Django out of `mirror_core`;
-- remain optional until the control-plane package is actually added.
+The control plane stores pipeline definitions as versioned blobs. The database
+stores metadata and indexes; the blob store stores the actual pipeline
+document. Code-defined pipelines are registered as read-only records until the
+user explicitly materializes them into managed pipelines.
 
-## Status
+## Primary objects
 
-Planned. Not shipped in this snapshot.
+- Project
+- Pipeline
+- PipelineVersion
+- ExecutionRun
+- ExecutionStep
+- Worker
+- Schedule
+- CrawledURL
+- ArchiveRecord
+- Checkpoint
+- DeadLetter
+
+## How to use it
+
+Install the package into a Django project and add `mirror_control_django` to
+`INSTALLED_APPS`. Then run migrations, register the URLs, and open Django admin
+or the dashboard view.
+
+The package is intentionally compatible with an existing Django project and does
+not require Mirror Core to import Django.

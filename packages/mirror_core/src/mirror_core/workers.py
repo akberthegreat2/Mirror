@@ -35,6 +35,7 @@ class WorkerJob(BaseModel):
     run_id: UUID | None = None
     pipeline_id: str | None = None
     step_id: str | None = None
+    execution_class: str = "default"
     payload: dict[str, Any] = Field(default_factory=dict)
     state: JobState = JobState.QUEUED
     worker_id: str | None = None
@@ -117,8 +118,16 @@ class WorkerBackend(Protocol):
         """Submit a job and return its stored representation."""
         ...
 
-    async def claim(self, worker_id: str) -> WorkerJob | None:
+    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
         """Claim the next queued job for a worker."""
+        ...
+
+    async def claim_job(self, job_id: UUID, worker_id: str) -> WorkerJob | None:
+        """Claim one specific queued job atomically."""
+        ...
+
+    async def get(self, job_id: UUID) -> WorkerJob | None:
+        """Return one job without changing its state."""
         ...
 
     async def heartbeat(self, worker_id: str, job_id: UUID | None = None) -> None:
@@ -234,12 +243,12 @@ class InlineWorker:
         self._jobs_by_id[stored.job_id] = stored
         return stored
 
-    async def claim(self, worker_id: str) -> WorkerJob | None:
-        """Claim the next queued job for a worker."""
+    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
+        """Claim the next queued job for a worker in one execution class."""
         self._ensure_started()
         while self._jobs:
             job = self._jobs.popleft()
-            if job.state is not JobState.QUEUED:
+            if job.state is not JobState.QUEUED or job.execution_class != execution_class:
                 continue
             now = _utcnow()
             claimed = job.model_copy(
@@ -253,6 +262,21 @@ class InlineWorker:
             self._jobs_by_id[claimed.job_id] = claimed
             return claimed
         return None
+
+    async def claim_job(self, job_id: UUID, worker_id: str) -> WorkerJob | None:
+        """Claim one specific queued job."""
+        self._ensure_started()
+        job = self._jobs_by_id.get(job_id)
+        if job is None or job.state is not JobState.QUEUED:
+            return None
+        now = _utcnow()
+        claimed = job.model_copy(update={"state": JobState.RUNNING, "worker_id": worker_id, "claimed_at": now, "lease_expires_at": now + timedelta(seconds=60)})
+        self._jobs_by_id[job_id] = claimed
+        return claimed
+
+    async def get(self, job_id: UUID) -> WorkerJob | None:
+        self._ensure_started()
+        return self._jobs_by_id.get(job_id)
 
     async def heartbeat(self, worker_id: str, job_id: UUID | None = None) -> None:
         """Record a worker heartbeat."""
@@ -391,15 +415,16 @@ class SQLiteWorkerBackend:
         conn.execute(
             """
             INSERT INTO jobs (
-                job_id, kind, run_id, pipeline_id, step_id, payload, state, worker_id, error, metadata,
+                job_id, kind, run_id, pipeline_id, step_id, execution_class, payload, state, worker_id, error, metadata,
                 created_at, updated_at, claimed_at, completed_at, cancelled_at, lease_expires_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(job_id)
             DO UPDATE SET
                 kind = excluded.kind,
                 run_id = excluded.run_id,
                 pipeline_id = excluded.pipeline_id,
                 step_id = excluded.step_id,
+                execution_class = excluded.execution_class,
                 payload = excluded.payload,
                 state = excluded.state,
                 worker_id = excluded.worker_id,
@@ -417,6 +442,7 @@ class SQLiteWorkerBackend:
                 str(stored.run_id),
                 stored.pipeline_id,
                 stored.step_id,
+                stored.execution_class,
                 json.dumps(stored.payload, sort_keys=True),
                 stored.state.value,
                 stored.worker_id,
@@ -433,7 +459,7 @@ class SQLiteWorkerBackend:
         conn.commit()
         return stored
 
-    async def claim(self, worker_id: str) -> WorkerJob | None:
+    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
         self._ensure_started()
         conn = self._connection()
         conn.execute("BEGIN IMMEDIATE")
@@ -441,11 +467,11 @@ class SQLiteWorkerBackend:
             """
             SELECT *
             FROM jobs
-            WHERE state = ?
+            WHERE state = ? AND execution_class = ?
             ORDER BY created_at, kind, job_id
             LIMIT 1
             """,
-            (JobState.QUEUED.value,),
+            (JobState.QUEUED.value, execution_class),
         ).fetchone()
         if row is None:
             conn.commit()
@@ -472,6 +498,25 @@ class SQLiteWorkerBackend:
             "SELECT * FROM jobs WHERE job_id = ?", (row["job_id"],)
         ).fetchone()
         return self._row_to_job(claimed)
+
+    async def claim_job(self, job_id: UUID, worker_id: str) -> WorkerJob | None:
+        self._ensure_started()
+        conn = self._connection()
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute("SELECT * FROM jobs WHERE job_id = ? AND state = ?", (str(job_id), JobState.QUEUED.value)).fetchone()
+        if row is None:
+            conn.commit()
+            return None
+        now = _utcnow()
+        expires = now + timedelta(seconds=60)
+        conn.execute("UPDATE jobs SET state=?, worker_id=?, updated_at=?, claimed_at=?, lease_expires_at=? WHERE job_id=?", (JobState.RUNNING.value, worker_id, now.isoformat(), now.isoformat(), expires.isoformat(), str(job_id)))
+        conn.commit()
+        return self._row_to_job(conn.execute("SELECT * FROM jobs WHERE job_id=?", (str(job_id),)).fetchone())
+
+    async def get(self, job_id: UUID) -> WorkerJob | None:
+        self._ensure_started()
+        row = self._connection().execute("SELECT * FROM jobs WHERE job_id=?", (str(job_id),)).fetchone()
+        return None if row is None else self._row_to_job(row)
 
     async def heartbeat(self, worker_id: str, job_id: UUID | None = None) -> None:
         self._ensure_started()
@@ -602,6 +647,7 @@ class SQLiteWorkerBackend:
                 run_id TEXT NOT NULL,
                 pipeline_id TEXT NOT NULL,
                 step_id TEXT,
+                execution_class TEXT NOT NULL DEFAULT 'default',
                 payload TEXT NOT NULL,
                 state TEXT NOT NULL,
                 worker_id TEXT,
@@ -627,7 +673,7 @@ class SQLiteWorkerBackend:
             """
         )
         conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_jobs_state_created ON jobs(state, created_at)"
+            "CREATE INDEX IF NOT EXISTS idx_jobs_state_class_created ON jobs(state, execution_class, created_at)"
         )
         conn.commit()
 
@@ -640,6 +686,7 @@ class SQLiteWorkerBackend:
             run_id=UUID(row["run_id"]),
             pipeline_id=row["pipeline_id"],
             step_id=row["step_id"],
+            execution_class=row["execution_class"],
             payload=json.loads(row["payload"]),
             state=JobState(row["state"]),
             worker_id=row["worker_id"],

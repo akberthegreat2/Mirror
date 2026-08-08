@@ -270,9 +270,9 @@ class WorkerRuntime:
         )
         return stored
 
-    async def claim(self, worker_id: str) -> WorkerJob | None:
-        """Claim the next queued job for a worker."""
-        job = await self.backend.claim(worker_id)
+    async def claim(self, worker_id: str, execution_class: str = "default") -> WorkerJob | None:
+        """Claim the next queued job for a worker in one execution class."""
+        job = await self.backend.claim(worker_id, execution_class)
         if job is None:
             self._record(
                 MetadataRecord.worker(
@@ -303,6 +303,14 @@ class WorkerRuntime:
                 },
             )
         )
+        return job
+
+    async def claim_job(self, job_id: UUID, worker_id: str) -> WorkerJob | None:
+        """Claim one specific job through the backend contract."""
+        job = await self.backend.claim_job(job_id, worker_id)
+        if job is not None and self.lease_manager is not None:
+            lease = self.lease_manager.acquire(job.job_id, worker_id)
+            self._record(MetadataRecord.worker_lease(job.job_id, worker_id, payload={"expires_at": lease.expires_at.isoformat()}))
         return job
 
     async def heartbeat(self, worker_id: str, job_id: UUID | None = None) -> None:

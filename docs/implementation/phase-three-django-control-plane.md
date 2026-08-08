@@ -1,26 +1,28 @@
 # Phase three: Django control plane
 
-**Status:** Planned boundary; the package is not shipped in this snapshot.
+**Status:** Implemented in this snapshot as reusable Django and REST packages.
 
 ## Goal
 
 Give Mirror a Django-based control plane for metadata, users, admin pages, and
 operator workflows without moving any of that responsibility into Mirror Core.
 
-## Documented so far
+## Implemented here
 
-- control-plane ADRs and docs that define the intended boundary;
-- a Django settings-fragment contract;
-- model and admin metadata specs for projects, runs, steps, workers,
-  schedules, crawled URLs, archive records, and checkpoints.
+- control-plane manifest catalog;
+- Django models and admin registrations;
+- blob-backed pipeline repository;
+- dashboard summary view;
+- REST API with serializers, viewsets, and router;
+- optional embedding into an existing Django project;
+- package-level smoke tests.
 
 ## Still to do
 
-- Django model classes and admin registrations;
-- auth and roles;
-- dashboard views for runs, crawled URLs, archives, and workers;
-- optional Django app packaging;
-- integration tests once Django is available in the environment.
+- richer dashboard pages and filters;
+- user/role/permission policy wiring;
+- more project scaffolding helpers for new deployments;
+- end-to-end integration tests against a real PostgreSQL control-plane DB.
 
 ## Non-goals
 

@@ -43,6 +43,8 @@ contract and stays small on purpose.
 | `mirror_vectorstore_memory` | First-party in-memory vector store provider |
 | `mirror_retrieval` | Retrieval contract and ranked-match models |
 | `mirror_retrieval_memory` | First-party in-memory retrieval provider |
+| `mirror_control_django` | Django control-plane app, dashboard, admin models, and pipeline repository |
+| `mirror_control_api` | REST control-plane app sharing the same catalog and models |
 
 ## How to think about them
 
@@ -59,9 +61,6 @@ A provider package should answer one question only:
 > How do all of these pieces run together safely?
 
 That is the separation Mirror follows now.
-
-
-> Planned control-plane work is documented in ADR-0017 and ADR-0020 through ADR-0023. This repository snapshot does not ship a `mirror_control_django` package.
 
 > The knowledge-infrastructure slice (normalization, enrichment, chunking, deduplication, embeddings, vector storage, retrieval, provenance, and compliance) now ships in the repository snapshot. Remaining provider-specific work is tracked in `docs/FUTURE.md` and ADR-0026.
 

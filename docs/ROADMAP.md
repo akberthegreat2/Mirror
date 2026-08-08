@@ -37,13 +37,15 @@
 - [ ] Crawl persistence
 - [ ] Scheduler backend
 - [ ] SQLite worker backend
-- [ ] PostgreSQL / MySQL metadata store
+- [x] PostgreSQL durable worker/metadata stores
+- [ ] MySQL metadata store
 - [ ] Blob storage adapters
-- [ ] Redis-backed queue / cache integration
+- [x] Redis broker through Celery execution backend
+- [x] Generic distributed workers and execution-class routing
 - [ ] Import smoke tests for every package
 - [ ] Discovery smoke tests for every package
 - [ ] Contract smoke tests for every package
-- [ ] Lab certification suite
+- [ ] Lab certification suite (requires live PostgreSQL certification environment)
 - [ ] Compatibility matrix suite
 - [ ] Beta release checklist
 
@@ -77,6 +79,6 @@ The following ideas are tracked as proposed ADRs rather than alpha commitments:
 
 - trusted execution pipeline;
 - extension model and plugin lifecycle;
-- distributed execution and Celery worker integration;
+- distributed execution and Celery worker integration (implemented; certification remains a deployment test);
 - open-source-first provider policy;
 - executor internal decomposition.

@@ -75,6 +75,7 @@ class ScheduleRecord(BaseModel):
     state: ScheduleState = ScheduleState.SCHEDULED
     last_run_at: datetime | None = None
     trigger: ScheduleTrigger = Field(default_factory=ScheduleTrigger)
+    execution_class: str = "default"
     queue_name: str = "default"
     next_run_at: datetime | None = None
     expires_at: datetime | None = None
@@ -85,6 +86,8 @@ class ScheduleRecord(BaseModel):
 
     def model_post_init(self, __context: Any, /) -> None:
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        if self.execution_class == "default" and self.queue_name != "default":
+            object.__setattr__(self, "execution_class", self.queue_name)
 
     def is_paused(self) -> bool:
         """Return whether the schedule is explicitly paused."""
@@ -287,9 +290,9 @@ class SQLiteScheduler:
             INSERT INTO schedules(
                 schedule_id, name, due_at, interval_seconds, payload, state, last_run_at,
                 trigger_kind, trigger_expression, trigger_every_seconds, trigger_depends_on,
-                trigger_catch_up, queue_name, next_run_at, expires_at, disabled_at, paused_at,
+                trigger_catch_up, execution_class, queue_name, next_run_at, expires_at, disabled_at, paused_at,
                 max_concurrency, metadata
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(schedule_id)
             DO UPDATE SET name = excluded.name,
                           due_at = excluded.due_at,
@@ -302,6 +305,7 @@ class SQLiteScheduler:
                           trigger_every_seconds = excluded.trigger_every_seconds,
                           trigger_depends_on = excluded.trigger_depends_on,
                           trigger_catch_up = excluded.trigger_catch_up,
+                          execution_class = excluded.execution_class,
                           queue_name = excluded.queue_name,
                           next_run_at = excluded.next_run_at,
                           expires_at = excluded.expires_at,
@@ -407,6 +411,7 @@ class SQLiteScheduler:
                 trigger_every_seconds REAL,
                 trigger_depends_on TEXT NOT NULL,
                 trigger_catch_up INTEGER NOT NULL,
+                execution_class TEXT NOT NULL DEFAULT 'default',
                 queue_name TEXT NOT NULL,
                 next_run_at TEXT,
                 expires_at TEXT,
@@ -442,6 +447,7 @@ class SQLiteScheduler:
             record.trigger.every_seconds,
             json.dumps(list(record.trigger.depends_on), sort_keys=True),
             1 if record.trigger.catch_up else 0,
+            record.execution_class,
             record.queue_name,
             record.next_run_at.isoformat() if record.next_run_at is not None else None,
             record.expires_at.isoformat() if record.expires_at is not None else None,
@@ -471,6 +477,7 @@ class SQLiteScheduler:
             if row["last_run_at"]
             else None,
             trigger=trigger,
+            execution_class=row["execution_class"] if "execution_class" in row.keys() else row["queue_name"],
             queue_name=row["queue_name"],
             next_run_at=_parse_datetime(row["next_run_at"])
             if row["next_run_at"]
@@ -512,6 +519,7 @@ class SchedulerCoordinator:
                 payload={
                     "schedule_id": str(record.schedule_id),
                     "name": record.name,
+                    "execution_class": record.execution_class,
                     "queue_name": record.queue_name,
                     "scheduled_at": record.effective_due_at().isoformat(),
                     "payload": record.payload,
@@ -520,6 +528,7 @@ class SchedulerCoordinator:
                 metadata={
                     "schedule_id": str(record.schedule_id),
                     "schedule_name": record.name,
+                    "execution_class": record.execution_class,
                     "queue_name": record.queue_name,
                     "trigger": record.trigger.model_dump(mode="json"),
                 },
@@ -532,6 +541,7 @@ class SchedulerCoordinator:
                     payload={
                         "name": updated.name,
                         "state": updated.state.value,
+                        "execution_class": updated.execution_class,
                         "queue_name": updated.queue_name,
                         "last_run_at": updated.last_run_at.isoformat()
                         if updated.last_run_at is not None
@@ -555,6 +565,7 @@ class SchedulerCoordinator:
                 payload={
                     "name": stored.name,
                     "state": stored.state.value,
+                    "execution_class": stored.execution_class,
                     "queue_name": stored.queue_name,
                     "due_at": stored.due_at.isoformat(),
                     "next_run_at": stored.next_run_at.isoformat()
@@ -574,7 +585,8 @@ class SchedulerCoordinator:
                 schedule_id,
                 payload={
                     "state": updated.state.value,
-                    "queue_name": updated.queue_name,
+                    "execution_class": updated.execution_class,
+                        "queue_name": updated.queue_name,
                 },
             )
         )
@@ -588,7 +600,8 @@ class SchedulerCoordinator:
                 schedule_id,
                 payload={
                     "state": updated.state.value,
-                    "queue_name": updated.queue_name,
+                    "execution_class": updated.execution_class,
+                        "queue_name": updated.queue_name,
                 },
             )
         )
